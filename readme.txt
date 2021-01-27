@@ -10,10 +10,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 The third party packages used in this software have their own copyright.
   - DataTables-1.10.2
-  - bootstrap-3.2.0-dist
+  - bootstrap-3.4.1-dist
   - fancytree-2.2.0
-  - font-awesome-4.1.0
-  - jquery-1.11.1
-  - jquery-ui-1.10.4
+  - font-awesome-4.7.0
+  - jquery-1.12.4
+  - jquery-ui-1.12.1
   - leaflet-0.7.3
   - noUiSlider-6.2.0

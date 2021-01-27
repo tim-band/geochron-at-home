@@ -20,7 +20,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 SECRET_KEY = 't=pe@w(lAbTofOYTW8EN#^a.q?4*0C{@0,psMZuq'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False # False #True
+DEBUG = os.getenv('DJANGO_DEBUG') in ['1', 'true', 'True', 'TRUE']
 
 TEMPLATE_DEBUG = True
 
@@ -76,7 +76,7 @@ DATABASES = {
         'NAME': os.getenv('POSTGRES_DB'),
         'USER': os.getenv('POSTGRES_USER'),
         'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
-        'HOST': 'db',
+        'HOST': os.getenv('DB_HOST'),
         'PORT': '5432',
     }
 }
@@ -99,7 +99,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/1.6/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = '/code/static'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATICFILES_DIRS = [
+  os.path.join(BASE_DIR, 'vendor')
+]
 
 #
 TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
@@ -110,7 +113,7 @@ TEMPLATE_CONTEXT_PROCESSORS = (
     "django.contrib.messages.context_processors.messages",
     # Required by allauth template tags
     "django.contrib.auth.context_processors.auth",
-    "django.core.context_processors.request",
+    "django.core.context_processors.request", 
     # allauth specific context processors
     "allauth.account.context_processors.account",
     "allauth.socialaccount.context_processors.socialaccount",
@@ -152,7 +155,7 @@ DEFAULT_TO_EMAIL = DEFAULT_FROM_EMAIL
 
 ## sub url
 #FORCE_SCRIPT_NAME = '/geochron'
-FORCE_SCRIPT_NAME = '/geochron'
+FORCE_SCRIPT_NAME = '/'
 LOGIN_REDIRECT_URL = FORCE_SCRIPT_NAME + '/accounts/profile/'
 LOGIN_URL = FORCE_SCRIPT_NAME + '/accounts/login/'
 LOGOUT_REDIRECT_URL = FORCE_SCRIPT_NAME + '/ftc/'
