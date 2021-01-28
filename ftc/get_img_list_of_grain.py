@@ -15,7 +15,7 @@ def parse_image_name(f):
     return k
 
 def get_grain_images_list(grain_pool_path, owner, project_name, sample_name, sample_property, grain_nth, ft_type):
-	# get lis of images
+    # get lis of images
     img_ext = set(['.png', '.jpeg', '.jpg'])
     images = dict()
     grain_path = os.path.join(grain_pool_path, owner, project_name, \
@@ -24,22 +24,22 @@ def get_grain_images_list(grain_pool_path, owner, project_name, sample_name, sam
         for f in os.listdir(grain_path):
             head, ext = os.path.splitext(f)
             path = os.path.join(grain_path, f)
-	    if os.path.isfile(path) and ext in img_ext:
-		k = None
-		str2parse = head
-		if ft_type == 'I' and head.lower().startswith('mica'):
-		    str2parse = head[4:]
-		elif sample_property == 'D' and not head.lower().startswith('mica'):
-		    pass
-		elif ft_type == 'S' and not head.lower().startswith('mica'):
-		    pass
-		else:
-		    continue
-		k = parse_image_name(str2parse)
-		if k != None:
-		    url = os.path.join(grain_path, f)
-		    images[k] = '/static/' + url.split('/static/')[1]  #link from /static/...
-		    #return HttpResponse('I got: '+url[19:])
+            if os.path.isfile(path) and ext in img_ext:
+                k = None
+            str2parse = head
+            if ft_type == 'I' and head.lower().startswith('mica'):
+                str2parse = head[4:]
+            elif sample_property == 'D' and not head.lower().startswith('mica'):
+                pass
+            elif ft_type == 'S' and not head.lower().startswith('mica'):
+                pass
+            else:
+                continue
+            k = parse_image_name(str2parse)
+            if k != None:
+                url = os.path.join(grain_path, f)
+                images[k] = '/static/' + url.split('/static/')[1]  #link from /static/...
+                #return HttpResponse('I got: '+url[19:])
     images_list = []
     if len(images) > 0:
        extra_image = None

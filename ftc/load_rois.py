@@ -40,4 +40,4 @@ if __name__ == "__main__":
     path="/Data/webapp/geochron/ftc/static/grain_pool/john/test_proj01/lu324-6-fct/Grain01/rois.json"
     path='/Data/webapp/geochron/ftc/static/grain_pool/john/Thermo2016_no_micas/1X/Grain13/rois.json'
     ft_type = 'S'
-    print load_rois_from_path(path, ft_type)
+    print(load_rois_from_path(path, ft_type))

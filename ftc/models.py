@@ -8,7 +8,7 @@ from django.core.validators import RegexValidator
 class Project(models.Model):
     alphanumeric = RegexValidator(r'^[0-9a-zA-Z_-]+$', 'Only alphanumeric, "-" and "_" are allowed.')
     project_name = models.CharField(max_length=36, validators=[alphanumeric])
-    creator = models.ForeignKey(User)
+    creator = models.ForeignKey(User, on_delete=models.CASCADE)
     create_date = models.DateTimeField(auto_now_add=True)
     project_description = models.CharField(max_length=200)
     priority = models.IntegerField(default='0')
@@ -31,7 +31,7 @@ class Sample(models.Model):
         ('D', 'Dosimeter Sample'),
     )
     sample_name = models.CharField(max_length=36, validators=[alphanumeric])
-    in_project = models.ForeignKey(Project)
+    in_project = models.ForeignKey(Project, on_delete=models.CASCADE)
     sample_property = models.CharField(max_length=1, choices=SAMPLE_PROPERTY, default='T')
     total_grains = models.IntegerField()
     priority = models.IntegerField(default='0')
@@ -51,10 +51,10 @@ class FissionTrackNumbering(models.Model):
         ('S', 'Spontaneous Fission Tracks'),
         ('I', 'Induced Fission Tracks'),
     )
-    in_sample = models.ForeignKey(Sample)
+    in_sample = models.ForeignKey(Sample, on_delete=models.CASCADE)
     grain = models.IntegerField()
     ft_type = models.CharField(max_length=1, choices=FT_TYPE)
-    worker = models.ForeignKey(User)
+    worker = models.ForeignKey(User, on_delete=models.CASCADE)
     result = models.IntegerField()
     create_date = models.DateTimeField(auto_now_add=True)
     latlngs = models.TextField(default='')

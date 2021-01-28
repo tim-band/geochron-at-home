@@ -67,7 +67,7 @@ password you set after `\password geochron` above. Then run the following:
 
 ### Starting Geochron@Home
 
-
+(geochron-at-home) $ python manage.py runserver
 
 And you can now browse to `localhost:8000/ftc`
 

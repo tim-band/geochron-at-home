@@ -3,8 +3,7 @@ from django.shortcuts import render, get_object_or_404
 # Create your views here.
 from django.http import HttpResponse, HttpResponseRedirect
 from django.contrib.auth import authenticate, login, logout
-from django.core.context_processors import csrf
-from django.shortcuts import render_to_response, redirect
+from django.shortcuts import redirect
 
 #Import models
 from ftc.models import Project, Sample, FissionTrackNumbering
@@ -15,7 +14,7 @@ def home(request):
 
 # the view for /accounts/profile/
 def profile(request):
-    if request.user.is_authenticated():
+    if request.user.is_authenticated:
         return render(request, 'ftc/profile.html', {})
     else:
         return redirect('account_login') # 'home'
@@ -30,7 +29,7 @@ def signmeup(request):
 from django.contrib.auth.decorators import login_required, user_passes_test
 """
 def user_is_staff(user):
-    return user.is_authenticated() and user.is_active and user.is_staff
+    return user.is_authenticated and user.is_active and user.is_staff
 """
 
 #@user_passes_test(user_is_staff)
@@ -85,10 +84,10 @@ def getTableData(request):
         return HttpResponse("Sorry, You don't have permission to access the requested page.")
 
 import os, random, itertools
-from get_img_list_of_grain  import get_grain_images_list
-from get_image_size import get_image_size, UnknownImageFormat
-from grain_uinfo import genearate_working_grain_uinfo, restore_grain_uinfo
-from load_rois import load_rois
+from .get_img_list_of_grain  import get_grain_images_list
+from .get_image_size import get_image_size, UnknownImageFormat
+from .grain_uinfo import genearate_working_grain_uinfo, restore_grain_uinfo
+from .load_rois import load_rois
 
 @login_required
 def get_grain_images(request):
@@ -160,7 +159,7 @@ def get_grain_images(request):
 from django.contrib.auth.models import User
 def counting(request, uname=None):
     #return HttpResponse("Hello, world. You're counting." + '--' + uname)
-    if uname is None and request.user.is_authenticated():
+    if uname is None and request.user.is_authenticated:
        return render(request, 'ftc/counting.html', {})
     elif uname == 'guest':
         passwd = 'guestsitest'
@@ -261,7 +260,7 @@ def saveWorkingGrain(request):
                     os.remove(os.path.join(working_repos_path, file))
             with open(filename_intermedia_result,'w+') as f:
                 json.dump(res, f)
-        except Exception, err:
+        except Exception as err:
             return HttpResponse(sys.exc_info()[0])
         else:
             myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)

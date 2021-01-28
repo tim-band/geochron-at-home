@@ -3,7 +3,7 @@ from optparse import OptionParser
 
 #------------------------------------------------------------
 def copygrain(src, dst, level=0):
-    print '@level %d, destination: %s' % (level, dst)
+    print('@level %d, destination: %s' % (level, dst))
     #level 0 see projects; level 1 see samples; level 2 see grains; level 3 see images
     folder_name = ['project', 'sample', 'grain']
     line_end = ['\n', '\n', '']
@@ -18,9 +18,9 @@ def copygrain(src, dst, level=0):
         for name in folders:
             mystr = 'Project "%s" created by %s' % (name, uname)
             mystr = '*' + mystr.center(len(mystr)+6, ' ') + '*'
-            print '*'*len(mystr)
-            print mystr
-            print '*'*len(mystr)
+            print('*'*len(mystr))
+            print(mystr)
+            print('*'*len(mystr))
             p = Project(project_name=name, creator=user, project_description='project '+name, closed=False)
             p.save()
     if level == 2:
@@ -28,7 +28,7 @@ def copygrain(src, dst, level=0):
         total_grain = len(folders)
         head, sample = os.path.split(src)
         head, project = os.path.split(head)
-        print 'create sample "%s" with %d grains - %s' % (sample, total_grain, project)
+        print('create sample "%s" with %d grains - %s' % (sample, total_grain, project))
         p = Project.objects.filter(project_name=project, creator=user)
         if len(p) == 1:
             p[0].sample_set.create(sample_name=sample, sample_property='T', total_grains=total_grain, completed=False)
@@ -40,11 +40,11 @@ def copygrain(src, dst, level=0):
         for n in names:
             if os.path.isfile(os.path.join(src, n)) and os.path.splitext(n)[1] in img_ext: 
                 total_image+=1
-        print '%s grain "%s" has %d images' % (' '*4, grain, total_image)
+        print('%s grain "%s" has %d images' % (' '*4, grain, total_image))
         
     # create folder structure
     if not os.path.isdir(dst):
-        print 'Create folder %s' % (dst)
+        print('Create folder %s' % (dst))
         os.makedirs(dst)
 
     errors = []
@@ -100,6 +100,6 @@ src = os.path.join(input_source_path, uname)
 dst = os.path.join(grain_pool_path, uname)
 
 copygrain(src, dst)
-print 'finished' + '-'*72
+print('finished' + '-'*72)
 
 

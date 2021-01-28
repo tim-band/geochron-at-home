@@ -52,7 +52,7 @@ def genearate_working_grain_uinfo(request):
                             if g.worker == request.user: #a
                                 user_finished_grains.add(key) #a
                         if len(g_count) != 0:
-                            for k, v in g_count.iteritems():
+                            for k, v in g_count.items():
                                 #min_contributors_per_grain: jhe add on 2017-12-11, guest exceptional
                                 if v >= the_sample.min_contributor_num and request.user.username != 'guest': 
                                     all_grains.remove(k)
