@@ -9,11 +9,11 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 The third party packages used in this software have their own copyright.
-  - DataTables-1.10.2
-  - bootstrap-3.4.1-dist
-  - fancytree-2.2.0
-  - font-awesome-4.7.0
-  - jquery-1.12.4
-  - jquery-ui-1.12.1
-  - leaflet-0.7.3
-  - noUiSlider-6.2.0
+  - DataTables-1.10.2 (MIT license https://www.datatables.net/license/mit)
+  - bootstrap-3.4.1-dist (MIT license https://github.com/twbs/bootstrap/blob/main/LICENSE)
+  - fancytree-2.2.0 (MIT license https://github.com/mar10/fancytree/blob/master/LICENSE.txt)
+  - font-awesome-4.7.0 (Font Awesome Free license https://github.com/FortAwesome/Font-Awesome/blob/master/LICENSE.txt)
+  - jquery-1.12.4 (MIT license https://tldrlegal.com/license/mit-license)
+  - jquery-ui-1.12.1 (licensed as for jquery)
+  - leaflet-0.7.3 (BSD 2-clause https://github.com/Leaflet/Leaflet/blob/master/LICENSE)
+  - noUiSlider-6.2.0 (MIT license https://github.com/leongersen/noUiSlider/blob/master/LICENSE.md)
