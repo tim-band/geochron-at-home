@@ -29,11 +29,23 @@ postgres=# alter database geochron owner to geochron;
 postgres=# \q
 ```
 
+If you do this you will have a database user that does not correspond to
+a real user on your system. If you want to log in to the database with this
+user, you will have to specify the host even if it is on localhost, or it will
+complain that the authentication failed. So you can log on, if you want,
+like this:
+
+```sh
+$ psql -h localhost geochron geochron
+Password for user geochron:
+geochron=>
+```
+
 ### Configure your Geochron@home instance
 
-Copy the file `env` to `.env`, and edit it as appropriate. In particular
-replace `<GEOCHRON_PASSWORD>` with the password you set after
-`\password geochron` above. These settings will be set as environment
+Copy the file `env` to `.env`, and edit the new copy as appropriate. In
+particular replace `<GEOCHRON_PASSWORD>` with the password you set
+after `\password geochron` above. These settings will be set as environment
 variables when you enter your pipenv shell (see next section).
 
 ### Setting up a Python environment
@@ -64,8 +76,8 @@ $ pipenv shell
 ### Initialising Geochron@Home
 
 ```sh
+(geochron-at-home) $ python manage.py makemigrations ftc
 (geochron-at-home) $ ./site_init.sh
-(geochron-at-home) $ python manage.py collectstatic
 ```
 
 ### Starting Geochron@Home
@@ -115,10 +127,45 @@ Run 2 workers with:
 
 ## Uploading x-ray images
 
+You can upload a new set of images by giving them the following paths:
+`user_upload/<user-name>/<project-name>/<sample-name>/<grain-name>/<image-name>.jpg`
+with the following changes:
+* You can use `.jpeg` or `.png` instead of `.jpg` for the filename extension
+* `<user-name>` needs to be placed with a valid user name in the Geochron@home system
+* `<project-name>` can be anything
+* `<sample-name>` can be anything
+* `<grain-name>` must be `Grain` followed by two digits
+* `<image-name>` must be one of
+    - `ReflStackFlat`
+    - `StackFlat`
+    - `stack-` followed by a natural number
+    - `mica` followed by any of the above
+
 From the Django project's pipenv shell:
 
 ```sh
-(geochron-at-home) $ python upload_projects.py geochron.settings
+(geochron-at-home) $ python upload_projects.py -s geochron.settings -i user_upload -o grain_pool
 ```
 
 (upload_projects needs fixing: uses hardcoded project admin 'john')
+
+Or you can keep it watching for uploads to be available with:
+
+```sh
+(geochron-at-home) $ ./watch-for-upload.sh
+```
+
+If running `watch-for-upload.sh` you need to add a file maybe like
+so (again replacing `<user-name>` with your user name):
+
+```sh
+(geochron-at-home) $ touch user_upload/<user-name>/do_commit
+```
+
+This file will be deleted by `watch-for-upload.sh` after it has logged
+the new samples.
+
+## Downloading results
+
+I think you just pick them out of the file system, although I have to see
+what the various reports do.

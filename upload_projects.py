@@ -8,11 +8,11 @@ def copygrain(src, dst, level=0):
     folder_name = ['project', 'sample', 'grain']
     line_end = ['\n', '\n', '']
     img_ext = set(['.png', '.jpeg', '.jpg'])
-    #print 'entering %s' % (src)    
+    #print('entering %s' % (src))
     names = sorted(os.listdir(src))
-    
+
     # populate DB
-    folders = os.walk(src).next()[1]
+    folders = next(os.walk(src))[1]
     if level == 0:
         # create projects
         for name in folders:
@@ -73,19 +73,25 @@ usage = "usage: %prog -s SETTINGS | --settings=SETTINGS"
 parser = OptionParser(usage)
 parser.add_option('-s', '--settings', dest='settings', metavar='SETTINGS',
                   help="The Django settings module to use")
+parser.add_option('-i', '--input', dest='input', metavar='INPUT_DIRECTORY',
+        help='The directory that contains the new files')
+parser.add_option('-o', '--output', dest='output', metavar='OUTPUT_DIRECTORY',
+        help='The directory to copy the new files to')
 (options, args) = parser.parse_args()
 if not options.settings:
     parser.error("You must specify a settings module. For examples, python standalone_django.py --settings=geochron.settings")
 
 os.environ['DJANGO_SETTINGS_MODULE'] = options.settings
 
-#----- start your code below -----
+import django
+django.setup()
+
 from django.contrib.auth.models import User
 from ftc.models import Project, Sample
 
 # get user id based on username
-input_source_path = '/code/user_upload/'
-grain_pool_path = '/code/static/grain_pool' #'irradiation/static/grain_pool'
+input_source_path = options.input or '/code/user_upload/'
+grain_pool_path = options.output or '/code/static/grain_pool' #'irradiation/static/grain_pool'
 uname = 'john'
 u = User.objects.filter(username=uname)
 if len(u) != 1:
