@@ -1,7 +1,7 @@
 /static/
+/ftc/static/
 Pipfile
 .env
 migrations
 /user_upload/
-/grain_pool/
 .vscode

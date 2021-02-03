@@ -79,7 +79,7 @@ def getTableData(request):
         except (KeyError, Project.DoesNotExist):
             return HttpResponse("you have no project currrently. add one?")
         else:
-            return HttpResponse(myjson, mimetype='application/json')
+            return HttpResponse(myjson, content_type='application/json')
     else:
         return HttpResponse("Sorry, You don't have permission to access the requested page.")
 
@@ -140,7 +140,7 @@ def get_grain_images(request):
                 res['rois'] = rois
                 #--- 
                 myjson = json.dumps(res, cls=DjangoJSONEncoder)
-                return HttpResponse(myjson, mimetype='application/json')
+                return HttpResponse(myjson, content_type='application/json')
             else:
                 # report error: cannot find images for grain
                 if working_f is not None:
@@ -149,11 +149,11 @@ def get_grain_images(request):
                           % (the_project.project_name, the_sample.sample_name, the_grain, ft_type) \
                           + "Refresh page to load another Grain."
                 myjson = json.dumps({'reply' : 'error: ' + error_str}, cls=DjangoJSONEncoder)
-                return HttpResponse(myjson, mimetype='application/json')                
+                return HttpResponse(myjson, content_type='application/json')                
         else:
             message = 'Well done! You did all your jobs and take a break.'
             myjson = json.dumps({'reply' : message}, cls=DjangoJSONEncoder)
-            return HttpResponse(myjson, mimetype='application/json')
+            return HttpResponse(myjson, content_type='application/json')
 
 
 from django.contrib.auth.models import User
@@ -224,7 +224,7 @@ def updateTFNResult(request):
             return HttpResponse("you have no project currrently.")
         else:
             myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
-            return HttpResponse(myjson, mimetype='application/json')
+            return HttpResponse(myjson, content_type='application/json')
     else:
         return HttpResponse("Sorry, You have to active your account first.")
 
@@ -264,7 +264,7 @@ def saveWorkingGrain(request):
             return HttpResponse(sys.exc_info()[0])
         else:
             myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
-            return HttpResponse(myjson, mimetype='application/json')
+            return HttpResponse(myjson, content_type='application/json')
     else:
         return HttpResponse("Sorry, You have to active your account first.")
 

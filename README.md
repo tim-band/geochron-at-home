@@ -141,10 +141,19 @@ with the following changes:
     - `stack-` followed by a natural number
     - `mica` followed by any of the above
 
+You also need a file called `rois.json` in alongside each set
+of image files. This represents a JSON object with the following
+attributes:
+* `image_width`: the width of all the images
+* `image_height`: the height of all the images
+* `regions`: an array of regions with tracks to count, each an object with the following attributes:
+    - `shift`: an array of `[x,y]`, sometimes (don't really understand it) the offset of `coords`, below.
+    - `vertices`: an array of `[[x0,y0], [x1,y1], ...]`; the boundary of the region
+
 From the Django project's pipenv shell:
 
 ```sh
-(geochron-at-home) $ python upload_projects.py -s geochron.settings -i user_upload -o grain_pool
+(geochron-at-home) $ python upload_projects.py -s geochron.settings -i user_upload -o ftc/static/grain_pool
 ```
 
 (upload_projects needs fixing: uses hardcoded project admin 'john')

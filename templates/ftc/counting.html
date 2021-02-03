@@ -4,8 +4,8 @@
 
 {% block head %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<link rel="stylesheet" href="{% static 'leaflet/css/leaflet-0.7.3.css' %}" />
-<link rel="stylesheet" href="{% static 'noUiSlider-6.2.0/jquery.nouislider.css' %}" />
+<link rel="stylesheet" href="{% static 'Leaflet-1.7.1/leaflet.css' %}" />
+<link rel="stylesheet" href="{% static 'jquery/jquery.nouislider-6.2.0.css' %}" />
 <style type="text/css">
     #map {
       position: absolute;
@@ -85,10 +85,10 @@ font: bold 1.2cm/1.5 'Lucida Console', Monaco, monospace;
 }
 */
 </style>
-<script src="{% static 'leaflet/script/leaflet-0.7.3.js' %}"></script>
+<script src="{% static 'Leaflet-1.7.1/leaflet.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/jquery.mousewheel.js' %}"></script>
-<script type='text/javascript' src="{% static 'noUiSlider-6.2.0/jquery.nouislider.min.js' %}"></script>
+<script type='text/javascript' src="{% static 'jquery/jquery.nouislider-6.2.0.min.js' %}"></script>
 <script type='text/javascript'>
 var iconUrl_normal = "{% static 'counting/images/circle.png' %}";
 var iconUrl_selected = "{% static 'counting/images/redCircle.png' %}";
