@@ -1,0 +1,4 @@
+Django==1.6
+django-allauth==0.18
+psycopg2-binary==2.8.6
+gunicorn==19.10.0

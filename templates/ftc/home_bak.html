@@ -1,0 +1,69 @@
+{% extends "ftc/base.html" %}
+
+{% load staticfiles %}
+
+{% block right_nav_functon_li %}
+    {% if user.is_authenticated %}
+        <li class="divider"></li>
+        <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i> &nbsp;fission track counting</a></li>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% if messages %}
+      {% for message in messages %}
+      <div class="alert alert-{{message.tags}} alert-dismissible" role="alert">
+        <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+        <strong>{{ message.tags }}</strong> {{ message }}
+      </div>
+      {% endfor %}
+    {% endif %}
+<!-- ========== -->
+<div class="container">
+      <!-- Jumbotron -->
+      <div class="jumbotron">
+        <h2 class="bs-docs-featurette-title">Welcome to this fission track counting site</h2>
+        <p class="lead">By just counting the tracks, you can help our scientists to calculate a grain's age, some of which are as old as a dinosaur. It's open to anyone and you can join the community in only two clicks (It's free!). Read more about the <a href="http://en.wikipedia.org/wiki/Fission_track_dating" target="_blank">fission-track dating technique</a> or <a href="{% url 'counting'%}guest/">try it without registration</a>.</p> 
+        <p><a class="btn btn-lg btn-success" href="{%url 'account_signup'%}" role="button">Join us now</a></p>
+      </div>
+
+      <!-- Example row of columns -->
+      <div class="row">
+        <div class="col-lg-4">
+          <img src="{% static 'home/global.png' %}" style="margin-left: auto; margin-right: auto;height:154px" alt="worldwide community" class="img-responsive">
+          <h3>Building a global community</h3>
+          <!--
+          <p>Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus.</p>
+          <p><a class="btn btn-primary" href="#" role="button">View details &raquo;</a></p>
+          -->
+        </div>
+        <div class="col-lg-4">
+          <img src="{% static 'home/everydevice.png' %}" style="margin-left: auto; margin-right: auto;height:154px" alt="Responsive across devices" class="img-responsive">
+          <h3>Accessible from every device</h3>
+          <!--
+          <p>Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh.</p>
+          <p><a class="btn btn-primary" href="#" role="button">View details &raquo;</a></p>
+          -->
+       </div>
+        <div class="col-lg-4">
+          <img src="{% static 'home/visualize2.jpg' %}" style="margin-left: auto; margin-right: auto; height:154px" alt="Responsive across devices" class="img-responsive">
+          <h3>Manage your projects online</h3>
+          <!--
+          <p>Donec sed odio dui. Cras justo odio, dapibus ac facilisis in, egestas eget quam. Vestibulum id ligula porta felis euismod semper.</p>
+          <p><a class="btn btn-primary" href="#" role="button">View details &raquo;</a></p>
+          -->
+        </div>
+      </div>
+
+      <hr>
+
+      <footer>
+        <p>&copy; Jiangping He 2014 - 2015</p>
+      </footer>
+
+</div>
+<!-- ========== -->
+
+{% endblock %}
+

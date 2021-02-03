@@ -1,0 +1,63 @@
+{% extends "ftc/base.html" %}
+
+{% load staticfiles %}
+
+{% block right_nav_functon_li %}
+    {% if user.is_authenticated %}
+        <li class="divider"></li>
+        <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i> &nbsp;fission track counting</a></li>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+
+    {% if messages %}
+      {% for message in messages %}
+      <div class="alert alert-{{message.tags}} alert-dismissible" role="alert">
+        <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+        <strong>{{ message.tags }}</strong> {{ message }}
+      </div>
+      {% endfor %}
+    {% endif %}
+<!-- ========== -->
+<div class="container">
+      <!-- Jumbotron -->
+      <div class="jumbotron">
+        <h2 class="bs-docs-featurette-title">Welcome to the crowd-sourcing app for fission track geochronology</h2>
+        <p class="lead">By counting <a href="http://ucl.ac.uk/~ucfbpve/geochron@home/about/" target="_blank">fission tracks</a>, 
+          you can help us to calculate the age of rocks and minerals, some of which may date back to the age of the dinosaurs. 
+          Join a global community of citizen-scientists by
+          <a href="{%url 'signmeup'%}">registering here</a> or try geochron@home 
+          <a href="{% url 'counting'%}guest">without registration</a>.</p>
+        <p>
+          <a class="btn btn-lg btn-success" href="{%url 'signmeup'%}" role="button">Join us now</a>
+        </p>
+      </div>
+
+      <!-- Example row of columns -->
+      <div class="row">
+        <div class="col-lg-4">
+          <img src="{% static 'home/global.png' %}" style="margin-left: auto; margin-right: auto;height:154px" alt="worldwide community" class="img-responsive">
+          <h3>Building a global community</h3>
+        </div>
+        <div class="col-lg-4">
+          <img src="{% static 'home/everydevice.png' %}" style="margin-left: auto; margin-right: auto;height:154px" alt="Responsive across devices" class="img-responsive">
+          <h3>Accessible from any device</h3>
+       </div>
+        <div class="col-lg-4">
+          <img src="{% static 'home/visualize2.jpg' %}" style="margin-left: auto; margin-right: auto; height:154px" alt="Responsive across devices" class="img-responsive">
+          <h3>Manage your projects online</h3>
+        </div>
+      </div>
+
+      <hr>
+
+      <footer>
+        <p>&copy; 2014 <a href="mailto:geochron.home@gmail.com" target="_top">Jiangping He</a></p>
+      </footer>
+
+</div>
+<!-- ========== -->
+
+{% endblock %}
+

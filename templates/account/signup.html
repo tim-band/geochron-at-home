@@ -1,0 +1,106 @@
+{% extends "account/base.html" %}
+
+{% load staticfiles %}
+
+{% load url from future %}
+{% load i18n %}
+
+{% block extra_head %}
+<link href="{% static 'font-awesome-4.1.0/css/font-awesome.min.css' %}" rel="stylesheet">
+<link href="{% static 'bootstrap-3.2.0-dist/css/bootstrap.min.css' %}" rel="stylesheet">
+<style type="text/css">
+body {
+  padding-top: 0px;
+  padding-bottom: 40px;
+  background-color: #eee;
+}
+
+.form-sign {
+  max-width: 400px;
+  padding: 30px 60px 30px 60px;
+  margin: 0 auto;
+  background-color: #fff;
+}
+#signup_form {
+  max-width: 480px;
+}
+.form-sign .form-sign-heading,
+.form-sign .checkbox {
+  margin-bottom: 10px;
+}
+.form-sign .checkbox {
+  font-weight: normal;
+}
+.form-sign .form-control {
+  position: relative;
+  height: auto;
+  -webkit-box-sizing: border-box;
+     -moz-box-sizing: border-box;
+          box-sizing: border-box;
+  padding: 10px;
+  font-size: 16px;
+  border-radius: 0px;
+}
+.form-sign .form-control:focus {
+  z-index: 2;
+}
+.form-sign input[type="text"], 
+           input[type="email"],
+           input[type="password"] {
+  margin-bottom: 10px;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}/*
+.form-sign input[type="email"]{
+  margin-bottom: 10px;
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.form-sign input[type="password"] {
+  margin-bottom: 10px;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}*/
+</style>
+
+{% endblock %}
+
+{% block head_title %}{% trans "Signup" %}{% endblock %}
+
+{% block content %}
+<div style="margin-top:40px">
+<form class="form-sign" id="signup_form" role="form" method="post" action="{% url 'account_signup' %}">
+<h3 style="text-align: center;">{% trans "Sign Up" %}</h3>
+<p class="pull-right text-muted">{% blocktrans %}Have an account? Then <a href="{{ login_url }}">sign in</a>.{% endblocktrans %}</p>
+<div style="clear:both"></div>
+  {% csrf_token %}
+<!--   {{ form.as_p }} -->
+
+{{ form.non_field_errors }}
+
+<div class="form-group">
+<label for="id_username">Username:</label> <input class="form-control" autofocus="autofocus" id="id_username" maxlength="30" name="username" placeholder="Username" type="text">{{ form.username.errors }}
+</div>
+<div class="form-group">
+  <label for="id_email">E-mail:</label> <input class="form-control" id="id_email" name="email" placeholder="E-mail address" type="email">
+  {{ form.email.errors }}
+</div>
+<div class="form-group">
+  <label for="id_password1">Password:</label> <input class="form-control" id="id_password1" name="password1" placeholder="Password" type="password">
+  {{ form.password1.errors }}
+</div>
+<div class="form-group">
+  <label for="id_password2">Password (again):</label> <input class="form-control" id="id_password2" name="password2" placeholder="Password" type="password">
+  {{ form.password2.errors }}
+</div>
+<button class="btn btn-primary pull-right" type="submit">{% trans "Sign Up" %} &raquo;</button>
+
+  {% if redirect_field_value %}
+  <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+  {% endif %}
+<div style="clear:both"></div>
+</form>
+</div>
+
+{% endblock %}
+

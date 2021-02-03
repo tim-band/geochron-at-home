@@ -1,0 +1,167 @@
+{% extends "ftc/base.html" %}
+
+{% load staticfiles %}
+
+{% block head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<link rel="stylesheet" href="{% static 'leaflet/css/leaflet-0.7.3.css' %}" />
+<link rel="stylesheet" href="{% static 'noUiSlider-6.2.0/jquery.nouislider.css' %}" />
+<style type="text/css">
+    #map {
+      position: absolute;
+      top: 40px;
+      bottom: 0;
+      width: 100%;
+    }
+#dropdown-tracknum  .form-control, .dropdown-menu {
+border-radius: 0px;
+}
+
+#dropdown-tracknum .input-group-lg > .input-group-addon{
+border-radius: 0px;
+padding: 0px 6px;
+}
+
+#dropdown-tracknum .form-control {
+background-color: #fff;
+}
+.input-group-lg > .form-control {
+padding: 0px 8px;
+font-size: 44px; /*canot set too big otherwise chromium will not vartical center*/
+font-family: "ds-digitalitalic";
+}
+.input-group-addon {
+    padding: 6px 6px;
+}
+
+.noUi-base {
+    box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+    border-radius: 4px;
+}
+
+.noUi-handle {
+    cursor: default;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: none repeat scroll 0% 0% #fff;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+    text-align: center;
+    font-weight: bold;
+    font-size: large;
+}
+
+.noUi-vertical .noUi-handle:before,
+.noUi-vertical .noUi-handle:after {
+    width: 0px;
+}
+
+#tracknum {
+  width:90px;
+  height:46px;
+  line-height: 1.3px;
+  text-align: center;
+  font-family: 'ds-digitalitalic';
+  font-size: 44px;
+}
+
+#btn-tracknum {
+  width:30px;height:46px;border-radius:0;padding:6px 1px;
+}
+/*
+.leaflet-container {
+font: 0.8cm "Helvetica Neue", Arial, Helvetica, sans-serif;
+}
+
+.leaflet-bar a, .leaflet-bar a:hover {
+background-color: #fff;
+border-bottom: 1px solid #ccc;
+width: 1.5cm;
+height: 1.5cm;
+line-height: 1.55cm;
+}
+
+.leaflet-control-zoom-in, .leaflet-control-zoom-out {
+font: bold 1.2cm/1.5 'Lucida Console', Monaco, monospace;
+}
+*/
+</style>
+<script src="{% static 'leaflet/script/leaflet-0.7.3.js' %}"></script>
+<script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
+<script type='text/javascript' src="{% static 'counting/script/jquery.mousewheel.js' %}"></script>
+<script type='text/javascript' src="{% static 'noUiSlider-6.2.0/jquery.nouislider.min.js' %}"></script>
+<script type='text/javascript'>
+var iconUrl_normal = "{% static 'counting/images/circle.png' %}";
+var iconUrl_selected = "{% static 'counting/images/redCircle.png' %}";
+var atoken = '{{ csrf_token }}';
+var get_grain_images_url = "{% url 'get_grain_images'%}";
+var updateTFNResult_url = "{% url 'updateTFNResult'%}";
+var saveWorkingGrain_url = "{% url 'saveWorkingGrain'%}";
+</script>
+<script type='text/javascript' src="{% static 'counting/script/geochron.min.js' %}"></script>
+{% endblock %}
+
+            {% block left_nav_li %}{% endblock %}
+
+            {% block right_nav_li %}{% endblock %}
+
+            {% block right_nav_functon_li %}
+                {% if user.is_staff %}
+                    <li class="divider"></li>
+                    <li><a href="{%url 'report'%}"><i class="fa fa-cubes"></i>&nbsp;Manage your projects</a></li>
+                {% endif %}
+            {% endblock %}
+
+{% block content %}
+    <!--    <div id="tracknum" style="cursor: pointer;">000</div> -->
+<!--
+<div id="dropdown-tracknum" class="nav navbar-nav navbar-right">
+<li class="dropdown">
+    <a class="dropdown-toggle" style="padding:0px;width:120px;background-color:#fff;text-align:center;" data-toggle="dropdown" href="#">
+       <input id="tracknum" class="form-control" style="padding:0px;width:95px;height:46px;float:left" type="text" value="000" readonly>
+       <div style="background-color:#eee;border: 1px solid #CCC;padding:0px;width:25px;height:46px;float:left;text-align:center;"><span class="caret"></span></div>
+    </a>
+    <ul class="dropdown-menu" style="background-color:#fff" role="menu">
+      <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>&nbsp;save current status</a></li>
+      <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>&nbsp;submit result</a></li>
+      <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>&nbsp;restart counting</a></li>
+    </ul>
+</li>
+</div>
+-->
+<div id="dropdown-tracknum" class="input-group">
+<div class="btn-group">
+  <input id="tracknum" class="form-control" type="text" value="000" readonly>
+  <button id="btn-tracknum" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+    <span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
+  </button>
+  <ul class="dropdown-menu">
+      {% ifnotequal user.username "guest"  %}
+      <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>&nbsp;save intermediate result</a></li>
+      {% endifnotequal %}
+    <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>&nbsp;submit result</a></li>
+    <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>&nbsp;restart counting</a></li>
+  </ul>
+</div>
+</div>
+<!-- ========================== -->
+        <div style="clear:both;"></div>
+    {% if messages %}
+    <div>
+      {% for message in messages %}
+      <div class="alert alert-{{message.tags}} alert-dismissible" role="alert">
+        <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+        <strong>{{ message.tags }}</strong> {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+           <div id="map" style="cursor: crosshair; position: absolute; top: 50px; bottom: 0; width: 100%; "></div>
+<!--           <div id="slider2" style="position: absolute; top: 140px; left: 14px; height: 120px;"></div> -->
+
+{% endblock %}
+
+{% block footer %}{% endblock %}
+
+</body>
+</html>
