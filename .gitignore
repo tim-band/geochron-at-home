@@ -1,3 +1,4 @@
 /static/
 Pipfile
+.env
 .vscode
