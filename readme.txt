@@ -10,6 +10,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 The third party packages used in this software have their own copyright.
   - DataTables-1.10.2 (MIT license https://www.datatables.net/license/mit)
+    (with the following extensions bundled: Buttons 1.6.5, Column visibility 1.6.5, Select 1.3.1)
   - bootstrap-3.4.1-dist (MIT license https://github.com/twbs/bootstrap/blob/main/LICENSE)
   - fancytree-2.2.0 (MIT license https://github.com/mar10/fancytree/blob/master/LICENSE.txt)
   - font-awesome-4.7.0 (Font Awesome Free license https://github.com/FortAwesome/Font-Awesome/blob/master/LICENSE.txt)

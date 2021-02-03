@@ -104,6 +104,11 @@ DJANGO_DEBUG=false
 
 Also make sure your `SECRET_KEY` is set to a fresh random string.
 
+Note that if your `OUT_EMAIL_...` settings are incorrect, it will appear
+as if users trying to log in are failing authentication with Geochron@home,
+when what is really happening is that Django is failing to authenticate with
+the email server.
+
 Let's say you wanted to serve your Geochron@home at `/gah/`, using port 3841 for
 your Django instance:
 

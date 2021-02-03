@@ -175,11 +175,9 @@ DEFAULT_FROM_EMAIL = os.getenv('OUT_EMAIL_ADDR')
 DEFAULT_TO_EMAIL = DEFAULT_FROM_EMAIL
 
 ## sub url
-#FORCE_SCRIPT_NAME = '/geochron'
-FORCE_SCRIPT_NAME = '/'
-LOGIN_REDIRECT_URL = FORCE_SCRIPT_NAME + '/accounts/profile/'
-LOGIN_URL = FORCE_SCRIPT_NAME + '/accounts/login/'
-LOGOUT_REDIRECT_URL = FORCE_SCRIPT_NAME + '/ftc/'
+LOGIN_REDIRECT_URL = '/accounts/profile/'
+LOGIN_URL = '/accounts/login/'
+LOGOUT_REDIRECT_URL = '/ftc/'
 
 # social auth
 USE_X_FORWARDED_HOST = True
