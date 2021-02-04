@@ -3,6 +3,5 @@
 /ftc/static/working_repos
 Pipfile
 .env
-migrations
 /user_upload/
 .vscode

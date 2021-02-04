@@ -76,7 +76,6 @@ $ pipenv shell
 ### Initialising Geochron@Home
 
 ```sh
-(geochron-at-home) $ python manage.py makemigrations ftc
 (geochron-at-home) $ ./site_init.sh
 ```
 
