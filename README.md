@@ -19,7 +19,7 @@ should not be typed yourself! The prompts I have used are as follows:
 Firstly set yourself up a PostgreSQL database (and role if you like, with
 password), perhaps like so:
 
-```sh
+```
 $ sudo -u postres psql
 postgres=# create role geochron;
 postgres=# \password geochron;
@@ -35,7 +35,7 @@ user, you will have to specify the host even if it is on localhost, or it will
 complain that the authentication failed. So you can log on, if you want,
 like this:
 
-```sh
+```
 $ psql -h localhost geochron geochron
 Password for user geochron:
 geochron=>
@@ -154,6 +154,8 @@ attributes:
 * `regions`: an array of regions with tracks to count, each an object with the following attributes:
     - `shift`: an array of `[x,y]`, sometimes (don't really understand it) the offset of `coords`, below.
     - `vertices`: an array of `[[x0,y0], [x1,y1], ...]`; the boundary of the region
+
+This file can be generated with the [`fissiontracks` R utility](https://github.com/pvermees/fissiontracks)
 
 From the Django project's pipenv shell:
 

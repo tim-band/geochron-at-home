@@ -67,7 +67,7 @@ def getTableData(request):
             res = []
             if sample_list:
                 for sample_id in sample_list:
-                    fts = FissionTrackNumbering.objects.select_related('Sample__Project').filter(in_sample=sample_id)
+                    fts = FissionTrackNumbering.objects.select_related('in_sample__in_project').filter(in_sample=sample_id)
                     for ft in fts:
                         if request.user.is_superuser or ft.in_sample.in_project.creator == request.user:
                             a = [ft.in_sample.in_project.project_name, ft.in_sample.sample_name, 
