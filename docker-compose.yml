@@ -2,23 +2,25 @@ version: "3.3"
    
 services:
   db:
-    image: postgres
+    image: postgres:13.1-alpine
+    volumes:
+      - "./db:/var/lib/postgresql:rw"
     env_file:
-      - db.env
+      - production.env
   web:
     image: nginx:1.19.6-alpine
     ports:
-      - 8080:80
+      - 3830:80
     volumes:
-      - ./gah.conf:/etc/nginx/conf.d/
-      - ./static:/var/www/static:ro
+      - "./nginx/conf.d:/etc/nginx/conf.d:ro"
+      - "./static:/var/www/static:ro"
     depends_on:
-      - geochron_at_home
-  geochron_at_home:
-    dockerfile: Dockerfile
+      - django
+  django:
+    build: .
     env_file:
       - production.env
     volumes:
-      - ./user_upload:/code/user_upload
+      - "./user_upload:/code/user_upload"
     depends_on:
       - db

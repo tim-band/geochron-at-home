@@ -179,3 +179,19 @@ LOGOUT_REDIRECT_URL = '/ftc/'
 
 # social auth
 USE_X_FORWARDED_HOST = True
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_handlers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        }
+    },
+}

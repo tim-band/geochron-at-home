@@ -14,33 +14,6 @@ should not be typed yourself! The prompts I have used are as follows:
 - `(geochron-at-home) $` after typing `pipenv shell` you get this.
 - `postgres=#` for PostgreSQL; after typing `psql` you get this.
 
-### Setting up PostgreSQL
-
-Firstly set yourself up a PostgreSQL database (and role if you like, with
-password), perhaps like so:
-
-```
-$ sudo -u postres psql
-postgres=# create role geochron;
-postgres=# \password geochron;
-postgres=# alter role geochron with login;
-postgres=# create database geochron;
-postgres=# alter database geochron owner to geochron;
-postgres=# \q
-```
-
-If you do this you will have a database user that does not correspond to
-a real user on your system. If you want to log in to the database with this
-user, you will have to specify the host even if it is on localhost, or it will
-complain that the authentication failed. So you can log on, if you want,
-like this:
-
-```
-$ psql -h localhost geochron geochron
-Password for user geochron:
-geochron=>
-```
-
 ### Configure your Geochron@home instance
 
 Copy the file `env` to `.env`, and edit the new copy as appropriate. In
@@ -71,6 +44,26 @@ And enter it by cding to the correct directory and typing:
 ```sh
 $ pipenv shell
 (geochron-at-home) $
+```
+
+### Setting up PostgreSQL
+
+Set yourself up a PostgreSQL database from the pipenv shell like this:
+
+```sh
+(geochron-at-home) $ sudo -u postgres ./init_db.sh
+```
+
+If you do this you will have a database user that does not correspond to
+a real user on your system. If you want to log in to the database with this
+user, you will have to specify the host even if it is on localhost, or it will
+complain that the authentication failed. So you can log on, if you want,
+like this:
+
+```
+$ psql -h localhost geochron geochron
+Password for user geochron:
+geochron=>
 ```
 
 ### Initialising Geochron@Home
@@ -129,6 +122,36 @@ Run 2 workers with:
 (geochron-at-home) $ gunicorn -b 127.0.0.1:3841 --workers=2 geochron.wsgi
 ```
 
+## Running in production with docker-compose
+
+(this is a work in progress)
+
+Firstly copy the file `production_env` to `production.env` and edit the copy
+to your liking. `DB_HOST` must remain set to `db`.
+
+Now:
+
+```sh
+$ docker-compose up -d
+```
+
+To set up the database, run:
+
+```
+$ docker-compose exec django ./site_init.sh
+```
+
+You can now browse to [http://localhost:3830/ftc] to see it running.
+
+If you want to see logs from Django, you can do so with:
+
+```sh
+$ docker logs -f geochron-at-home_django_1
+```
+
+(with the `-f` to show log messages as they arrive, or without
+to show just the messages currently logged)
+
 ## Uploading x-ray images
 
 You can upload a new set of images by giving them the following paths:
@@ -162,6 +185,12 @@ From the Django project's pipenv shell:
 (geochron-at-home) $ python upload_projects.py -s geochron.settings -i user_upload -o ftc/static/grain_pool
 ```
 
+Or, if you are using docker-compose:
+
+```sh
+$ docker-compose exec django python upload_projects.py -s geochron.settings -i user_upload -o ftc/static/grain_pool
+```
+
 (upload_projects needs fixing: uses hardcoded project admin 'john')
 
 Or you can keep it watching for uploads to be available with:
@@ -179,8 +208,3 @@ so (again replacing `<user-name>` with your user name):
 
 This file will be deleted by `watch-for-upload.sh` after it has logged
 the new samples.
-
-## Downloading results
-
-I think you just pick them out of the file system, although I have to see
-what the various reports do.

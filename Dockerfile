@@ -1,12 +1,18 @@
 FROM python:3.9.1-alpine3.12
 
 WORKDIR /code
-COPY manage.py .
+RUN apk add postgresql-dev libffi-dev build-base postgresql-client
 COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY manage.py .
+COPY site_init.sh .
+COPY upload_projects.py .
+COPY site_default_users.py .
 COPY templates templates
 COPY geochron geochron
 COPY ftc ftc
 
 # the following flags make gunicorn work better in a container:
-# --worker-tmp-dir /dev/shm --threads=4 --worker-class=gthread --log-file=- -b 0.0.0.0:80
-CMD gunicorn --worker-tmp-dir /dev/shm --threads=4 --worker-class=gthread --log-file=- -b 0.0.0.0:80 --workers=2 geochron.wsgi
+# --worker-tmp-dir /dev/shm --threads=4 --worker-class=gthread --capture-output -b 0.0.0.0:80
+CMD gunicorn --worker-tmp-dir /dev/shm --threads=4 --worker-class=gthread --log-level debug --capture-output -b 0.0.0.0:80 --workers=2 geochron.wsgi
