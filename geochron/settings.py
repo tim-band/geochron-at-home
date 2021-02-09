@@ -24,7 +24,8 @@ DEBUG = os.getenv('DJANGO_DEBUG') in ['1', 'true', 'True', 'TRUE']
 
 TEMPLATE_DEBUG = DEBUG
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+allowed_hosts = os.getenv('ALLOWED_HOSTS') or '127.0.0.1,localhost'
+ALLOWED_HOSTS = allowed_hosts.split(',')
 
 sslOnly = os.getenv('SSL_ONLY') in ['1', 'true', 'True', 'TRUE']
 SECURE_SSL_REDIRECT = sslOnly
@@ -119,7 +120,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
-STATIC_URL = os.getenv('STATIC_URL') or '/static/'
+STATIC_URL = os.getenv('STATIC_URL') or 'static/'
 STATIC_ROOT = os.getenv('STATIC_ROOT') or os.path.join(BASE_DIR, 'static')
 STATICFILES_DIRS = [
   os.path.join(BASE_DIR, 'vendor')
@@ -173,9 +174,12 @@ DEFAULT_FROM_EMAIL = os.getenv('OUT_EMAIL_ADDR')
 DEFAULT_TO_EMAIL = DEFAULT_FROM_EMAIL
 
 ## sub url
-LOGIN_REDIRECT_URL = '/accounts/profile/'
-LOGIN_URL = '/accounts/login/'
-LOGOUT_REDIRECT_URL = '/ftc/'
+FORCE_SCRIPT_NAME = os.getenv('BASE_URL')
+
+base_url = FORCE_SCRIPT_NAME or ''
+LOGIN_REDIRECT_URL = os.path.join(base_url, '/accounts/profile/')
+LOGIN_URL = os.path.join(base_url, '/accounts/login/')
+LOGOUT_REDIRECT_URL = os.path.join(base_url, '/ftc/')
 
 # social auth
 USE_X_FORWARDED_HOST = True

@@ -1,7 +1,7 @@
-FROM python:3.9.1-alpine3.12
+FROM rust:1.45.1-alpine3.12
 
 WORKDIR /code
-RUN apk add postgresql-dev libffi-dev build-base postgresql-client
+RUN apk add python3-dev py3-pip postgresql-dev libffi-dev build-base postgresql-client
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 

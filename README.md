@@ -129,9 +129,13 @@ Run 2 workers with:
 Firstly copy the file `production_env` to `production.env` and edit the copy
 to your liking. `DB_HOST` must remain set to `db`.
 
-Now:
+We must build the docker swarm, setting the hosts and base URL. In this example,
+the service is being hosted at `www.myhost.com/geochron@home`. Multiple hosts
+can be specified in `ALLOWED_HOSTS` as a comma-separated list. Any host can
+be allowed with `ALLOWED_HOSTS='*'`.
 
 ```sh
+$ ALLOWED_HOSTS=www.myhost.com BASE_URL=/geochron@home docker-compose build
 $ docker-compose up -d
 ```
 
@@ -151,6 +155,42 @@ $ docker logs -f geochron-at-home_django_1
 
 (with the `-f` to show log messages as they arrive, or without
 to show just the messages currently logged)
+
+### nginx stanza
+
+To proxy to this docker swarm with nginx (using the path
+`/geochronathome`), you can use:
+
+```
+location /geochronathome/ {
+        proxy_pass http://127.0.0.1:3830;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        location /geochronathome/static/ {
+                proxy_pass http://127.0.0.1:3830/static/;
+        }
+}
+```
+
+Or, if you are not using `ALLOWED_HOSTS` you need:
+
+```
+location /geochronathome/ {
+        proxy_pass http://127.0.0.1:3830;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header SCRIPT_NAME /geochronathome;
+		proxy_redirect /geochronathome/ /geochronathome/;
+        proxy_redirect / /geochronathome/;
+        location /geochronathome/static/ {
+                proxy_pass http://127.0.0.1:3830/static/;
+        }
+}
+```
 
 ## Uploading x-ray images
 
@@ -188,7 +228,7 @@ From the Django project's pipenv shell:
 Or, if you are using docker-compose:
 
 ```sh
-$ docker-compose exec django python upload_projects.py -s geochron.settings -i user_upload -o ftc/static/grain_pool
+$ docker-compose exec django python3 upload_projects.py -s geochron.settings -i user_upload -o ftc/static/grain_pool
 ```
 
 (upload_projects needs fixing: uses hardcoded project admin 'john')

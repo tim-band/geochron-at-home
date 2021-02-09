@@ -1,4 +1,4 @@
-version: "3.3"
+version: "2.0"
    
 services:
   db:
@@ -22,5 +22,7 @@ services:
       - production.env
     volumes:
       - "./user_upload:/code/user_upload"
+      - "./static/grain_pool:/code/static/grain_pool"
+      - "./vendor:/code/vendor"
     depends_on:
       - db
