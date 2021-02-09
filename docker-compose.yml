@@ -25,7 +25,7 @@ services:
       - BASE_URL=${BASE_URL}
     volumes:
       - "./user_upload:/code/user_upload"
-      - "./static/grain_pool:/code/static/grain_pool"
+      - "./ftc/static/grain_pool:/code/ftc/static/grain_pool"
       - "./vendor:/code/vendor"
     depends_on:
       - db
