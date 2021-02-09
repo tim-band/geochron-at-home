@@ -26,6 +26,7 @@ services:
     volumes:
       - "./user_upload:/code/user_upload"
       - "./ftc/static/grain_pool:/code/ftc/static/grain_pool"
+      - "./ftc/static/working_repos:/code/ftc/static/working_repos"
       - "./vendor:/code/vendor"
     depends_on:
       - db
