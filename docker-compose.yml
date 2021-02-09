@@ -20,6 +20,9 @@ services:
     build: .
     env_file:
       - production.env
+    environment:
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - BASE_URL=${BASE_URL}
     volumes:
       - "./user_upload:/code/user_upload"
       - "./static/grain_pool:/code/static/grain_pool"

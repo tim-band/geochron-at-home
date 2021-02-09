@@ -145,6 +145,9 @@ To set up the database, run:
 $ docker-compose exec django ./site_init.sh
 ```
 
+(you can ignore warnings about `ALLOWED_HOSTS` and `BASE_URL` not
+being defined)
+
 You can now browse to [http://localhost:3830/ftc] to see it running.
 
 If you want to see logs from Django, you can do so with:
@@ -163,11 +166,12 @@ To proxy to this docker swarm with nginx (using the path
 
 ```
 location /geochronathome/ {
-        proxy_pass http://127.0.0.1:3830;
+        proxy_pass http://127.0.0.1:3830/;
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+        proxy_redirect off;
         location /geochronathome/static/ {
                 proxy_pass http://127.0.0.1:3830/static/;
         }
@@ -191,6 +195,8 @@ location /geochronathome/ {
         }
 }
 ```
+
+(note the deleted slash from the `proxy_pass` line)
 
 ## Uploading x-ray images
 
