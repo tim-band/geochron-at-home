@@ -84,6 +84,8 @@ def getTableData(request):
         return HttpResponse("Sorry, You don't have permission to access the requested page.")
 
 import os, random, itertools
+from django.templatetags.static import static
+
 from .get_img_list_of_grain  import get_grain_images_list
 from .get_image_size import get_image_size, UnknownImageFormat
 from .grain_uinfo import genearate_working_grain_uinfo, restore_grain_uinfo
@@ -91,8 +93,8 @@ from .load_rois import load_rois
 
 @login_required
 def get_grain_images(request):
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__)) #'/Data/webapp/geochron/ftc/'
-    grain_pool_path = os.path.join(BASE_DIR, 'static/grain_pool')
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # ftc/
+    grain_pool_path = os.path.join(os.path.dirname(BASE_DIR), 'static/grain_pool')
     working_repos_path = os.path.join(BASE_DIR, "static/working_repos/")
     sep = '~'
     res = {}
@@ -127,7 +129,7 @@ def get_grain_images(request):
                 rois = None
             if (len(images_list) > 0) and (rois is not None):
                 try:
-                    width, height = get_image_size(os.path.join(BASE_DIR, images_list[0][1:]))
+                    width, height = get_image_size(os.path.join(grain_pool_path, images_list[0]))
                 except UnknownImageFormat:
                     width, height = 1, 1 
                 res['proj_id'] = the_project.id
@@ -136,7 +138,7 @@ def get_grain_images(request):
                 res['ft_type'] = ft_type
                 res['image_width'] = width
                 res['image_height'] = height
-                res['images'] = images_list
+                res['images'] = list(map(lambda i: static(os.path.join('grain_pool', i)), images_list))
                 res['rois'] = rois
                 #--- 
                 myjson = json.dumps(res, cls=DjangoJSONEncoder)

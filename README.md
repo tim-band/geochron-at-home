@@ -129,8 +129,9 @@ Run 2 workers with:
 Firstly copy the file `production_env` to `production.env` and edit the copy
 to your liking. `DB_HOST` must remain set to `db`.
 
-We must build the docker swarm, setting the hosts and base URL. In this example,
-the service is being hosted at `www.myhost.com/geochron@home`. Multiple hosts
+We must build the docker swarm, setting the hosts and base URL. In this
+example, the service is being hosted at `www.myhost.com/geochron@home`,
+behind a reverse proxy that strips the initial `/geochron@home`. Multiple hosts
 can be specified in `ALLOWED_HOSTS` as a comma-separated list. Any host can
 be allowed with `ALLOWED_HOSTS='*'`.
 

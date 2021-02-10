@@ -18,8 +18,9 @@ def get_grain_images_list(grain_pool_path, owner, project_name, sample_name, sam
     # get lis of images
     img_ext = set(['.png', '.jpeg', '.jpg'])
     images = dict()
-    grain_path = os.path.join(grain_pool_path, owner, project_name, \
+    to_grain = os.path.join(owner, project_name, \
                  sample_name, 'Grain%02d'%(grain_nth))
+    grain_path = os.path.join(grain_pool_path, to_grain)
     if os.path.isdir(grain_path):
         for f in os.listdir(grain_path):
             head, ext = os.path.splitext(f)
@@ -37,9 +38,7 @@ def get_grain_images_list(grain_pool_path, owner, project_name, sample_name, sam
                 continue
             k = parse_image_name(str2parse)
             if k != None:
-                url = os.path.join(grain_path, f)
-                images[k] = '/static/' + url.split('/static/')[1]  #link from /static/...
-                #return HttpResponse('I got: '+url[19:])
+                images[k] = os.path.join(to_grain, f)
     images_list = []
     if len(images) > 0:
        extra_image = None
