@@ -202,6 +202,7 @@ location /geochronathome/ {
 
 You can upload a new set of images by giving them the following paths:
 `user_upload/<user-name>/<project-name>/<sample-name>/<grain-name>/<image-name>.jpg`
+(please ensure that all these files are readable by all users)
 with the following changes:
 * You can use `.jpeg` or `.png` instead of `.jpg` for the filename extension
 * `<user-name>` needs to be placed with a valid user name in the Geochron@home system
@@ -228,13 +229,13 @@ This file can be generated with the [`fissiontracks` R utility](https://github.c
 From the Django project's pipenv shell:
 
 ```sh
-(geochron-at-home) $ python upload_projects.py -s geochron.settings -i user_upload -o ftc/static/grain_pool
+(geochron-at-home) $ python upload_projects.py -s geochron.settings -i user_upload -o static/grain_pool
 ```
 
 Or, if you are using docker-compose:
 
 ```sh
-$ docker-compose exec django python3 upload_projects.py -s geochron.settings -i user_upload -o ftc/static/grain_pool
+$ docker-compose exec django python3 upload_projects.py -s geochron.settings -i user_upload -o static/grain_pool
 ```
 
 (upload_projects needs fixing: uses hardcoded project admin 'john')
@@ -254,3 +255,11 @@ so (again replacing `<user-name>` with your user name):
 
 This file will be deleted by `watch-for-upload.sh` after it has logged
 the new samples.
+
+### Troubleshooting image upload
+
+If the web server returns a 403 (forbidden) when attempting to access
+these images, you may have uploaded images that are not readable by
+all users. You can correct this by entering the `django` container with
+`docker-compose exec django sh`, navigating to the offending
+directory within `/code/static/grain_pool` and using `chmod ao+r *`.

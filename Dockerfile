@@ -12,6 +12,7 @@ COPY site_default_users.py .
 COPY templates templates
 COPY geochron geochron
 COPY ftc ftc
+RUN mkdir -p ftc/static/working_repos
 
 # the following flags make gunicorn work better in a container:
 # --worker-tmp-dir /dev/shm --threads=4 --worker-class=gthread --capture-output -b 0.0.0.0:80

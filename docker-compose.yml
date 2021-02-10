@@ -1,5 +1,8 @@
 version: "2.0"
-   
+
+volumes:
+  web_static:
+
 services:
   db:
     image: postgres:13.1-alpine
@@ -13,7 +16,7 @@ services:
       - 3830:80
     volumes:
       - "./nginx/conf.d:/etc/nginx/conf.d:ro"
-      - "./static:/var/www/static:ro"
+      - "web_static:/var/www/static:ro"
     depends_on:
       - django
   django:
@@ -25,8 +28,7 @@ services:
       - BASE_URL=${BASE_URL}
     volumes:
       - "./user_upload:/code/user_upload"
-      - "./ftc/static/grain_pool:/code/ftc/static/grain_pool"
-      - "./ftc/static/working_repos:/code/ftc/static/working_repos"
+      - "web_static:/code/static/"
       - "./vendor:/code/vendor"
     depends_on:
       - db
