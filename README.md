@@ -27,12 +27,18 @@ You can set up a pipenv to run Geochron@home like so (after installing Python 2.
 
 ```sh
 $ pip install pipenv
-$ pipenv --python $(which python2.7)
-$ pipenv shell
-$ pip install -r requirements.txt
+$ pipenv install
 ```
 
-You are now in the pipenv; you can exit this any time with `exit`:
+Now you can enter the pipenv shell like this:
+
+```sh
+$ pipenv shell
+(geochron-at-home) $
+```
+
+and now you can run the app and use all the Python tools it depends on.
+You can exit this any time with `exit`:
 
 ```sh
 (geochron-at-home) $ exit
@@ -51,7 +57,8 @@ $ pipenv shell
 Set yourself up a PostgreSQL database from the pipenv shell like this:
 
 ```sh
-(geochron-at-home) $ sudo -u postgres ./init_db.sh
+(geochron-at-home) $ sudo -Eu postgres ./init_db.sh
+(geochron-at-home) $ ./site_init.sh
 ```
 
 If you do this you will have a database user that does not correspond to
@@ -64,12 +71,6 @@ like this:
 $ psql -h localhost geochron geochron
 Password for user geochron:
 geochron=>
-```
-
-### Initialising Geochron@Home
-
-```sh
-(geochron-at-home) $ ./site_init.sh
 ```
 
 ### Starting Geochron@Home
