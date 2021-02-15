@@ -360,6 +360,12 @@ $(window).load(function() {
         slider_bringToFront(sliders2.get());
     });
 
+    slider2elt.onpointerdown = function(ev) {
+        // Prevents the sample image from being dragged around
+        // by movements that begin on the slider.
+        ev.stopPropagation();
+    };
+
     /**************************
      *  map load image layers *
      **************************/
