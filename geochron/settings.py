@@ -165,7 +165,7 @@ SOCIALACCOUNT_PROVIDERS = \
 # email
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-EMAIL_USE_TLS = True
+EMAIL_USE_TLS = os.getenv('FAKE_MAIL_SERVER') in [None, "false", "False", "0", ""]
 EMAIL_HOST = os.getenv('OUT_EMAIL_HOST')
 EMAIL_PORT = os.getenv('OUT_EMAIL_PORT')
 EMAIL_HOST_USER = os.getenv('OUT_EMAIL_HOST_USER')

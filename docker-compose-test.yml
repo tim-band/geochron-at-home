@@ -1,0 +1,61 @@
+version: "2.0"
+
+volumes:
+  web_static:
+  db:
+
+services:
+  db:
+    image: postgres:13.1-alpine
+    environment:
+      - POSTGRES_DB=geochron
+      - POSTGRES_USER=geochron
+      - POSTGRES_PASSWORD=geochron
+    volumes:
+      - "db:/var/lib/postgresql:rw"
+  web:
+    image: nginx:1.19.6-alpine
+    ports:
+      - 18080:80
+    volumes:
+      - "./nginx/conf.d:/etc/nginx/conf.d:ro"
+      - "web_static:/var/www/static:ro"
+    depends_on:
+      - django
+  django:
+    build: .
+    environment:
+      - "ALLOWED_HOSTS=*"
+      - "BASE_URL=/"
+      - SSL_ONLY=false
+      - DJANGO_DEBUG=0
+      - DB_HOST=db
+      - POSTGRES_DB=geochron
+      - POSTGRES_USER=geochron
+      - POSTGRES_PASSWORD=geochron
+      - "SITE_DOMAIN=localhost:18080"
+      - "SITE_NAME=geochron@home"
+      - SITE_ADMIN_NAME=admin
+      - SITE_ADMIN_PASSWORD=admin
+      - "SITE_ADMIN_EMAIL=admin@test.com"
+      - PROJ_ADMIN_NAME=john
+      - PROJ_ADMIN_PASSWORD=john
+      - "PROJ_ADMIN_EMAIL=john@test.com"
+      - OUT_EMAIL_HOST=smtp
+      - OUT_EMAIL_PORT=25
+      - OUT_EMAIL_HOST_USER=
+      - OUT_EMAIL_HOST_PASSWORD=
+      - "OUT_EMAIL_ADDR=admin@test.com"
+      - SECRET_KEY=1234abcd
+      - FAKE_MAIL_SERVER=1
+    volumes:
+      - "./user_upload:/code/user_upload"
+      - "web_static:/code/static/"
+      - "./vendor:/code/vendor"
+    depends_on:
+      - db
+      - smtp
+  smtp:
+    image: timband/mocksmtp
+    ports:
+      - "18081:80"
