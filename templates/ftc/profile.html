@@ -117,17 +117,17 @@ footer {
             <div class="col-6 col-sm-6 col-lg-4">
               <h2>How to</h2>
               <!--<p>A tutorial on how to count tracks.</p>-->
-              <p><a class="btn btn-default" href="http://www.ucl.ac.uk/~ucfbpve/geochron@home/tutorial" role="button" target="_blank">Tutorial &raquo;</a></p>
+              <p><a id="tutorial-link" class="btn btn-default" href="http://www.ucl.ac.uk/~ucfbpve/geochron@home/tutorial" role="button" target="_blank">Tutorial &raquo;</a></p>
             </div><!--/span-->
             <div class="col-6 col-sm-6 col-lg-4">
               <h2>Start counting</h2>
               <!--<p>Counting the tracks</p>-->
-              <p><a class="btn btn-default" href="{% url 'counting'%}" role="button">Go &raquo;</a></p>
+              <p><a id="start-counting-link" class="btn btn-default" href="{% url 'counting'%}" role="button">Go &raquo;</a></p>
             </div><!--/span-->
             <div class="col-6 col-sm-6 col-lg-4">
               <h2>Site statistics</h2>
               <!--<p>View your site statistics.</p>-->
-              <p><a class="btn btn-default" href="#" role="button">View details &raquo;</a></p>
+              <p><a id="site-statistics-link" class="btn btn-default" href="#" role="button">View details &raquo;</a></p>
             </div><!--/span-->
             {% if user.is_staff %}
             <div class="col-6 col-sm-6 col-lg-4">

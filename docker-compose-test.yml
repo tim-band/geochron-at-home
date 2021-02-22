@@ -49,7 +49,7 @@ services:
       - SECRET_KEY=1234abcd
       - FAKE_MAIL_SERVER=1
     volumes:
-      - "./user_upload:/code/user_upload"
+      - "./test/xrays:/code/test/xrays"
       - "web_static:/code/static/"
       - "./vendor:/code/vendor"
     depends_on:

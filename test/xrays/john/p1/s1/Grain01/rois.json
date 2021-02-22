@@ -1,0 +1,14 @@
+{
+    "image_width": 200,
+    "image_height": 200,
+    "regions": [
+        {
+            "shift": [0,0],
+            "vertices": [
+                [0,0],
+                [200,0],
+                [0,200]
+            ]
+        }
+    ]
+}
