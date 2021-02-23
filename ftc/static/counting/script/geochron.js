@@ -366,6 +366,12 @@ $(window).load(function() {
         ev.stopPropagation();
     };
 
+    slider2elt.onclick = function(ev) {
+        // Prevents points from being added
+        // by movements that begin on the slider.
+        ev.stopPropagation();
+    };
+
     /**************************
      *  map load image layers *
      **************************/

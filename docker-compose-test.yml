@@ -1,4 +1,4 @@
-version: "2.0"
+version: "2.1"
 
 volumes:
   web_static:
@@ -13,6 +13,11 @@ services:
       - POSTGRES_PASSWORD=geochron
     volumes:
       - "db:/var/lib/postgresql:rw"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "geochron"]
+      interval: 3s
+      timeout: 3s
+      retries: 3
   web:
     image: nginx:1.19.6-alpine
     ports:
@@ -53,8 +58,10 @@ services:
       - "web_static:/code/static/"
       - "./vendor:/code/vendor"
     depends_on:
-      - db
-      - smtp
+      db:
+        condition: service_healthy
+      smtp:
+        condition: service_started
   smtp:
     image: timband/mocksmtp
     ports:
