@@ -46,6 +46,34 @@ class Sample(models.Model):
                 self.in_project.project_name, self.sample_property)
 
 #
+class Grain(models.Model):
+    sample = models.ForeignKey(Sample, on_delete=models.CASCADE)
+    image_width = models.IntegerField()
+    image_height = models.IntegerField()
+
+#
+class Region(models.Model):
+    grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
+    shift_x = models.IntegerField()
+    shift_y = models.IntegerField()
+
+#
+class Vertex(models.Model):
+    region = models.ForeignKey(Region, on_delete=models.CASCADE)
+    x = models.IntegerField()
+    y = models.IntegerField()
+
+#
+class Image(models.Model):
+    IMAGE_FORMAT=(
+        ('J', 'JPEG'),
+        ('P', 'PNG'),
+    )
+    grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
+    format = models.CharField(max_length=1, choices=IMAGE_FORMAT)
+    data = models.BinaryField()
+
+#
 class FissionTrackNumbering(models.Model):
     FT_TYPE = (
         ('S', 'Spontaneous Fission Tracks'),

@@ -1,73 +1,93 @@
 import os, sys, shutil
 from optparse import OptionParser
+from django.db import transaction
+import json
 
-#------------------------------------------------------------
-def copygrain(src, dst, level=0):
-    print('@level %d, destination: %s' % (level, dst))
-    #level 0 see projects; level 1 see samples; level 2 see grains; level 3 see images
-    folder_name = ['project', 'sample', 'grain']
-    line_end = ['\n', '\n', '']
-    img_ext = set(['.png', '.jpeg', '.jpg'])
-    #print('entering %s' % (src))
+def ensuredir(d):
+    if not os.path.isdir(d):
+        os.makedirs(d)
+
+def copyimages(src, dst, grain):
+    img_ext = { '.png' : 'P', '.jpeg': 'J', '.jpg': 'J' }
+    ensuredir(dst)
+    total_image = 0
     names = sorted(os.listdir(src))
+    for n in names:
+        srcname = os.path.join(src, n)
+        is_image = False
+        ext = os.path.splitext(n)[1]
+        if os.path.isfile(srcname) and ext in img_ext:
+            is_image = True
+            with open(srcname, mode='rb') as f:
+                im = Image(grain=grain, format=img_ext[ext], data=f.read())
+                im.save()
+            total_image+=1
+        if is_image or n == 'rois.json':
+            dstname = os.path.join(dst, n)
+            shutil.copy2(srcname, dstname)
 
-    # populate DB
+
+def creategrain(src, sample):
+    p = os.path.join(src, 'rois.json')
+    if not os.path.isfile(p):
+        sys.exit('no such grain file {0}; exiting'.format(p))
+    with open(p, mode='r') as j:
+        rois = json.load(j)
+    g = Grain(sample=sample, image_width=rois['image_width'], image_height=rois['image_height'])
+    g.save()
+    for r in rois['regions']:
+        shift = r['shift']
+        region = Region(grain=g, shift_x=shift[0], shift_y=shift[1])
+        region.save()
+        for v in r['vertices']:
+            vertex = Vertex(region=region, x=v[0], y=v[1])
+            vertex.save()
+    return g
+
+
+def copygrains(src, dst, sample):
+    # create sample
     folders = next(os.walk(src))[1]
-    if level == 0:
-        # create projects
-        for name in folders:
-            mystr = 'Project "%s" created by %s' % (name, uname)
-            mystr = '*' + mystr.center(len(mystr)+6, ' ') + '*'
-            print('*'*len(mystr))
-            print(mystr)
-            print('*'*len(mystr))
-            p = Project(project_name=name, creator=user, project_description='project '+name, closed=False)
-            p.save()
-    if level == 2:
-        # create sample
-        total_grain = len(folders)
-        head, sample = os.path.split(src)
-        head, project = os.path.split(head)
-        print('create sample "%s" with %d grains - %s' % (sample, total_grain, project))
-        p = Project.objects.filter(project_name=project, creator=user)
-        if len(p) == 1:
-            p[0].sample_set.create(sample_name=sample, sample_property='T', total_grains=total_grain, completed=False)
-        else:
-            sys.exit('not unique for the combine keys, creator: %s and project_name: %s' % (uname, name)) 
-    if level == 3:
-        grain = os.path.split(src)[1]
-        total_image = 0
-        for n in names:
-            if os.path.isfile(os.path.join(src, n)) and os.path.splitext(n)[1] in img_ext: 
-                total_image+=1
-        print('%s grain "%s" has %d images' % (' '*4, grain, total_image))
-        
-    # create folder structure
-    if not os.path.isdir(dst):
-        print('Create folder %s' % (dst))
-        os.makedirs(dst)
-
-    errors = []
+    total_grain = 0
+    names = sorted(os.listdir(src))
     for name in names:
         srcname = os.path.join(src, name)
+        if os.path.isdir(srcname):
+            dstname = os.path.join(dst, name)
+            grain = creategrain(srcname, sample)
+            copyimages(srcname, dstname, grain)
+            total_grain += 1
+    sample.total_grains = total_grain
+    sample.save()
+
+
+def copysamples(src, dst, project):
+    names = sorted(os.listdir(src))
+    for name in names:
+        srcname = os.path.join(src, name)
+        if os.path.isdir(srcname):
+            dstname = os.path.join(dst, name)
+            sample = project.sample_set.create(sample_name=name,
+                sample_property='T', total_grains=0, completed=False)
+            copygrains(srcname, dstname, sample)
+
+
+@transaction.atomic
+def copyprojects(src, dst):
+    folders = next(os.walk(src))[1]
+    # create projects
+    for name in folders:
+        mystr = 'Project "%s" created by %s' % (name, uname)
+        mystr = '*' + mystr.center(len(mystr)+6, ' ') + '*'
+        print('*'*len(mystr))
+        print(mystr)
+        print('*'*len(mystr))
+        p = Project(project_name=name, creator=user, project_description='project '+name, closed=False)
+        p.save()
+        srcname = os.path.join(src, name)
         dstname = os.path.join(dst, name)
-        try:
-            if os.path.isdir(srcname) and level < 4:
-                copygrain(srcname, dstname, level=level+1)
-            elif os.path.isfile(srcname) and level == 3 and (os.path.splitext(srcname)[1] in img_ext or os.path.split(srcname)[1]=="rois.json"):
-                shutil.copy2(srcname, dstname)
-        except (IOError, OSError) as why:
-            errors.append((srcname, dstname, str(why)))
-        # catch the Error from the recursive copygrain so that we can
-        # continue with other files
-        except shutil.Error as err:
-            if len(errors)>0:
-              errors.extend(err.args[0])
-            else:
-              errors.append(err.args[0])
-    if len(errors)>0:
-        raise Exception(errors)
-#--------------------------------------------end of copygrain
+        copysamples(srcname, dstname, p)
+
 
 usage = "usage: %prog -s SETTINGS | --settings=SETTINGS"
 parser = OptionParser(usage)
@@ -87,7 +107,7 @@ import django
 django.setup()
 
 from django.contrib.auth.models import User
-from ftc.models import Project, Sample
+from ftc.models import Project, Sample, Grain, Image, Region, Vertex
 
 # get user id based on username
 input_source_path = options.input or '/code/user_upload/'
@@ -105,7 +125,7 @@ grain_pool_path = os.path.normpath(grain_pool_path)
 src = os.path.join(input_source_path, uname)
 dst = os.path.join(grain_pool_path, uname)
 
-copygrain(src, dst)
+copyprojects(src, dst)
 print('finished' + '-'*72)
 
 
