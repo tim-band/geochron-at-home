@@ -1,43 +1,36 @@
 import os
 import json
+from ftc.models import Vertex, Region, Image, Grain
 
 def load_rois(grain_pool_path, owner, project_name, sample_name, sample_property, grain_nth, ft_type):
-    path = os.path.join(grain_pool_path, owner, project_name, \
-                 sample_name, 'Grain%02d'%(grain_nth), 'rois.json')
-    return load_rois_from_path(path, ft_type)
+    grains = Grain.objects.filter(
+        index=grain_nth,
+        sample__sample_name=sample_name,
+        sample__in_project__project_name=project_name
+    )
+    grain = grains[0]
 
-def load_rois_from_path(path, ft_type):
-    with open(path,'r') as inf:
-        data = json.load(inf)
-
-    w = data['image_width']
-    h = data['image_height']
+    w = grain.image_width
+    h = grain.image_height
 
     rois = list()
-    for index, item in enumerate(data['regions']):
-        coords = item['vertices']
-        shift = item['shift']
+    for index, item in enumerate(grain.region_set.all()):
+        coords = item.vertex_set.all()
         latlng = list()
         # only 'Induced Fission Tracks' will shift coordinates
         # positive sx or sy mean move along the image positive axis directions
         if ft_type == 'I':
             for coord in coords:
-                x = w - (float(coord[0]) + shift[0])
-                y = float(coord[1]) + shift[1]
+                x = w - (float(coord.x) + item.shit_x)
+                y = float(coord.y) + item.shift_x
                 latlng.append([(h-y)/w, x/w])
         else:
             for coord in coords:
-                x = float(coord[0])
-                y = float(coord[1])
+                x = float(coord.x)
+                y = float(coord.y)
                 latlng.append([(h-y)/w, x/w])
         if len(latlng) < 1:
             return None
         else:
             rois.append(latlng)
     return rois
-
-if __name__ == "__main__":
-    path="/Data/webapp/geochron/ftc/static/grain_pool/john/test_proj01/lu324-6-fct/Grain01/rois.json"
-    path='/Data/webapp/geochron/ftc/static/grain_pool/john/Thermo2016_no_micas/1X/Grain13/rois.json'
-    ft_type = 'S'
-    print(load_rois_from_path(path, ft_type))

@@ -1,7 +1,9 @@
 from django.conf.urls import include, re_path
+from django.urls import path
 
-from ftc.views import home, signmeup, report, getTableData,\
-    get_grain_images, updateTFNResult, counting, saveWorkingGrain
+from ftc.views import home, signmeup, report, getTableData, \
+    get_grain_images, updateTFNResult, counting, saveWorkingGrain, \
+    get_image
 
 urlpatterns = [
     # Ex: /ftc/
@@ -14,4 +16,6 @@ urlpatterns = [
     re_path(r'^counting/(?P<uname>(guest))/$', counting, name='guest_counting'),
     re_path(r'^counting/$', counting, name='counting'),
     re_path(r'^saveWorkingGrain/$', saveWorkingGrain, name='saveWorkingGrain'),
+    path('image/<str:project_name>/<str:sample_name>/<int:grain_nth>/<str:image_nth>/',
+        get_image, name="get_image"),
 ]

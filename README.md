@@ -75,7 +75,17 @@ geochron=>
 
 ### Starting Geochron@Home
 
+If any static files have changed you might have to:
+
+```sh
+(gechron-at-home) $ STATIC_ROOT='static' python manage.py collectstatic
+```
+
+Then, in any case you must:
+
+```sh
 (geochron-at-home) $ python manage.py runserver
+```
 
 And you can now browse to `localhost:8000/ftc`
 

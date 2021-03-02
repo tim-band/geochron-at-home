@@ -48,6 +48,7 @@ class Sample(models.Model):
 #
 class Grain(models.Model):
     sample = models.ForeignKey(Sample, on_delete=models.CASCADE)
+    index = models.IntegerField()
     image_width = models.IntegerField()
     image_height = models.IntegerField()
 
@@ -71,6 +72,7 @@ class Image(models.Model):
     )
     grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
     format = models.CharField(max_length=1, choices=IMAGE_FORMAT)
+    index = models.IntegerField()
     data = models.BinaryField()
 
 #

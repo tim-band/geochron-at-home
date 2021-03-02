@@ -1,12 +1,10 @@
 from django.shortcuts import render, get_object_or_404
 
-# Create your views here.
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import redirect
 
-#Import models
-from ftc.models import Project, Sample, FissionTrackNumbering
+from ftc.models import Project, Sample, FissionTrackNumbering, Image, Grain
 
 #
 def home(request):
@@ -92,6 +90,19 @@ from .grain_uinfo import genearate_working_grain_uinfo, restore_grain_uinfo
 from .load_rois import load_rois
 
 @login_required
+def get_image(request, project_name, sample_name, grain_nth, image_nth):
+    images = Image.objects.filter(grain__sample__sample_name=sample_name,
+        grain__sample__in_project__project_name=project_name,
+        grain__index=grain_nth,
+        index=int(image_nth))
+    if len(images) == 0:
+        raise Http404('image does not exist')
+    if 1 < len(images):
+        raise Exception('{0} matching images found'.format(len(images)))
+    mime = images[0].format = 'P' and 'image/png' or 'image/jpeg'
+    return HttpResponse(images[0].data, content_type=mime)
+
+@login_required
 def get_grain_images(request):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # ftc/
     grain_pool_path = os.path.join(os.path.dirname(BASE_DIR), 'static/grain_pool')
@@ -129,7 +140,12 @@ def get_grain_images(request):
                 rois = None
             if (len(images_list) > 0) and (rois is not None):
                 try:
-                    width, height = get_image_size(os.path.join(grain_pool_path, images_list[0]))
+                    gs = Grain.objects.filter(index=the_grain,
+                        sample__sample_name=the_sample.sample_name,
+                        sample__in_project__project_name=the_project.project_name)
+                    width = gs[0].image_width
+                    height = gs[0].image_height
+                    #width, height = get_image_size(os.path.join(grain_pool_path, images_list[0]))
                 except UnknownImageFormat:
                     width, height = 1, 1 
                 res['proj_id'] = the_project.id
@@ -138,7 +154,7 @@ def get_grain_images(request):
                 res['ft_type'] = ft_type
                 res['image_width'] = width
                 res['image_height'] = height
-                res['images'] = list(map(lambda i: static(os.path.join('grain_pool', i)), images_list))
+                res['images'] = images_list
                 res['rois'] = rois
                 #--- 
                 myjson = json.dumps(res, cls=DjangoJSONEncoder)

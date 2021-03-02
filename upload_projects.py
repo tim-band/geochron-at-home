@@ -7,6 +7,19 @@ def ensuredir(d):
     if not os.path.isdir(d):
         os.makedirs(d)
 
+
+def parse_image_name(f):
+    if f.lower() == 'reflstackflat':
+        return -1
+    elif f.lower() == 'stackflat':
+        return 0
+    elif f[0:6].lower() == 'stack-':
+        try:
+            return int(f[6:])
+        except:
+            return None
+
+
 def copyimages(src, dst, grain):
     img_ext = { '.png' : 'P', '.jpeg': 'J', '.jpg': 'J' }
     ensuredir(dst)
@@ -15,11 +28,13 @@ def copyimages(src, dst, grain):
     for n in names:
         srcname = os.path.join(src, n)
         is_image = False
-        ext = os.path.splitext(n)[1]
-        if os.path.isfile(srcname) and ext in img_ext:
+        name_ext = os.path.splitext(n)
+        ext = name_ext[1]
+        v = parse_image_name(name_ext[0])
+        if os.path.isfile(srcname) and ext in img_ext and v != None:
             is_image = True
             with open(srcname, mode='rb') as f:
-                im = Image(grain=grain, format=img_ext[ext], data=f.read())
+                im = Image(grain=grain, format=img_ext[ext], index=v, data=f.read())
                 im.save()
             total_image+=1
         if is_image or n == 'rois.json':
@@ -27,13 +42,15 @@ def copyimages(src, dst, grain):
             shutil.copy2(srcname, dstname)
 
 
-def creategrain(src, sample):
+def creategrain(src, sample, grain_nth):
     p = os.path.join(src, 'rois.json')
     if not os.path.isfile(p):
         sys.exit('no such grain file {0}; exiting'.format(p))
     with open(p, mode='r') as j:
+        print(p)
         rois = json.load(j)
-    g = Grain(sample=sample, image_width=rois['image_width'], image_height=rois['image_height'])
+    g = Grain(sample=sample, index=grain_nth,
+        image_width=rois['image_width'], image_height=rois['image_height'])
     g.save()
     for r in rois['regions']:
         shift = r['shift']
@@ -51,10 +68,14 @@ def copygrains(src, dst, sample):
     total_grain = 0
     names = sorted(os.listdir(src))
     for name in names:
+        try:
+            grain_nth = int(name[5:])
+        except:
+            grain_nth = None
         srcname = os.path.join(src, name)
-        if os.path.isdir(srcname):
+        if os.path.isdir(srcname) and name[0:5] == 'Grain':
             dstname = os.path.join(dst, name)
-            grain = creategrain(srcname, sample)
+            grain = creategrain(srcname, sample, grain_nth)
             copyimages(srcname, dstname, grain)
             total_grain += 1
     sample.total_grains = total_grain

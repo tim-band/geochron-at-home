@@ -309,7 +309,7 @@ $(window).load(function() {
         var position = sliders2.get();
         position = position - delta;
         position = (position > (sliderNum - 1)) ? (sliderNum - 1) : ((position < 0) ? 0 : position);
-        slider2.set(position);
+        sliders2.set(position);
         slider_bringToFront(position);
         return false;
     });

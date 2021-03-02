@@ -1,5 +1,6 @@
 SSL_ONLY=false
 DJANGO_DEBUG=0
+STATIC_ROOT='static'
 DB_HOST=db
 POSTGRES_DB=geochron
 POSTGRES_USER=geochron
