@@ -1,8 +1,10 @@
 import unittest
 from selenium import webdriver
 from selenium.webdriver.common.alert import Alert
+from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.support.ui import WebDriverWait
 import subprocess
 import time
 
@@ -173,13 +175,27 @@ class CountingPage(BasePage):
         return self
 
     def image_displayed_id(self):
-        images = self.driver.find_elements_by_class_name("leaflet-image-layer")
+
+        class ElementsLoaded:
+            def __init__(self, locator_type, locator_string, count):
+                self.locator_type = locator_type
+                self.locator_string = locator_string
+                self.count = count
+            def __call__(self, driver):
+                es = driver.find_elements(self.locator_type, self.locator_string)
+                if len(es) < self.count:
+                    return False
+                return es
+
+        images = WebDriverWait(self.driver, 3).until(
+            ElementsLoaded(By.CLASS_NAME, "leaflet-image-layer", 4))
+
         # find the URI of the last image
         src = images[-1].get_attribute("src")
         # we assume this is the visible one (assuming that
         # all the images are visible and have the same z-index)
-        dindex = src.find("stack-") + 6
-        return int(src[dindex:dindex+2])
+        index = src.rfind("/") + 1
+        return int(src[index:])
 
 
 class NavBar(BasePage):
