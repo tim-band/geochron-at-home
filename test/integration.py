@@ -8,15 +8,15 @@ from selenium.webdriver.support.ui import WebDriverWait
 import subprocess
 import time
 
-def retrying(retries, f):
+def retrying(retries, f, delay=1):
     if retries == 1:
-        f()
+        return f()
     else:
         try:
-            f()
+            return f()
         except:
-            time.sleep(1)
-            retrying(retries - 1, f)
+            time.sleep(delay)
+            return retrying(retries - 1, f)
 
 
 class DockerCompose:
@@ -133,16 +133,31 @@ class CountingPage(BasePage):
         self.driver.find_element_by_id("btn-tracknum")
         return self
 
+    def go(self):
+        self.driver.get("http://localhost:18080/ftc/counting")
+        return self
+
     def count(self):
         return self.driver.execute_script(
             'return document.getElementById("tracknum").value;')
+
+    def assert_count(self, count):
+        c = self.count()
+        assert c == count, "Count should be '{0}' but is '{1}'".format(count, c)
+
+    def check_count(self, count):
+        retrying(
+            6,
+            lambda: self.assert_count(count),
+            0.3
+        )
 
     def click_at(self, x, y):
         mp = self.driver.find_element_by_id("map")
         actions = ActionChains(self.driver)
         actions.move_to_element_with_offset(mp,
             x * mp.size["width"], y * mp.size["height"])
-        actions.click().pause(1.2).perform()
+        actions.click().pause(1.0).perform()
         return self
 
     def delete_from(self, minx, maxx, miny, maxy):
@@ -164,6 +179,11 @@ class CountingPage(BasePage):
         Alert(self.driver).accept()
         # Also dismiss "Well done!" message
         retrying(3, lambda: Alert(self.driver).accept())
+
+    def save(self):
+        self.driver.find_element_by_id("btn-tracknum").click()
+        self.driver.find_element_by_id("tracknum-save").click()
+        Alert(self.driver).accept()
         return self
 
     def drag_layer_handle(self, offset):
@@ -235,10 +255,21 @@ class ReportPage(BasePage):
         ).click()
         return self
 
+    def result_now(self, grain_number):
+        rows = self.driver.find_elements(By.CSS_SELECTOR, "#mytable tbody tr")
+        for r in rows:
+            tds = r.find_elements(By.CSS_SELECTOR, "td")
+            if 5 <= len(tds) and tds[2].text == grain_number:
+                return tds[4].text
+        return None
+
+    def result_or_fail(self, grain_number):
+        r = self.result_now(grain_number)
+        assert r != None, "Grain number {0} not in table".format(grain_number)
+        return r
+
     def result(self, grain_number):
-        return self.driver.find_element_by_css_selector(
-            "#mytable tbody td:nth-child(5)"
-        ).text
+        return retrying(4, lambda: self.result_or_fail(grain_number), 0.1)
 
 
 class DjangoTests(unittest.TestCase):
@@ -269,31 +300,53 @@ class DjangoTests(unittest.TestCase):
         self.assertEqual(counting.drag_layer_handle(0.33).image_displayed_id(), 2)
         self.assertEqual(counting.drag_layer_handle(0.67).image_displayed_id(), 4)
         self.assertEqual(counting.drag_layer_handle(-0.33).image_displayed_id(), 3)
-        self.assertEqual(counting.count(), "000")
+        counting.check_count("000")
         counting.click_at(0.6, 0.35)
-        self.assertEqual(counting.count(), "001")
+        counting.check_count("001")
         counting.click_at(0.45, 0.5)
-        self.assertEqual(counting.count(), "002")
+        counting.check_count("002")
         # this one is outside of the boundary
         counting.click_at(0.55, 0.55)
-        self.assertEqual(counting.count(), "002")
+        counting.check_count("002")
         counting.click_at(0.52, 0.37)
-        self.assertEqual(counting.count(), "003")
+        counting.check_count("003")
         counting.click_at(0.37, 0.52)
-        self.assertEqual(counting.count(), "004")
+        counting.check_count("004")
         # delete one
         counting.delete_from(0.51, 0.59, 0.33, 0.41)
-        self.assertEqual(counting.count(), "003")
-        # submit the result
-        counting.submit()
+        counting.check_count("003")
 
-        # see this result, as project admin
+        # save intermediate result and logout
+        counting.save()
         navbar = NavBar(self.driver)
         navbar.logout()
+        # confirm project admin account
         project_user = User("john", "john@test.com", "john")
         profile = SignInPage(self.driver).go().sign_in(project_user)
         WebMail(self.driver).go().click_first_body_link()
         ConfirmPage(self.driver).check(project_user).confirm()
+        # login, check no results yet
+        profile = SignInPage(self.driver).go().sign_in(project_user)
+        report = navbar.go_manage_projects()
+        report.toggle_tree_node("p1")
+        report.select_tree_node("s1")
+        # Should be no grain "1" in the table yet
+        # (as it is a partial save, not a submission)
+        self.assertRaises(AssertionError, report.result, "1")
+        # start counting, logout
+        counting.go().check_count("000")
+        navbar.logout()
+
+        # login as test user, we should still see the saved result
+        profile = SignInPage(self.driver).go().sign_in(test_user)
+        counting = profile.go_start_counting().check()
+        counting.check_count("003")
+
+        # submit the result
+        counting.submit()
+
+        # see this result, as project admin
+        navbar.logout()
         profile = SignInPage(self.driver).go().sign_in(project_user)
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
