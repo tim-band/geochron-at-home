@@ -173,12 +173,15 @@ class CountingPage(BasePage):
         self.driver.find_element_by_id("ftc-btn-delete").click()
         return self
 
+    def dismiss_well_done_message(self):
+        retrying(3, lambda: Alert(self.driver).accept())
+        return self
+
     def submit(self):
         self.driver.find_element_by_id("btn-tracknum").click()
         self.driver.find_element_by_id("tracknum-submit").click()
         Alert(self.driver).accept()
-        # Also dismiss "Well done!" message
-        retrying(3, lambda: Alert(self.driver).accept())
+        self.dismiss_well_done_message()
 
     def save(self):
         self.driver.find_element_by_id("btn-tracknum").click()
@@ -219,6 +222,12 @@ class CountingPage(BasePage):
 
 
 class NavBar(BasePage):
+    def check(self):
+        self.driver.find_element_by_css_selector(
+            ".navbar-fixed-top .navbar-right a.dropdown-toggle"
+        )
+        return self
+
     def logout(self):
         self.driver.find_element_by_css_selector(
             ".navbar-fixed-top .navbar-right a.dropdown-toggle"
@@ -282,7 +291,7 @@ class DjangoTests(unittest.TestCase):
         self.dc.exec("python3", "upload_projects.py",
             "-s", "geochron.settings",
             "-i", "test/xrays",
-            "-o", "static/grain_pool")
+        )
 
         # create user
         join_page = HomePage(self.driver).go().join()
@@ -334,8 +343,8 @@ class DjangoTests(unittest.TestCase):
         # (as it is a partial save, not a submission)
         self.assertRaises(AssertionError, report.result, "1")
         # start counting, logout
-        counting.go().check_count("000")
-        navbar.logout()
+        counting.go().dismiss_well_done_message().check_count("000")
+        navbar.check().logout()
 
         # login as test user, we should still see the saved result
         profile = SignInPage(self.driver).go().sign_in(test_user)

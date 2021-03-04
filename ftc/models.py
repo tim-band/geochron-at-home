@@ -70,8 +70,13 @@ class Image(models.Model):
         ('J', 'JPEG'),
         ('P', 'PNG'),
     )
+    FT_TYPE = (
+        ('S', 'Spontaneous Fission Tracks'),
+        ('I', 'Induced Fission Tracks'),
+    )
     grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
     format = models.CharField(max_length=1, choices=IMAGE_FORMAT)
+    ft_type = models.CharField(max_length=1, choices=FT_TYPE)
     index = models.IntegerField()
     data = models.BinaryField()
 
@@ -85,7 +90,7 @@ class FissionTrackNumbering(models.Model):
     grain = models.IntegerField()
     ft_type = models.CharField(max_length=1, choices=FT_TYPE)
     worker = models.ForeignKey(User, on_delete=models.CASCADE)
-    result = models.IntegerField()
+    result = models.IntegerField() #-1 means this is a partial save state
     create_date = models.DateTimeField(auto_now_add=True)
     latlngs = models.TextField(default='')
 
@@ -97,4 +102,3 @@ class FissionTrackNumbering(models.Model):
 
     def __unicode__(self):
         return '%s-%s-%d-%s-%s: %d' %(self.in_sample.in_project, self.in_sample.sample_name, self.grain, self.ft_type, self.worker.username, self.result)
-

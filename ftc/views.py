@@ -1,5 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 
+from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import redirect
@@ -65,15 +67,15 @@ def getTableData(request):
             res = []
             if sample_list:
                 for sample_id in sample_list:
-                    fts = FissionTrackNumbering.objects.select_related('in_sample__in_project').filter(in_sample=sample_id)
+                    fts = FissionTrackNumbering.objects.select_related('in_sample__in_project').filter(
+                        Q(in_sample=sample_id) & ~Q(result=-1)
+                    )
                     for ft in fts:
                         if request.user.is_superuser or ft.in_sample.in_project.creator == request.user:
                             a = [ft.in_sample.in_project.project_name, ft.in_sample.sample_name, 
                                  ft.grain, ft.ft_type, ft.result, ft.worker.username, ft.create_date]
                             res.append(a)
-            #--ok--projects = FissionTrackNumbering.objects.filter(in_sample__in=sample_list).values_list('in_sample', 'grain', 'result')
             myjson = json.dumps({ 'aaData' : res }, cls=DjangoJSONEncoder)
-            #--ok--myjson = json.dumps({ 'aaData' : list(projects) }, cls=DjangoJSONEncoder)
         except (KeyError, Project.DoesNotExist):
             return HttpResponse("you have no project currrently. add one?")
         else:
@@ -90,11 +92,13 @@ from .grain_uinfo import genearate_working_grain_uinfo, restore_grain_uinfo
 from .load_rois import load_rois
 
 @login_required
-def get_image(request, project_name, sample_name, grain_nth, image_nth):
+def get_image(request, project_name, sample_name, grain_nth, ft_type, image_nth):
     images = Image.objects.filter(grain__sample__sample_name=sample_name,
         grain__sample__in_project__project_name=project_name,
         grain__index=grain_nth,
-        index=int(image_nth))
+        ft_type=ft_type,
+        index=int(image_nth),
+    )
     if len(images) == 0:
         raise Http404('image does not exist')
     if 1 < len(images):
@@ -106,7 +110,6 @@ def get_image(request, project_name, sample_name, grain_nth, image_nth):
 def get_grain_images(request):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # ftc/
     grain_pool_path = os.path.join(os.path.dirname(BASE_DIR), 'static/grain_pool')
-    working_repos_path = os.path.join(BASE_DIR, "static/working_repos/")
     sep = '~'
     res = {}
     # img_ext = set(['.png', '.jpeg', '.jpg'])
@@ -115,10 +118,9 @@ def get_grain_images(request):
     flag_continue_old_counting = False
     if request.is_ajax() and request.user.is_active:
         uname = request.user.username
-        grain_uinfo, working_f = restore_grain_uinfo(working_repos_path, uname)
+        grain_uinfo, ftn = restore_grain_uinfo(uname)
         if len(grain_uinfo) == 0:
             grain_uinfo = genearate_working_grain_uinfo(request)
-            working_f = None
         else:
             res['num_markers']  = grain_uinfo['num_markers']
             res['marker_latlngs'] = grain_uinfo['marker_latlngs']
@@ -161,8 +163,8 @@ def get_grain_images(request):
                 return HttpResponse(myjson, content_type='application/json')
             else:
                 # report error: cannot find images for grain
-                if working_f is not None:
-                    os.remove(working_f)
+                if ftn is not None:
+                    ftn.delete()
                 error_str = "[Project: %s, Sample: %s, Grain #: %d, FT_type: %s] has no images or has no ROIs\n" \
                           % (the_project.project_name, the_sample.sample_name, the_grain, ft_type) \
                           + "Refresh page to load another Grain."
@@ -207,8 +209,6 @@ def counting(request, uname=None):
 @login_required
 def updateTFNResult(request):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    working_repos_path = os.path.join(BASE_DIR, "static/working_repos/")
-    #working_repos_path = "ftc/static/working_repos/"
     sep = '~'
     if request.is_ajax() and request.user.is_active:
         try:
@@ -222,22 +222,16 @@ def updateTFNResult(request):
                                         ft_type=res_dic['ft_type'], 
                                         worker=request.user, 
                                         result=res_dic['track_num'],
-                                        latlngs=latlng_json_str)
+                                        latlngs=latlng_json_str,
+            )
             fts.save()
-            #remove intermedia result file if exists
-            proj_id = res_dic['proj_id']
-            sample_id = res_dic['sample_id']
-            grain_num = res_dic['grain_num']
-            ft_type = res_dic['ft_type']
-            filename_intermedia_result = working_repos_path \
-                                       + request.user.username + sep \
-                                       + str(proj_id) + sep \
-                                       + str(sample_id)  + sep \
-                                       + str(grain_num) + sep \
-                                       + ft_type + '.json'
-            if os.path.isfile(filename_intermedia_result): os.remove(filename_intermedia_result)
-            # if stack-mica pair, do the uncounted part
-            # TODO 
+            user = User.objects.get(username=request.user.username)
+            project = Project.objects.get(id=res_dic['proj_id'])
+            # Remove any partial save state
+            FissionTrackNumbering.objects.filter(
+                worker=user,
+                result=-1,
+            ).delete()
         except (KeyError, Project.DoesNotExist):
             return HttpResponse("you have no project currrently.")
         else:
@@ -250,39 +244,29 @@ import sys
 import fnmatch
 @login_required
 def saveWorkingGrain(request):
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    working_repos_path = os.path.join(BASE_DIR, "static/working_repos/")
-    #working_repos_path = "ftc/static/working_repos/"
-    sep = '~'
     if request.is_ajax() and request.user.is_active:
-        try:
+        with transaction.atomic():
+            user = User.objects.get(username=request.user.username)
+            # Remove any previous partial save state
+            FissionTrackNumbering.objects.filter(
+                worker=user,
+                result=-1,
+            ).delete()
             json_str = request.body.decode(encoding='UTF-8')
             res_json = json.loads(json_str)
             res = res_json['intermedia_res']
-            proj_id = res['proj_id']
-            sample_id = res['sample_id']
-            grain_num = res['grain_num']
-            ft_type = res['ft_type']
-            #image_width = res['image_width']
-            #image_height = res['image_height']
-            num_markers = res['num_markers']
-            marker_latlngs = res['marker_latlngs']
-            filename_intermedia_result = working_repos_path \
-                                       + request.user.username + sep \
-                                       + str(proj_id) + sep \
-                                       + str(sample_id)  + sep \
-                                       + str(grain_num) + sep \
-                                       + ft_type + '.json'
-            for file in os.listdir(working_repos_path):
-                if fnmatch.fnmatch(file, request.user.username + '*'):
-                    os.remove(os.path.join(working_repos_path, file))
-            with open(filename_intermedia_result,'w+') as f:
-                json.dump(res, f)
-        except Exception as err:
-            return HttpResponse(sys.exc_info()[0])
-        else:
-            myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
-            return HttpResponse(myjson, content_type='application/json')
+            sample = Sample.objects.get(id=res['sample_id'])
+            ftn = FissionTrackNumbering(
+                in_sample=sample,
+                grain=res['grain_num'],
+                ft_type='S',
+                worker=user,
+                result=-1,
+                latlngs=res['marker_latlngs'],
+            )
+            ftn.save()
+        myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
+        return HttpResponse(myjson, content_type='application/json')
     else:
         return HttpResponse("Sorry, You have to active your account first.")
 

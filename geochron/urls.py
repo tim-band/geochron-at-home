@@ -1,6 +1,7 @@
 from django.conf.urls import include, re_path
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
+from django.urls import path
 
 from ftc.views import profile
 
@@ -15,5 +16,5 @@ urlpatterns = [
     re_path(r'^accounts/', include('allauth.urls')),
     # admin
     re_path(r'^admin/', admin.site.urls),
-    re_path(r'^ftc/', include('ftc.urls')),
+    path(r'ftc/', include('ftc.urls')),
 ]

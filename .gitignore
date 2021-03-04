@@ -1,6 +1,5 @@
 /static/
 /ftc/static/grain_pool
-/ftc/static/working_repos
 .env
 production.env
 /user_upload/

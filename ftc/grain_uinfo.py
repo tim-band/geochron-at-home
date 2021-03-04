@@ -78,29 +78,20 @@ def genearate_working_grain_uinfo(request):
     # if still len(projs) > 0, means this user has nothing left, but not all project closed
     return grain_uinfo
 
-def restore_grain_uinfo(working_repos_path, username):
+def restore_grain_uinfo(username):
     grain_uinfo = {}
-    path = None
-    files = [f for f in os.listdir(working_repos_path)]
-    for f in files:
-        path = os.path.join(working_repos_path, f)
-        if os.path.isfile(path) and f.startswith(username) and f.endswith('.json'):
-            with open(path,'r') as inf:
-                data = json.load(inf)
-            try:
-              project_id = data['proj_id']
-              sample_id = data['sample_id']
-              the_project = Project.objects.get(pk=project_id)
-              the_sample = Sample.objects.get(pk=sample_id)
-            except:
-              # in case project and/or sample is deleted in database
-              os.remove(path)
-              break
-            grain_uinfo['project'] = the_project
-            grain_uinfo['sample'] = the_sample
-            grain_uinfo['num_markers'] = data['num_markers']
-            grain_uinfo['marker_latlngs'] = data['marker_latlngs']
-            grain_uinfo['grain_index'] = data['grain_num']
-            grain_uinfo['ft_type'] = data['ft_type']
-            break
-    return grain_uinfo, path
+    ftns = FissionTrackNumbering.objects.filter(
+        result=-1,
+        worker__username=username,
+    ).select_related()
+    if len(ftns) == 0:
+        return grain_uinfo, None
+    ftn = ftns[0]
+    latlngs = json.loads(ftn.latlngs)
+    grain_uinfo['project'] = ftn.in_sample.in_project
+    grain_uinfo['sample'] =  ftn.in_sample
+    grain_uinfo['num_markers'] = len(latlngs)
+    grain_uinfo['marker_latlngs'] = latlngs
+    grain_uinfo['grain_index'] =  ftn.grain
+    grain_uinfo['ft_type'] = 'S'
+    return grain_uinfo, ftn

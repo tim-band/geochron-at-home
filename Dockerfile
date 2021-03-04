@@ -5,7 +5,6 @@ RUN apk add python3-dev py3-pip postgresql-dev libffi-dev build-base postgresql-
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-RUN mkdir -p ftc/static/working_repos
 COPY manage.py .
 COPY site_init.sh .
 COPY upload_projects.py .

@@ -1,6 +1,6 @@
 import os
 import json
-from ftc.models import Vertex, Region, Image, Grain
+from ftc.models import Grain
 
 def load_rois(grain_pool_path, owner, project_name, sample_name, sample_property, grain_nth, ft_type):
     grains = Grain.objects.filter(
