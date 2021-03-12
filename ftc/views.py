@@ -27,16 +27,14 @@ def signmeup(request):
        
 # Fission tracks measuring report
 from django.contrib.auth.decorators import login_required, user_passes_test
-"""
+
 def user_is_staff(user):
-    return user.is_authenticated and user.is_active and user.is_staff
-"""
+    return user.is_active and user.is_staff
 
 #@user_passes_test(user_is_staff)
 @login_required
 def report(request):
     if request.user.is_active and request.user.is_staff:
-        #projects = get_object_or_404(Project, creator=request.user)
         try:
             if request.user.is_superuser:
                 projects = Project.objects.all()
@@ -45,10 +43,53 @@ def report(request):
         except (KeyError, Project.DoesNotExist):
             return HttpResponse("you have no project currrently. add one?")
         else:
-#            return render(request, 'ftc/home.html', {'projects': projects})
             return render(request, 'ftc/report.html', {'projects': projects})
     else:
         return HttpResponse("Sorry, You don't have permission to access the requested page.")
+
+
+@user_passes_test(user_is_staff)
+def projects(request):
+    return render(request, "ftc/projects.html", {
+        'projects': Project.objects.all()
+    })
+
+
+@user_passes_test(user_is_staff)
+def samples(request, project_name):
+    return render(request, "ftc/samples.html", {
+        'samples': Sample.objects.filter(
+            in_project__project_name=project_name
+        ),
+        'project_name': project_name,
+    })
+
+
+@user_passes_test(user_is_staff)
+def grains(request, project_name, sample_name):
+    return render(request, "ftc/grains.html", {
+        'grains': Grain.objects.filter(
+            sample__in_project__project_name=project_name,
+            sample__sample_name=sample_name,
+        ).order_by('index'),
+        'project_name': project_name,
+        'sample_name': sample_name,
+    })
+
+
+@user_passes_test(user_is_staff)
+def images(request, project_name, sample_name, grain_index):
+    return render(request, "ftc/images.html", {
+        'images': Image.objects.filter(
+            grain__sample__in_project__project_name=project_name,
+            grain__sample__sample_name=sample_name,
+            grain__index=grain_index,
+        ).order_by('index'),
+        'project_name': project_name,
+        'sample_name': sample_name,
+        'grain_index': grain_index,
+    })
+
 
 import json
 from django.core.serializers.json import DjangoJSONEncoder
@@ -147,7 +188,6 @@ def get_grain_images(request):
                         sample__in_project__project_name=the_project.project_name)
                     width = gs[0].image_width
                     height = gs[0].image_height
-                    #width, height = get_image_size(os.path.join(grain_pool_path, images_list[0]))
                 except UnknownImageFormat:
                     width, height = 1, 1 
                 res['proj_id'] = the_project.id
@@ -158,7 +198,6 @@ def get_grain_images(request):
                 res['image_height'] = height
                 res['images'] = images_list
                 res['rois'] = rois
-                #--- 
                 myjson = json.dumps(res, cls=DjangoJSONEncoder)
                 return HttpResponse(myjson, content_type='application/json')
             else:

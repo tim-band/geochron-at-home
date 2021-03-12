@@ -321,29 +321,24 @@ footer {
         selectMode: 3, // 1:single, 2:multi, 3:multi-hier
         renderNode: function (event, data) {
            var node = data.node;
-           //var deleteButton = $('<span class="badge badge-info" data-toggle="modal" data-target="#exampleModal" data-whatever="@mdo">count</span>');
-           //deleteButton.css('cursor','pointer');
-           //var deleteButton = $('<button type="button" class="btn" onclick="myFunction()">delete node</button>');
            leaf_node = $(node.span).not('.fancytree-has-children')
            if((leaf_node.length != 0) && !(leaf_node.children().hasClass('label-as-badge')) ) {
-               //alert(node.parent.title+'\n'+node.parent.key+'\n'+node.title+'\n'+node.key+'\n');
                var btn_html = '<span class="label label-primary label-as-badge" data-toggle="modal"'
                             + ' data-proj=' + node.parent.title
                             + ' data-proj_id=' + node.parent.key
                             + ' data-sample=' + node.title
                             + ' data-sample_id=' + node.key
                             + ' data-toggle="modal" data-target="#exampleModal">count</span>'
-               var deleteButton = $(btn_html); 
-               //var deleteButton = $('<span class="badge badge-info" data-toggle="modal" data-target="#exampleModal" data-proj="@mdo">count</span>');
-               deleteButton.css('cursor','pointer');
-               leaf_node.append(deleteButton);
-               deleteButton.hide();
+               var countButton = $(btn_html); 
+               countButton.css('cursor','pointer');
+               leaf_node.append(countButton);
+               countButton.hide();
                leaf_node.hover(function () {
                   // mouse over
-                  deleteButton.show();
+                  countButton.show();
                   }, function () {
                   // mouse out
-                  deleteButton.hide();
+                  countButton.hide();
                });
            } // end lead_node setting
         },
@@ -354,9 +349,6 @@ footer {
             var selectedKeys = $.map(selectedNodes, function(node){
                return (node.key.charAt(0).toLowerCase() == 'p') ? null : node.key.split('_')[0];
             });
-            //console.log(selectedKeys);
-            // ... get id of all node
-            //dataTable.ajax.url( '/getTableData/' ).load();
             $.ajax({
                 url: "{% url 'getTableData'%}",
                 type: 'POST',
@@ -371,7 +363,6 @@ footer {
                              //console.log(result);
                              if (result.aaData.length > 0) {
                                  dataTable.fnClearTable();
-                                 //dataTable.fnDraw();
                                  dataTable.fnAddData(result.aaData);
                                  dataTable.fnDraw();
                                  //dataTable.columns.adjust().draw();

@@ -3,11 +3,6 @@ from optparse import OptionParser
 from django.db import transaction
 import json
 
-def ensuredir(d):
-    if not os.path.isdir(d):
-        os.makedirs(d)
-
-
 def parse_image_name(f):
     if f.lower() == 'reflstackflat':
         return -1

@@ -1,0 +1,18 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block content %}
+
+<h1>Samples for project <strong>{{ project_name }}</strong></h1>
+
+<ul>
+    {% for s in samples %}
+    <li><a href="{% url 'grains' project_name s.sample_name %}">{{ s.sample_name }}</a></li>
+    {% endfor %}
+</ul>
+
+<p>Form for creating a new sample should go here</p>
+
+{% endblock %}
+

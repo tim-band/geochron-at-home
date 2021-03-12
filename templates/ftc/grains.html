@@ -1,0 +1,18 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block content %}
+
+<h1>Grains for sample <strong>{{ sample_name }}</strong> in project <strong>{{ project_name }}</strong></h1>
+
+<ul>
+    {% for g in grains %}
+    <li><a href="{% url 'images' project_name sample_name g.index %}">Grain {{ g.index }}</a></li>
+    {% endfor %}
+</ul>
+
+<p>Form for creating a new grain should go here</p>
+
+{% endblock %}
+
