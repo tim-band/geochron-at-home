@@ -1,10 +1,14 @@
 from django.shortcuts import render, get_object_or_404
-
 from django.db import transaction
 from django.db.models import Q
+from django.forms import ModelForm, CharField, Textarea
+from django.views.generic.edit import CreateView, UpdateView
+from django.views.generic import DetailView
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.mixins import UserPassesTestMixin
 from django.shortcuts import redirect
+import base64
 
 from ftc.models import Project, Sample, FissionTrackNumbering, Image, Grain
 
@@ -55,39 +59,108 @@ def projects(request):
     })
 
 
-@user_passes_test(user_is_staff)
-def samples(request, project_name):
-    return render(request, "ftc/samples.html", {
-        'samples': Sample.objects.filter(
-            in_project__project_name=project_name
-        ),
-        'project_name': project_name,
-    })
+class StaffRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        return user_is_staff(self.request.user)
 
 
-@user_passes_test(user_is_staff)
-def grains(request, project_name, sample_name):
-    return render(request, "ftc/grains.html", {
-        'grains': Grain.objects.filter(
-            sample__in_project__project_name=project_name,
-            sample__sample_name=sample_name,
-        ).order_by('index'),
-        'project_name': project_name,
-        'sample_name': sample_name,
-    })
+class CreatorOrSuperuserMixin(UserPassesTestMixin):
+    def test_func(self):
+        return (
+            self.request.user == self.object.get_creator()
+            or self.request.user.is_superuser
+        )
+
+
+class ProjectDetailView(DetailView, StaffRequiredMixin):
+    model = Project
+    template_name = "ftc/project.html"
+
+
+class ProjectForm(ModelForm):
+    class Meta:
+        model = Project
+        fields = ['project_name', 'project_description', 'priority', 'closed']
+    project_description = CharField(widget=Textarea)
+
+
+class ProjectCreateView(CreateView, StaffRequiredMixin):
+    model = Project
+    form_class = ProjectForm
+
+
+class ProjectUpdateView(UpdateView, CreatorOrSuperuserMixin):
+    model = Project
+    form_class = ProjectForm
+    template_name = "ftc/project_update.html"
+
+
+class SampleDetailView(DetailView, StaffRequiredMixin):
+    model = Sample
+    template_name = "ftc/sample.html"
+
+
+class SampleForm(ModelForm):
+    class Meta:
+        model = Sample
+        fields = ['sample_name', 'sample_property', 'priority', 'min_contributor_num', 'completed']
+
+
+class SampleCreateView(CreateView, StaffRequiredMixin):
+    model = Sample
+    form_class = SampleForm
+
+
+class SampleUpdateView(UpdateView, CreatorOrSuperuserMixin):
+    model = Sample
+    form_class = SampleForm
+    template_name = "ftc/sample_update.html"
+
+
+class GrainDetailView(DetailView, StaffRequiredMixin):
+    model = Grain
+    template_name = "ftc/grain.html"
+
+
+class GrainForm(ModelForm):
+    class Meta:
+        model = Grain
+        fields = ['index', 'image_width', 'image_height']
+
+
+class GrainCreateView(CreateView, StaffRequiredMixin):
+    model = Grain
+    form_class = GrainForm
+
+
+class GrainUpdateView(UpdateView, CreatorOrSuperuserMixin):
+    model = Grain
+    form_class = GrainForm
+    template_name = "ftc/grain_update.html"
 
 
 @user_passes_test(user_is_staff)
 def images(request, project_name, sample_name, grain_index):
+    grain = Grain.objects.get(
+        sample__in_project__project_name=project_name,
+        sample__sample_name=sample_name,
+        index=grain_index,
+    )
+    images = Image.objects.filter(
+        grain__sample__in_project__project_name=project_name,
+        grain__sample__sample_name=sample_name,
+        grain__index=grain_index,
+    ).order_by('index')
+    mimetype = {
+        'J': 'image/jpeg',
+        'P': 'image/png',
+    }
     return render(request, "ftc/images.html", {
-        'images': Image.objects.filter(
-            grain__sample__in_project__project_name=project_name,
-            grain__sample__sample_name=sample_name,
-            grain__index=grain_index,
-        ).order_by('index'),
+        'images': images,
         'project_name': project_name,
         'sample_name': sample_name,
         'grain_index': grain_index,
+        'grain': grain,
     })
 
 
@@ -133,19 +206,10 @@ from .grain_uinfo import genearate_working_grain_uinfo, restore_grain_uinfo
 from .load_rois import load_rois
 
 @login_required
-def get_image(request, project_name, sample_name, grain_nth, ft_type, image_nth):
-    images = Image.objects.filter(grain__sample__sample_name=sample_name,
-        grain__sample__in_project__project_name=project_name,
-        grain__index=grain_nth,
-        ft_type=ft_type,
-        index=int(image_nth),
-    )
-    if len(images) == 0:
-        raise Http404('image does not exist')
-    if 1 < len(images):
-        raise Exception('{0} matching images found'.format(len(images)))
-    mime = images[0].format = 'P' and 'image/png' or 'image/jpeg'
-    return HttpResponse(images[0].data, content_type=mime)
+def get_image(request, pk):
+    image = get_object_or_404(Image, pk=pk)
+    mime = image.format = 'P' and 'image/png' or 'image/jpeg'
+    return HttpResponse(image.data, content_type=mime)
 
 @login_required
 def get_grain_images(request):

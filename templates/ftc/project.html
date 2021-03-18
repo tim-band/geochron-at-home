@@ -1,0 +1,28 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block content %}
+
+<h1> Project <strong>{{ object.project_name }}</strong></h1>
+{% if user.is_superuser or is_creator %}
+<div><a href="{% url 'project_update' object.pk %}">Edit</a></div>
+{% endif %}
+<div>
+    <table>
+        <tr><td>By</td><td>{{object.creator}}</td></tr>
+        <tr><td>On</td><td>{{object.create_date}}</td></tr>
+        <tr><td>Description</td><td>{{object.project_description}}</td></tr>
+        <tr><td>Priority</td><td>{{object.priority}}</td></tr>
+        <tr><td>Closed?</td><td>{{object.closed}}</td></tr>
+    </table>
+</div>
+<h2>Samples</h2>
+<ul>
+    {% for s in object.sample_set.all %}
+    <li><a href="{% url 'sample' s.pk %}">{{ s.sample_name }}</a></li>
+    {% endfor %}
+</ul>
+
+{% endblock %}
+

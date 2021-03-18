@@ -7,6 +7,9 @@
         <li class="divider"></li>
         <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i> &nbsp;fission track counting</a></li>
     {% endif %}
+    {% if user.is_staff or user.is_superuser %}
+    <li><a href="{% url 'projects'%}"><i class="fa fa-flash"></i> &nbsp;Edit your projects</a></li>
+    {% endif %}
 {% endblock %}
 
 {% block content %}

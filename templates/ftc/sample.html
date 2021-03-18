@@ -1,0 +1,28 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block content %}
+
+<h1> Sample <strong>{{ object.sample_name }}</strong></h1>
+{% if user.is_superuser or is_creator %}
+<div><a href="{% url 'sample_update' object.pk %}">Edit</a></div>
+{% endif %}
+<div>
+    <table>
+        <tr><td>Property</td><td>{{object.get_sample_property_display}}</td></tr>
+        <tr><td>Total grains</td><td>{{object.total_grains}}</td></tr>
+        <tr><td>Priority</td><td>{{object.priority}}</td></tr>
+        <tr><td>Minimum contributor number</td><td>{{object.min_contributor_num}}</td></tr>
+        <tr><td>Completed?</td><td>{{object.completed}}</td></tr>
+    </table>
+</div>
+<h2>Grains</h2>
+<ul>
+    {% for g in object.grain_set.all %}
+    <li><a href="{% url 'grain' g.pk %}">{{ g.index }}</a></li>
+    {% endfor %}
+</ul>
+
+{% endblock %}
+

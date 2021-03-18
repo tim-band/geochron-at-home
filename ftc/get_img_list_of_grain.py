@@ -6,6 +6,5 @@ def get_grain_images_list(grain_pool_path, owner, project_name, sample_name, sam
         grain__sample__in_project__project_name=project_name,
         grain__index=grain_nth,
         ft_type=ft_type,
-    ).order_by('index').values_list('index', flat=True)
-    return list(map(lambda x:'/ftc/image/{0}/{1}/{2}/{3}/{4}'.format(
-        project_name, sample_name, grain_nth, ft_type, x), images))
+    ).order_by('index')
+    return list(map(lambda x:'/ftc/image/{0}/'.format(x.pk), images))

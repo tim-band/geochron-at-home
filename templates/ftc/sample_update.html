@@ -1,0 +1,20 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block content %}
+
+<h1> Sample <strong>{{ object.sample_name }}</strong></h1>
+<div><a href="{% url 'sample' object.pk %}">Cancel</a></div>
+<div>
+    <form action="{% url 'sample_update' object.pk %}" method="POST">
+        {% csrf_token %}
+        <table>
+            {{ form.as_table }}
+        </table>
+        <input type="submit" value="Save">
+    </form>
+</div>
+
+{% endblock %}
+

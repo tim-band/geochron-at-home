@@ -1,0 +1,24 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block content %}
+
+<h1> Project <strong>{{ object.project_name }}</strong></h1>
+<div><a href="{% url 'project' object.pk %}">Cancel</a></div>
+<div>
+    <table>
+        <tr><td>By</td><td>{{object.creator}}</td></tr>
+        <tr><td>On</td><td>{{object.create_date}}</td></tr>
+    </table>
+    <form action="{% url 'project_update' object.pk %}" method="POST">
+        {% csrf_token %}
+        <table>
+            {{ form.as_table }}
+        </table>
+        <input type="submit" value="Save">
+    </form>
+</div>
+
+{% endblock %}
+

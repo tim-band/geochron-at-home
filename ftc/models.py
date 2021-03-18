@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
+from django.urls import reverse
 
 # import re
 
@@ -21,6 +22,12 @@ class Project(models.Model):
 
     def __unicode__(self):
         return '%s owned by %s' % (self.project_name, self.creator.username)
+
+    def get_absolute_url(self):
+        return reverse('project', args=[self.pk])
+
+    def get_creator(self):
+        return self.creator
 
 #
 class Sample(models.Model):
@@ -45,12 +52,24 @@ class Sample(models.Model):
         return 'sample %s belong to project %s as %s' % (self.sample_name, 
                 self.in_project.project_name, self.sample_property)
 
+    def get_absolute_url(self):
+        return reverse('sample', args=[self.pk])
+
+    def get_creator(self):
+        return self.in_project.get_creator()
+
 #
 class Grain(models.Model):
     sample = models.ForeignKey(Sample, on_delete=models.CASCADE)
     index = models.IntegerField()
     image_width = models.IntegerField()
     image_height = models.IntegerField()
+
+    def get_creator(self):
+        return self.sample.get_creator()
+
+    def get_images(self):
+        return self.image_set.order_by('index')
 
 #
 class Region(models.Model):
