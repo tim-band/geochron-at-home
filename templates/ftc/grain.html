@@ -88,83 +88,17 @@ button:disabled {
 </style>
 <script type='text/javascript' src="{% static 'Leaflet-1.7.1/leaflet.js' %}"></script>
 <script type='text/javascript' src="{% static 'noUiSlider-14.6.3/nouislider.min.js' %}"></script>
+<script type='text/javascript' src="{% static 'projects/script/grain.js' %}"></script>
 <script>
-function forEach(arr, f) {
-    for (var i = 0; i !== arr.length; ++i) {
-        f(arr[i], i);
-    }
-}
-function forEachInCycle(arr, f) {
-    var lastI = arr.length - 1;
-    var lastV = arr[lastI];
-    forEach(arr, function(v, i) {
-        f(lastV, v, lastI, i);
-        lastV = v;
-        lastI = i;
-    });
-}
-
-function pointsClose(a, b, closeness) {
-    return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1])) < closeness;
-}
-
-// returns the point on the (extended) line start-end closest to the
-// point pt, provided that it is less than closeness away from the
-// extended line.
-function closePointOnLine(pt, start, end, closeness) {
-    // vector of line
-    var vx = end[1] - start[1];
-    var vy = end[0] - start[0];
-    // pt relative to start of line
-    var px = pt[1] - start[1];
-    var py = pt[0] - start[0];
-    // p dot v
-    var pv = px * vx + py * vy;
-    // |v| squared
-    var v2 = vx * vx + vy * vy;
-    // closest point is how far along v?
-    var prop = pv / v2;
-    // which is which point?
-    var ix = start[1] + prop * vx;
-    var iy = start[0] + prop * vy;
-    if (pointsClose([ix, iy], pt, closeness)) {
-        return [iy, ix];
-    }
-    return null;
-}
-
-function noop() { }
-
-function makeMap() {
+var xray_control;
+function makeGrainMap() {
     var image_height = {{ object.image_height }};
     var image_width = {{ object.image_width }};
-    var yox = image_height / image_width;
-    var mapView = [yox / 2.0, 0.5];
-    var mapZoom = 11;
-    var imageBounds = [
-        [0.0, 0.0],
-        [yox, 1.0]
-    ];
-    var imageOverlays = [];
-    //{% for i in object.get_images %}
-    imageOverlays.push(L.imageOverlay(
+    var image_urls = [
+        //{% for i in object.get_images %}
         "{% url 'get_image' i.pk %}",
-        imageBounds, {
-            zIndex: 1,
-        }
-    ));
-    //{% endfor %}
-    var map = L.map('map', {
-        center: mapView,
-        zoom: mapZoom,
-        minZoom: mapZoom - 2,
-        maxZoom: mapZoom + 3,
-        scrollWheelZoom: false,
-        //doubleClickZoom: false
-        /* zoomControl: false */
-        layers: imageOverlays,
-        attributionControl: false,
-    });
+        //{% endfor %}
+    ];
     var region_points = [
         //{% for region in object.region_set.all %}
         [
@@ -174,121 +108,11 @@ function makeMap() {
         ],
         //{% endfor %}
     ];
-    var region_layer = L.polygon(region_points, {
-        color: 'white',
-        fill: false,
-        bubblingMouseEvents: false,
-    }).addTo(map);
-    currentFront = imageOverlays.length - 1;
-    function bringToFront(layerNumber) {
-        if (0 <= layerNumber && layerNumber < imageOverlays.length) {
-            imageOverlays[currentFront].setZIndex(1);
-            currentFront = layerNumber;
-            imageOverlays[currentFront].setZIndex(2);
-        }
-    }
-    bringToFront(0);
-    var MyControl = function() {
-        var slider;
-
-        function onAdd(map) {
-            // create the control container with a particular class name
-            var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control slider2-container');
-            container.id = 'slider2-container';
-            slider_div = L.DomUtil.create('div', 'leaflet-bar-slider2', container);
-            slider_div.id = 'slider2';
-            slider = noUiSlider.create(slider_div, {
-                start: currentFront,
-                orientation: 'vertical',
-                range: {
-                    'min': 0,
-                    'max': imageOverlays.length - 1
-                },
-                step: 1,
-                format: {
-                    to: function(v) { return Math.floor(v); },
-                    from: function(v) { return Number(v); }
-                },
-                tooltips: [
-                    {
-                        to: function(x) { return Math.floor(x); }
-                    }
-                ],
-                keyboardDefaultStep: 1
-            });
-            slider.on('update', function(ev) {
-                bringToFront(slider.get());
-            });
-            L.DomEvent.disableClickPropagation(slider_div);
-            container.control = slider;
-            return container;
-        }
-
-        return L.Control.extend({
-            options: {
-                position: 'topleft'
-            },
-            onAdd: onAdd,
-        });
-    }();
-    var slider = new MyControl();
-    map.addControl(slider);
-
-    // zoom by wheel
-    document.getElementById('map').addEventListener('wheel', function(ev) {
-        var s = slider.getContainer().control;
-        var position = Math.min(
-            Math.max(s.get() - Math.sign(-ev.deltaY), 0),
-            imageOverlays.length - 1
-        );
-        s.set(position);
-    });
-
-    return {
-        map: map,
-        region_layer: region_layer,
-        marker_layer: L.layerGroup().addTo(map),
-        region_points: region_points,
-    };
+    return makeMap(image_height, image_width, image_urls, region_points);
 }
-
-var xray_control;
-
 window.addEventListener('load', function() {
-    xray_control = makeMap();
+    xray_control = makeGrainMap();
 });
-
-function add_region_markers(xray) {
-    forEach(xray.region_points, function(region, ri) {
-        forEach(region, function(vertex) {
-            var v = L.marker(vertex, {
-                draggable: true,
-            }).addTo(xray.marker_layer);
-            L.DomEvent.on(v, 'move', function(ev) {
-                vertex[0] = ev.latlng.lat
-                vertex[1] = ev.latlng.lng;
-                xray.region_layer.setLatLngs(xray.region_points);
-            });
-        });
-    });
-}
-
-function begin_edit() {
-    add_region_markers(xray_control);
-    var edit = document.getElementById("edit");
-    var save = document.getElementById("save");
-    edit.setAttribute('disabled', true);
-    save.removeAttribute('disabled');
-}
-
-function save() {
-    console.log('should do some saving here (remember the csrf token!)');
-    var edit = document.getElementById("edit");
-    var save = document.getElementById("save");
-    edit.removeAttribute('disabled');
-    save.setAttribute('disabled', true);
-    xray_control.marker_layer.clearLayers();
-}
 </script>
 
 {% endblock %}
@@ -302,8 +126,8 @@ function save() {
         in project <strong>{{ object.sample.in_project.project_name }}</strong>
     </span>
     {% if user.is_superuser or is_creator %}
-    <button id="edit" onclick="begin_edit()">Edit</button>
-    <button id="save" onclick="save()" disabled>Save</button>
+    <button id="edit" onclick="beginEdit(xray_control)">Edit</button>
+    <button id="save" onclick="save(xray_control)" disabled>Save</button>
     {% endif %}
 </div>
 
