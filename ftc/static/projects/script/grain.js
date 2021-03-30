@@ -185,6 +185,9 @@ function makeMap(image_height, image_width, image_urls, region_points) {
 }
 
 function wantsToMerge(xray, v, i, region) {
+    if (region.length < 2) {
+        return false;
+    }
     var lasti = i === 0? region.length - 1 : i - 1;
     var nexti = i === region.length - 1? 0 : i + 1;
     var lastp = xray.map.latLngToLayerPoint(region[lasti]);
@@ -194,15 +197,20 @@ function wantsToMerge(xray, v, i, region) {
 }
 
 function mergePoints(xray, i, region, region_index) {
+    if (region.length === 2 && 1 < xray.region_points.length) {
+        // gone down to a single point. If there are more regions,
+        // just delete the whole region.
+        return xray.region_points.slice(0, region_index).concat(
+            xray.region_points.slice(region_index + 1));
+    }
     var r = region.slice(0, i).concat(region.slice(i + 1));
     var new_regions = xray.region_points.slice(0, region_index).concat(
         [r], xray.region_points.slice(region_index + 1));
-    console.log('merged', xray.region_points, new_regions);
     return new_regions;
 }
 
-// get a list of sides that cross other sides, listed by
-// their
+// get a list of sides that cross other sides, sorted by
+// their lengths
 function getSplits(i, region) {
     var n = region.length;
     if (n < 5) {
@@ -216,12 +224,10 @@ function getSplits(i, region) {
     var prev = (i1 + 1) % n;
     for (var j = (prev + 1) % n; j !== i0; prev=j,j=(j+1)%n) {
         if (linesCross(region[i], region[i1], region[prev], region[j])) {
-            console.log("lines cross: ", i, i1, prev, j);
             cuts[i1] = true;
             cuts[j] = true;
         }
         if (linesCross(region[i0], region[i], region[prev], region[j])) {
-            console.log("2 lines cross: ", i0, i, prev, j);
             cuts[i] = true;
             cuts[j] = true;
         }
@@ -231,37 +237,97 @@ function getSplits(i, region) {
     return c;
 }
 
-function getParts(i, region) {
-    var splits = getSplits(i, region);
-    if (splits.length < 2) {
+// get a list of sides in other_region that are crossed by the
+// two sides next to node i from home_region
+function getSplits2(i, home_region, other_region) {
+    var m = home_region.length;
+    var n = other_region.length;
+    // moving sides are i0->i and i->i1
+    var i0 = (i + m - 1) % m; // node before i
+    var i1 = (i + 1) % m; // node after i
+    var cuts = {};
+    var prev = n-1;
+    for (var j = 0; j !== n; prev=j, j++) {
+        if (linesCross(home_region[i], home_region[i1], other_region[prev], other_region[j])) {
+            cuts[j] = true;
+        }
+        if (linesCross(home_region[i0], home_region[i], other_region[prev], other_region[j])) {
+            cuts[j] = true;
+        }
+    }
+    var c = Object.keys(cuts);
+    c.sort();
+    return c;
+}
+
+// return the two biggest parts after slicing before each node
+// index in the `splits` array (returns the biggest first, returns
+// only one if there is only one part)
+function getParts(splits, region, min_parts) {
+    if (splits.length < min_parts) {
         return null;
     }
     var lastIndex = splits[splits.length - 1];
     var prev = splits[0];
     var parts = [region.slice(lastIndex).concat(region.slice(0, prev))];
-    for (var j = 1; j !== splits.length; prev=splits[j],++j) {
-        parts.push(region.slice(prev, splits[j]));
+    for (var j = 1, cur=splits[1]; j !== splits.length; prev=cur, ++j, cur=splits[j]) {
+        parts.push(region.slice(prev, cur));
     }
-    if (parts.length < 2) {
+    if (parts.length < min_parts) {
         return null;
     }
     parts.sort(function(a,b) {
         return b.length - a.length;
     });
-    console.log("parts", parts, splits);
     return parts.slice(0,2);
 }
 
+function mergeRegion(home_region, i, other_region) {
+    var ps = getParts(getSplits2(i, home_region, other_region), other_region, 1);
+    if (!ps) {
+        return null;
+    }
+    return home_region.slice(0, i).concat(
+        ps[0],
+        home_region.slice(i + 1)
+    );
+}
+
+function mergeRegions(regions, region_index, region, i) {
+    for (var oi = 0; oi !== region_index; ++oi) {
+        var other_region = regions[oi];
+        var new_region = mergeRegion(region, i, other_region);
+        if (new_region) {
+            return regions.slice(0, oi).concat(
+                [new_region],
+                regions.slice(oi + 1, region_index),
+                regions.slice(region_index + 1)
+            );
+        }
+    }
+    for (var oi = region_index + 1; oi < regions.length; ++oi) {
+        var other_region = regions[oi];
+        var new_region = mergeRegion(region, i, other_region);
+        if (new_region) {
+            return regions.slice(0, region_index).concat(
+                regions.slice(region_index + 1, oi),
+                [new_region],
+                regions.slice(oi + 1)
+            );
+        }
+    }
+    return regions;
+}
+
 function reconfigureRegions(regions, region_index, region, i) {
-    var parts = getParts(i, region);
+    var parts = getParts(getSplits(i, region), region, 2);
     if (parts) {
-        console.log("and the parts are", parts);
         return regions.slice(0, region_index).concat(
             parts,
             regions.slice(region_index + 1)
         );
     }
-    return regions;
+    return mergeRegions(regions, region_index, region, i);
 }
 
 function moveMarker(ev, xray, v, i, region, region_index) {
@@ -288,9 +354,9 @@ function addRegionMarkers(xray) {
         iconSize: [20, 20],
         iconAnchor: [10, 10],
     });
+    var new_regions;
     forEach(xray.region_points, function(region, region_index) {
         forEach(region, function(vertex, index) {
-            var new_regions;
             var v = L.marker(vertex, {
                 draggable: true,
             }).addTo(xray.marker_layer);
@@ -316,9 +382,10 @@ function addRegionMarkers(xray) {
                 region.splice(i1, 0, v);
             });
             L.DomEvent.on(m, 'drag', function(ev) {
-                moveMarker(ev, xray, v, i1, region, region_index);
+                new_regions = moveMarker(ev, xray, v, i1, region, region_index);
             });
             L.DomEvent.on(m, 'dragend', function(ev) {
+                xray.region_points = new_regions;
                 removeRegionMarkers(xray);
                 addRegionMarkers(xray);
             });
