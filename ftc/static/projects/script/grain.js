@@ -343,6 +343,31 @@ function moveMarker(ev, xray, v, i, region, region_index) {
     return new_regions;
 }
 
+function normalizeRegions(regions) {
+    forEach(regions, function(region, i) {
+        if (2 < region.length) {
+            var area = 0;
+            var last = region[region.length - 1];
+            var r = [];
+            forEach(region, function(v) {
+                if (v[0] !== last[0] || v[1] !== last[1]) {
+                    area += v[0] * last[1] - last[0] * v[1];
+                    r.push(v);
+                    last = v;
+                }
+            });
+            if (r.length === 0) {
+                // all the points were the same!
+                r = [region[0]];
+            }
+            if (area < 0) {
+                r.reverse();
+            }
+            regions[i] = r;
+        }
+    });
+}
+
 function removeRegionMarkers(xray) {
     xray.marker_layer.clearLayers();
     xray.mid_marker_layer.clearLayers();
@@ -354,19 +379,20 @@ function addRegionMarkers(xray) {
         iconSize: [20, 20],
         iconAnchor: [10, 10],
     });
+    normalizeRegions(xray.region_points);
     var new_regions;
     forEach(xray.region_points, function(region, region_index) {
         forEach(region, function(vertex, index) {
             var v = L.marker(vertex, {
                 draggable: true,
             }).addTo(xray.marker_layer);
-            L.DomEvent.on(v, 'dragstart', function(ev) {
+            L.DomEvent.on(v, 'dragstart', function() {
                 xray.mid_marker_layer.clearLayers();
             });
             L.DomEvent.on(v, 'drag', function(ev) {
                 new_regions = moveMarker(ev, xray, vertex, index, region, region_index);
             });
-            L.DomEvent.on(v, 'dragend', function(ev) {
+            L.DomEvent.on(v, 'dragend', function() {
                 xray.region_points = new_regions;
                 removeRegionMarkers(xray);
                 addRegionMarkers(xray);
@@ -378,13 +404,13 @@ function addRegionMarkers(xray) {
                 draggable: true,
                 icon: midIcon,
             }).addTo(xray.mid_marker_layer);
-            L.DomEvent.on(m, 'dragstart', function(ev) {
+            L.DomEvent.on(m, 'dragstart', function() {
                 region.splice(i1, 0, v);
             });
             L.DomEvent.on(m, 'drag', function(ev) {
                 new_regions = moveMarker(ev, xray, v, i1, region, region_index);
             });
-            L.DomEvent.on(m, 'dragend', function(ev) {
+            L.DomEvent.on(m, 'dragend', function() {
                 xray.region_points = new_regions;
                 removeRegionMarkers(xray);
                 addRegionMarkers(xray);
