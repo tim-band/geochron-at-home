@@ -45,22 +45,40 @@ function closePointOnLine(pt, start, end, closeness) {
     return null;
 }
 
+// lines are as + at*ad and bs + bt*bd (at,bt <- [0,1])
+// so at the crossing point: as + at*ad = bs +bt*bd
+// separating out co-ordinates (0 and 1 for x and y):
+// as0 + at*ad0 = bs0 + bt*bd0
+// as1 + at*ad1 = bs1 + bt*bd1
+// multiply through by bd1 and bd0
+// as0*bd1 + at*ad0*bd1 = bs0*bd1 + bt*bd0*bd1
+// as1*bd0 + at*ad1*bd0 = bs1*bd0 + bt*bd1*bd0
+// subtracting:
+// as0*bd1 - as1*bd0 + at*(ad0*bd1 - ad1*bd0) = bs0*bd1 - bs1*bd0
+// `at` on the LHS:
+// at*(ad0*bd1 - ad1*bd0) = bs0*bd1 - bs1*bd0 - as0*bd1 + as1*bd0
+// at*(ad0*bd1 - ad1*bd0) = bd1 * (bs0 - as0) + bd0 * (as1 - bs1)
+// by symmetry a/b:
+// bt*(bd0*ad1 - bd1*ad0) = ad1 * (as0 - bs0) + ad0 * (bs1 - as1)
+// re-arranging to look like the `a` version:
+// bt*(ad0*bd1 - ad1*bd0) = ad1 * (bs0 - as0) + ad0 * (as1 - bs1)
 function linesCross(aStart, aEnd, bStart, bEnd) {
     var ad = [aEnd[0] - aStart[0], aEnd[1] - aStart[1]];
     var bd = [bEnd[0] - bStart[0], bEnd[1] - bStart[1]];
-    var max = ad[1] * bd[0] + bd[1] * ad[0];
+    var max = ad[0] * bd[1] - ad[1] * bd[0];
     var min = 0;
     if (max < 0) {
         min = max;
         max = 0;
     }
-    for (var i = 0; i !== 2; ++i) {
-        var a = ad[1-i] * (aStart[i] - bStart[i]) - ad[i] * (aStart[1-i] - bStart[1-i]);
-        if (a < min || max < a) {
-            return false;
-        }
+    var sd0 = bStart[0] - aStart[0];
+    var sd1 = aStart[1] - bStart[1];
+    var b = bd[1] * sd0 + bd[0] * sd1;
+    if (b < min || max < b) {
+        return false;
     }
-    return true;
+    var a = ad[1] * sd0 + ad[0] * sd1;
+    return min <= a && a <= max;
 }
 
 function noop() { }
@@ -177,18 +195,86 @@ function wantsToMerge(xray, v, i, region) {
 
 function mergePoints(xray, i, region, region_index) {
     var r = region.slice(0, i).concat(region.slice(i + 1));
-    return xray.region_points.slice(0, region_index).concat(
-        r, xray.region_points.slice(region_index + 1));
+    var new_regions = xray.region_points.slice(0, region_index).concat(
+        [r], xray.region_points.slice(region_index + 1));
+    console.log('merged', xray.region_points, new_regions);
+    return new_regions;
+}
+
+// get a list of sides that cross other sides, listed by
+// their
+function getSplits(i, region) {
+    var n = region.length;
+    if (n < 5) {
+        return [];
+    }
+    // moving sides are i0->i and i->i1
+    var i0 = (i + n - 1) % n; // node before i
+    var i1 = (i + 1) % n; // node after i
+    var cuts = {};
+    // iterate through the other non-adjacent sides
+    var prev = (i1 + 1) % n;
+    for (var j = (prev + 1) % n; j !== i0; prev=j,j=(j+1)%n) {
+        if (linesCross(region[i], region[i1], region[prev], region[j])) {
+            console.log("lines cross: ", i, i1, prev, j);
+            cuts[i1] = true;
+            cuts[j] = true;
+        }
+        if (linesCross(region[i0], region[i], region[prev], region[j])) {
+            console.log("2 lines cross: ", i0, i, prev, j);
+            cuts[i] = true;
+            cuts[j] = true;
+        }
+    }
+    var c = Object.keys(cuts);
+    c.sort();
+    return c;
+}
+
+function getParts(i, region) {
+    var splits = getSplits(i, region);
+    if (splits.length < 2) {
+        return null;
+    }
+    var lastIndex = splits[splits.length - 1];
+    var prev = splits[0];
+    var parts = [region.slice(lastIndex).concat(region.slice(0, prev))];
+    for (var j = 1; j !== splits.length; prev=splits[j],++j) {
+        parts.push(region.slice(prev, splits[j]));
+    }
+    if (parts.length < 2) {
+        return null;
+    }
+    parts.sort(function(a,b) {
+        return b.length - a.length;
+    });
+    console.log("parts", parts, splits);
+    return parts.slice(0,2);
+}
+
+function reconfigureRegions(regions, region_index, region, i) {
+    var parts = getParts(i, region);
+    if (parts) {
+        console.log("and the parts are", parts);
+        return regions.slice(0, region_index).concat(
+            parts,
+            regions.slice(region_index + 1)
+        );
+    }
+    return regions;
 }
 
 function moveMarker(ev, xray, v, i, region, region_index) {
     v[0] = ev.latlng.lat;
     v[1] = ev.latlng.lng;
+    var new_regions;
     if (wantsToMerge(xray, v, i, region)) {
-        xray.region_layer.setLatLngs(mergePoints(xray, i, region, region_index));
+        new_regions = mergePoints(xray, i, region, region_index);
     } else {
-        xray.region_layer.setLatLngs(xray.region_points);
+        new_regions = reconfigureRegions(xray.region_points, region_index, region, i);
     }
+    xray.region_layer.setLatLngs(new_regions);
+    return new_regions;
 }
 
 function removeRegionMarkers(xray) {
@@ -204,6 +290,7 @@ function addRegionMarkers(xray) {
     });
     forEach(xray.region_points, function(region, region_index) {
         forEach(region, function(vertex, index) {
+            var new_regions;
             var v = L.marker(vertex, {
                 draggable: true,
             }).addTo(xray.marker_layer);
@@ -211,14 +298,10 @@ function addRegionMarkers(xray) {
                 xray.mid_marker_layer.clearLayers();
             });
             L.DomEvent.on(v, 'drag', function(ev) {
-                moveMarker(ev, xray, vertex, index, region, region_index);
+                new_regions = moveMarker(ev, xray, vertex, index, region, region_index);
             });
             L.DomEvent.on(v, 'dragend', function(ev) {
-                if (wantsToMerge(xray, vertex, index, region)) {
-                    console.log(xray.region_points);
-                    xray.region_points[region_index] = mergePoints(xray, index, region, region_index);
-                    console.log(xray.region_points);
-                }
+                xray.region_points = new_regions;
                 removeRegionMarkers(xray);
                 addRegionMarkers(xray);
             });
