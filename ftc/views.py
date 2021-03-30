@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.db import transaction
 from django.db.models import Q
 from django.forms import ModelForm, CharField, Textarea
+from django.views.decorators.csrf import csrf_protect
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic import DetailView
 from django.http import HttpResponse, HttpResponseRedirect, Http404
@@ -10,7 +11,7 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.shortcuts import redirect
 import base64
 
-from ftc.models import Project, Sample, FissionTrackNumbering, Image, Grain
+from ftc.models import Project, Sample, FissionTrackNumbering, Image, Grain, Region, Vertex
 
 #
 def home(request):
@@ -45,11 +46,12 @@ def report(request):
             else:
                 projects = Project.objects.filter(creator=request.user)
         except (KeyError, Project.DoesNotExist):
-            return HttpResponse("you have no project currrently. add one?")
+            return HttpResponse("you have no project currrently. add one?", status=204)
         else:
             return render(request, 'ftc/report.html', {'projects': projects})
     else:
-        return HttpResponse("Sorry, You don't have permission to access the requested page.")
+        return HttpResponse("Sorry, You don't have permission to access the requested page.",
+            status=403)
 
 
 @user_passes_test(user_is_staff)
@@ -133,10 +135,43 @@ class GrainCreateView(CreateView, StaffRequiredMixin):
     form_class = GrainForm
 
 
-class GrainUpdateView(UpdateView, CreatorOrSuperuserMixin):
-    model = Grain
-    form_class = GrainForm
-    template_name = "ftc/grain_update.html"
+@csrf_protect
+@user_passes_test(user_is_staff)
+def grain_update(request, pk):
+    grain = Grain.objects.get(pk=pk)
+    if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
+        return HttpResponse("Grain update forbidden", status=403)
+    regions = {}
+    for k,v in request.POST.items():
+        ps = k.rsplit("_", 3)
+        if (len(ps) == 4
+            and ps[0] == "vertex"
+            and ps[1].isnumeric()
+            and ps[2].isnumeric()
+            and ps[3] in ['x','y']):
+            if ps[1] not in regions:
+                regions[ps[1]] = {}
+            region = regions[ps[1]]
+            if ps[2] not in region:
+                region[ps[2]] = {}
+            vertex = region[ps[2]]
+            if ps[3] not in vertex:
+                vertex[ps[3]] = {}
+            vertex[ps[3]] = v
+
+    w = grain.image_width
+    h = grain.image_height
+    with transaction.atomic():
+        Region.objects.filter(grain=grain).delete()
+        for _, vertices in sorted(regions.items()):
+            region = Region(grain=grain, shift_x=0, shift_y=0)
+            region.save()
+            for _, v in sorted(vertices.items()):
+                x = float(v['x']) * w
+                y = h - float(v['y']) * w
+                Vertex(region=region, x=x, y=y).save()
+
+    return redirect('grain', pk=pk)
 
 
 @user_passes_test(user_is_staff)

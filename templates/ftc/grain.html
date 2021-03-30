@@ -127,7 +127,7 @@ window.addEventListener('load', function() {
     </span>
     {% if user.is_superuser or is_creator %}
     <button id="edit" onclick="beginEdit(xray_control)">Edit</button>
-    <button id="save" onclick="save(xray_control)" disabled>Save</button>
+    <button id="save" onclick="save(xray_control, &quot;{% url 'grain_update' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
     {% endif %}
 </div>
 
@@ -139,5 +139,8 @@ window.addEventListener('load', function() {
     {% endfor %}
 </ul>
 
+<form id="empty-form" style="display: none;">
+    {% csrf_token %}
+</form>
 {% endblock %}
 

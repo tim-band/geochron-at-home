@@ -344,6 +344,7 @@ function moveMarker(ev, xray, v, i, region, region_index) {
 }
 
 function normalizeRegions(regions) {
+    var count = 0;
     forEach(regions, function(region, i) {
         if (2 < region.length) {
             var area = 0;
@@ -353,6 +354,7 @@ function normalizeRegions(regions) {
                 if (v[0] !== last[0] || v[1] !== last[1]) {
                     area += v[0] * last[1] - last[0] * v[1];
                     r.push(v);
+                    ++count;
                     last = v;
                 }
             });
@@ -364,8 +366,14 @@ function normalizeRegions(regions) {
                 r.reverse();
             }
             regions[i] = r;
+        } else {
+            count += region.length;
         }
     });
+    if (count === 0) {
+        regions = [[[0.5,0.5]]];
+    }
+    return regions;
 }
 
 function removeRegionMarkers(xray) {
@@ -379,7 +387,7 @@ function addRegionMarkers(xray) {
         iconSize: [20, 20],
         iconAnchor: [10, 10],
     });
-    normalizeRegions(xray.region_points);
+    xray.region_points = normalizeRegions(xray.region_points);
     var new_regions;
     forEach(xray.region_points, function(region, region_index) {
         forEach(region, function(vertex, index) {
@@ -427,12 +435,28 @@ function beginEdit(xray) {
     save.removeAttribute('disabled');
 }
 
-function save(xray) {
-    removeRegionMarkers(xray);
-    console.log('should do some saving here (remember the csrf token!)');
-    var edit = document.getElementById("edit");
-    var save = document.getElementById("save");
-    edit.removeAttribute('disabled');
-    save.setAttribute('disabled', true);
-    xray.marker_layer.clearLayers();
+function save(xray, url, form, error_callback) {
+    const xhr = new XMLHttpRequest();
+    const fd = new FormData(form);
+    forEach(xray.region_points, function(region, ri) {
+        forEach(region, function(v, vi) {
+            fd.append('vertex_' + ri + '_' + vi + '_x', v[1]);
+            fd.append('vertex_' + ri + '_' + vi + '_y', v[0]);
+        });
+    });
+    xhr.addEventListener("load", function() {
+        removeRegionMarkers(xray);
+        var edit = document.getElementById("edit");
+        var save = document.getElementById("save");
+        edit.removeAttribute('disabled');
+        save.setAttribute('disabled', true);
+        xray.marker_layer.clearLayers();
+    });
+    if (error_callback) {
+        xhr.addEventListener("error", function() {
+            error_callback();
+        });
+    }
+    xhr.open("POST", url);
+    xhr.send(fd);
 }

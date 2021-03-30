@@ -6,7 +6,7 @@ from ftc.views import home, signmeup, report, getTableData, \
     get_image, projects, images, \
     ProjectDetailView, ProjectUpdateView, \
     SampleDetailView, SampleUpdateView, \
-    GrainDetailView, GrainUpdateView
+    GrainDetailView, grain_update
 
 urlpatterns = [
     # Ex: /ftc/
@@ -19,7 +19,7 @@ urlpatterns = [
     path('sample/<pk>/', SampleDetailView.as_view(), name='sample'),
     path('sample/<pk>/update', SampleUpdateView.as_view(), name='sample_update'),
     path('grain/<pk>/', GrainDetailView.as_view(), name='grain'),
-    path('grain/<pk>/update', GrainUpdateView.as_view(), name='grain_update'),
+    path('grain/<pk>/update', grain_update, name='grain_update'),
     path('projects/', projects, name='projects'),
     path('getTableData/', getTableData, name='getTableData'),
     path('get_grain_images/', get_grain_images, name='get_grain_images'),
