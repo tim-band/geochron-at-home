@@ -203,3 +203,5 @@ LOGGING = {
         }
     },
 }
+
+IMAGE_UPLOAD_SIZE_LIMIT = os.getenv('IMAGE_UPLOAD_SIZE_LIMIT') or 256 * 1024

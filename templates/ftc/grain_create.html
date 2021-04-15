@@ -1,0 +1,15 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block content %}
+<form
+    enctype="multipart/form-data"
+    action="{% url 'grain_create' sample_pk %}"
+    method="POST">
+    {% csrf_token %}
+    {{ form.images.errors }}
+    {{ form.images }}
+    <input type="submit" value="Create Grain">
+</form>
+{% endblock %}

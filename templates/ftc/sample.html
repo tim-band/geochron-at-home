@@ -7,6 +7,7 @@
 <h1> Sample <strong>{{ object.sample_name }}</strong></h1>
 {% if user.is_superuser or is_creator %}
 <div><a href="{% url 'sample_update' object.pk %}">Edit</a></div>
+<div><a href="{% url 'grain_create' object.pk %}">Create new grain</a></div>
 {% endif %}
 <div>
     <table>

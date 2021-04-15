@@ -1,42 +1,23 @@
 import os, sys, shutil
 from optparse import OptionParser
 from django.db import transaction
+from ftc.parse_image_name import parse_image_name
 import json
-
-def parse_image_name(f):
-    if f.lower() == 'reflstackflat':
-        return -1
-    elif f.lower() == 'stackflat':
-        return 0
-    elif f[0:6].lower() == 'stack-':
-        try:
-            return int(f[6:])
-        except:
-            return None
 
 
 def copyimages(src, grain):
-    img_ext = { '.png' : 'P', '.jpeg': 'J', '.jpg': 'J' }
-    total_image = 0
-    names = sorted(os.listdir(src))
-    for n in names:
-        srcname = os.path.join(src, n)
-        is_image = False
-        name_ext = os.path.splitext(n)
-        ext = name_ext[1]
-        v = parse_image_name(name_ext[0])
-        if os.path.isfile(srcname) and ext in img_ext and v != None:
-            is_image = True
+    for n in sorted(os.listdir(src)):
+        v = parse_image_name(n)
+        if os.path.isfile(srcname) and v != None:
+            srcname = os.path.join(src, n)
             with open(srcname, mode='rb') as f:
-                im = Image(
+                Image(
                     grain=grain,
-                    format=img_ext[ext],
+                    format=v['format'],
                     ft_type='S',
-                    index=v,
+                    index=v['index'],
                     data=f.read()
-                )
-                im.save()
-            total_image+=1
+                ).save()
 
 
 def creategrain(src, sample, grain_nth):

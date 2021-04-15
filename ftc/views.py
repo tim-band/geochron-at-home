@@ -1,15 +1,21 @@
 from django.shortcuts import render, get_object_or_404
 from django.db import transaction
 from django.db.models import Q
-from django.forms import ModelForm, CharField, Textarea
+from django.db.models.aggregates import Max
+from django.forms import ModelForm, CharField, Textarea, FileField, ClearableFileInput, ValidationError
 from django.views.decorators.csrf import csrf_protect
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic import DetailView
+from django.urls import reverse
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.shortcuts import redirect
+from ftc.parse_image_name import parse_image_name
+from ftc.get_image_size import get_image_size_from_handle
+from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 import base64
+import io
 
 from ftc.models import Project, Sample, FissionTrackNumbering, Image, Grain, Region, Vertex
 
@@ -124,15 +130,141 @@ class GrainDetailView(DetailView, StaffRequiredMixin):
     template_name = "ftc/grain.html"
 
 
+class XrayImageInput(ClearableFileInput):
+    def value_from_datadict(self, data, files, name):
+        return files.getlist(name)
+
+
+def validate_file_image(f):
+    if not parse_image_name(f.name):
+        raise ValidationError(
+            'File %(fn)s is not called image<nn> or refl-image',
+            params={'fn': f.name},
+            code='bad-image-file-name'
+        )
+    if IMAGE_UPLOAD_SIZE_LIMIT < f.size:
+        raise ValidationError(
+            "File '%(fn)s' is too large",
+            params={'fn': f.name},
+            code='file-too-large'
+        )
+
+
+class ImageStackField(FileField):
+    def clean(self, data, initial):
+        s = super()
+        return [s.clean(d, initial) for d in data]
+
+
 class GrainForm(ModelForm):
     class Meta:
         model = Grain
-        fields = ['index', 'image_width', 'image_height']
+        fields = ['images']
+
+    images = ImageStackField(
+        widget=XrayImageInput(attrs={'multiple': True}),
+        validators=[validate_file_image])
+
+    def clean(self):
+        files = []
+        errors = []
+        images = 'images' in self.cleaned_data and self.cleaned_data['images'] or []
+        for f in images:
+            v = parse_image_name(f.name)
+            data = f.read()
+            size = get_image_size_from_handle(io.BytesIO(data), len(data))
+            if size:
+                files.append({
+                    'name': f.name,
+                    'data': data,
+                    'width': size[0],
+                    'height': size[1],
+                    'index': v['index'],
+                    'format': v['format']
+                })
+            else:
+                errors.append(
+                    ValidationError(
+                        "File '%(fn)s' neither a Jpeg nor a PNG",
+                        params={'fn': f.name},
+                        code='unknown-file-format'
+                    )
+                )
+        if errors:
+            raise ValidationError(errors)
+        self.cleaned_data['files'] = files
+        return self.cleaned_data
+
+    def save(self, commit=True):
+        max_index = self.sample.grain_set.aggregate(Max('index'))['index__max']
+        if not max_index:
+            max_index = 0
+        self.instance.index = max_index + 1
+        max_w = 0
+        max_h = 0
+        for f in self.cleaned_data['files']:
+            w = f['width']
+            if max_w < w:
+                max_w = w
+            h = f['height']
+            if max_h < h:
+                max_h = h
+        self.instance.image_width = max_w
+        self.instance.image_height = max_h
+        self.instance.sample = self.sample
+        region = Region(grain=self.instance, shift_x=0, shift_y=0)
+        x_margin = int(max_w / 20)
+        y_margin = int(max_h / 20)
+        v0 = Vertex(region=region, x=x_margin, y=y_margin)
+        v1 = Vertex(region=region, x=x_margin, y=max_h-y_margin)
+        v2 = Vertex(region=region, x=max_w-x_margin, y=max_h-y_margin)
+        v3 = Vertex(region=region, x=max_w-x_margin, y=y_margin)
+        inst = super().save(commit)
+        if commit:
+            region.save()
+            v0.save()
+            v1.save()
+            v2.save()
+            v3.save()
+        return inst
 
 
 class GrainCreateView(CreateView, StaffRequiredMixin):
     model = Grain
     form_class = GrainForm
+    template_name = "ftc/grain_create.html"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['sample_pk'] = self.sample_pk
+        return ctx
+
+    def get(self, request, *args, **kwargs):
+        self.sample_pk = kwargs.get('pk')
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.sample_pk = kwargs.get('pk')
+        self.object = None
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        form.sample = Sample.objects.get(pk=kwargs.get('pk'))
+        if not form.is_valid():
+            return self.form_invalid(form)
+        rtn = self.form_valid(form)
+        with transaction.atomic():
+            for f in form.cleaned_data['files']:
+                image = Image(
+                    grain=self.object,
+                    format=f['format'],
+                    ft_type='S',
+                    index=f['index'],
+                    data=f['data']
+                ).save()
+        return rtn
+
+    def get_success_url(self):
+        return reverse('grain', kwargs={'pk': self.object.pk})
 
 
 @csrf_protect
@@ -172,31 +304,6 @@ def grain_update(request, pk):
                 Vertex(region=region, x=x, y=y).save()
 
     return redirect('grain', pk=pk)
-
-
-@user_passes_test(user_is_staff)
-def images(request, project_name, sample_name, grain_index):
-    grain = Grain.objects.get(
-        sample__in_project__project_name=project_name,
-        sample__sample_name=sample_name,
-        index=grain_index,
-    )
-    images = Image.objects.filter(
-        grain__sample__in_project__project_name=project_name,
-        grain__sample__sample_name=sample_name,
-        grain__index=grain_index,
-    ).order_by('index')
-    mimetype = {
-        'J': 'image/jpeg',
-        'P': 'image/png',
-    }
-    return render(request, "ftc/images.html", {
-        'images': images,
-        'project_name': project_name,
-        'sample_name': sample_name,
-        'grain_index': grain_index,
-        'grain': grain,
-    })
 
 
 import json
