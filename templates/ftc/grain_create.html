@@ -5,7 +5,7 @@
 {% block content %}
 <form
     enctype="multipart/form-data"
-    action="{% url 'grain_create' sample_pk %}"
+    action="{% url 'grain_create' parent.pk %}"
     method="POST">
     {% csrf_token %}
     {{ form.images.errors }}

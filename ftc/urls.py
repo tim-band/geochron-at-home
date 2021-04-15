@@ -5,7 +5,7 @@ from ftc.views import home, signmeup, report, getTableData, \
     get_grain_images, updateTFNResult, counting, saveWorkingGrain, \
     get_image, projects, \
     ProjectDetailView, ProjectUpdateView, \
-    SampleDetailView, SampleUpdateView, \
+    SampleDetailView, SampleUpdateView, SampleCreateView, \
     GrainDetailView, GrainCreateView, grain_update
 
 urlpatterns = [
@@ -15,6 +15,7 @@ urlpatterns = [
     path('report/', report, name='report'),
     path('project/<pk>/', ProjectDetailView.as_view(), name='project'),
     path('project/<pk>/update', ProjectUpdateView.as_view(), name='project_update'),
+    path('project/<pk>/create_sample', SampleCreateView.as_view(), name='sample_create'),
     path('sample/<pk>/', SampleDetailView.as_view(), name='sample'),
     path('sample/<pk>/update', SampleUpdateView.as_view(), name='sample_update'),
     path('sample/<pk>/create_grain', GrainCreateView.as_view(), name='grain_create'),

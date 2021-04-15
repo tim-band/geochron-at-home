@@ -18,6 +18,7 @@
     </table>
 </div>
 <h2>Samples</h2>
+<a href="{% url 'sample_create' object.pk %}">Create new sample</a>
 <ul>
     {% for s in object.sample_set.all %}
     <li><a href="{% url 'sample' s.pk %}">{{ s.sample_name }}</a></li>

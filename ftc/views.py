@@ -74,13 +74,37 @@ class StaffRequiredMixin(UserPassesTestMixin):
 
 class CreatorOrSuperuserMixin(UserPassesTestMixin):
     def test_func(self):
+        self.object = self.model.objects.get(pk=self.kwargs['pk'])
         return (
             self.request.user == self.object.get_creator()
             or self.request.user.is_superuser
         )
 
 
-class ProjectDetailView(DetailView, StaffRequiredMixin):
+class ParentCreatorOrSuperuserMixin(UserPassesTestMixin):
+    """
+    Allows the user to view if s/he is superuser or the creator
+    of the parent class with pk=kwargs['pk'].
+    Also sets self.parent to this object, and provides it as a
+    context variable 'parent'.
+    Set parent=ModelClass in the derived class, and ensure
+    that this mixin is placed before the CreateView class
+    in the base classes list of your derived class.
+    """
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['parent'] = self.parent_object
+        return ctx
+
+    def test_func(self):
+        self.parent_object = self.parent.objects.get(pk=self.kwargs['pk'])
+        return (
+            self.request.user == self.parent_object.get_creator()
+            or self.request.user.is_superuser
+        )
+
+
+class ProjectDetailView(StaffRequiredMixin, DetailView):
     model = Project
     template_name = "ftc/project.html"
 
@@ -92,40 +116,41 @@ class ProjectForm(ModelForm):
     project_description = CharField(widget=Textarea)
 
 
-class ProjectCreateView(CreateView, StaffRequiredMixin):
+class ProjectCreateView(StaffRequiredMixin, CreateView):
     model = Project
     form_class = ProjectForm
 
 
-class ProjectUpdateView(UpdateView, CreatorOrSuperuserMixin):
+class ProjectUpdateView(CreatorOrSuperuserMixin, UpdateView):
     model = Project
     form_class = ProjectForm
     template_name = "ftc/project_update.html"
 
 
-class SampleDetailView(DetailView, StaffRequiredMixin):
+class SampleDetailView(StaffRequiredMixin, DetailView):
     model = Sample
     template_name = "ftc/sample.html"
 
 
-class SampleForm(ModelForm):
-    class Meta:
-        model = Sample
-        fields = ['sample_name', 'sample_property', 'priority', 'min_contributor_num', 'completed']
-
-
-class SampleCreateView(CreateView, StaffRequiredMixin):
+class SampleCreateView(ParentCreatorOrSuperuserMixin, CreateView):
     model = Sample
-    form_class = SampleForm
+    parent = Project
+    template_name = "ftc/sample_create.html"
+    fields = ['sample_name', 'sample_property', 'priority', 'min_contributor_num', 'completed']
+
+    def form_valid(self, form):
+        form.instance.total_grains = 0
+        form.instance.in_project = self.parent_object
+        return super().form_valid(form)
 
 
-class SampleUpdateView(UpdateView, CreatorOrSuperuserMixin):
+class SampleUpdateView(CreatorOrSuperuserMixin, UpdateView):
     model = Sample
-    form_class = SampleForm
     template_name = "ftc/sample_update.html"
+    fields = ['sample_name', 'sample_property', 'priority', 'min_contributor_num', 'completed']
 
 
-class GrainDetailView(DetailView, StaffRequiredMixin):
+class GrainDetailView(StaffRequiredMixin, DetailView):
     model = Grain
     template_name = "ftc/grain.html"
 
@@ -229,26 +254,17 @@ class GrainForm(ModelForm):
         return inst
 
 
-class GrainCreateView(CreateView, StaffRequiredMixin):
+class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
     model = Grain
+    parent = Sample
     form_class = GrainForm
     template_name = "ftc/grain_create.html"
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx['sample_pk'] = self.sample_pk
-        return ctx
-
-    def get(self, request, *args, **kwargs):
-        self.sample_pk = kwargs.get('pk')
-        return super().get(request, *args, **kwargs)
-
     def post(self, request, *args, **kwargs):
-        self.sample_pk = kwargs.get('pk')
         self.object = None
         form_class = self.get_form_class()
         form = self.get_form(form_class)
-        form.sample = Sample.objects.get(pk=kwargs.get('pk'))
+        form.sample = self.parent_object
         if not form.is_valid():
             return self.form_invalid(form)
         rtn = self.form_valid(form)
