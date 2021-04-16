@@ -6,6 +6,8 @@
 
 <h1>Projects</h1>
 
+<a href="{% url 'project_create' %}">Create new project</a>
+
 <ul>
     {% for p in projects %}
     <li><a href="{% url 'project' p.pk %}">{{ p.project_name }}</a></li>

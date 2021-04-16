@@ -3,7 +3,7 @@ from django.urls import path
 
 from ftc.views import home, signmeup, report, getTableData, \
     get_grain_images, updateTFNResult, counting, saveWorkingGrain, \
-    get_image, projects, \
+    get_image, projects, ProjectCreateView, \
     ProjectDetailView, ProjectUpdateView, \
     SampleDetailView, SampleUpdateView, SampleCreateView, \
     GrainDetailView, GrainCreateView, grain_update
@@ -22,6 +22,7 @@ urlpatterns = [
     path('grain/<pk>/', GrainDetailView.as_view(), name='grain'),
     path('grain/<pk>/update', grain_update, name='grain_update'),
     path('projects/', projects, name='projects'),
+    path('create_project/', ProjectCreateView.as_view(), name='project_create'),
     path('getTableData/', getTableData, name='getTableData'),
     path('get_grain_images/', get_grain_images, name='get_grain_images'),
     path('updateTFNResult/', updateTFNResult, name='updateTFNResult'),

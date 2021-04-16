@@ -119,6 +119,11 @@ class ProjectForm(ModelForm):
 class ProjectCreateView(StaffRequiredMixin, CreateView):
     model = Project
     form_class = ProjectForm
+    template_name = "ftc/project_create.html"
+
+    def form_valid(self, form):
+        form.instance.creator = self.request.user
+        return super().form_valid(form)
 
 
 class ProjectUpdateView(CreatorOrSuperuserMixin, UpdateView):
