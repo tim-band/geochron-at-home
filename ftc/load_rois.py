@@ -2,7 +2,7 @@ import os
 import json
 from ftc.models import Grain
 
-def load_rois(grain_pool_path, owner, project_name, sample_name, sample_property, grain_nth, ft_type):
+def load_rois(project_name, sample_name, sample_property, grain_nth, ft_type):
     grains = Grain.objects.filter(
         index=grain_nth,
         sample__sample_name=sample_name,

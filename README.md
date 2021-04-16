@@ -268,6 +268,14 @@ so (again replacing `<user-name>` with your user name):
 This file will be deleted by `watch-for-upload.sh` after it has logged
 the new samples.
 
+## Running tests
+
+From the pipenv shell:
+
+```sh
+(geochron-at-home) $ python test/integration.py
+```
+
 ### Troubleshooting image upload
 
 If the web server returns a 403 (forbidden) when attempting to access

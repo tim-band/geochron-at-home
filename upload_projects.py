@@ -8,8 +8,8 @@ import json
 def copyimages(src, grain):
     for n in sorted(os.listdir(src)):
         v = parse_image_name(n)
+        srcname = os.path.join(src, n)
         if os.path.isfile(srcname) and v != None:
-            srcname = os.path.join(src, n)
             with open(srcname, mode='rb') as f:
                 Image(
                     grain=grain,

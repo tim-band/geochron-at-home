@@ -376,14 +376,7 @@ def get_image(request, pk):
 
 @login_required
 def get_grain_images(request):
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # ftc/
-    grain_pool_path = os.path.join(os.path.dirname(BASE_DIR), 'static/grain_pool')
-    sep = '~'
     res = {}
-    # img_ext = set(['.png', '.jpeg', '.jpg'])
-    # at least number of contributions, here set to 1 at moment
-    min_contributors_per_grain = 1
-    flag_continue_old_counting = False
     if request.is_ajax() and request.user.is_active:
         uname = request.user.username
         grain_uinfo, ftn = restore_grain_uinfo(uname)
@@ -399,12 +392,10 @@ def get_grain_images(request):
             ft_type = grain_uinfo['ft_type']
             if the_grain is None:
                 the_grain = -1
-            images_list = get_grain_images_list(grain_pool_path, the_project.creator.username, \
-                                                the_project.project_name, the_sample.sample_name, \
+            images_list = get_grain_images_list(the_project.project_name, the_sample.sample_name, \
                                                 the_sample.sample_property, the_grain, ft_type)
             if (len(images_list) > 0):
-                rois = load_rois(grain_pool_path, the_project.creator.username, \
-                                                the_project.project_name, the_sample.sample_name, \
+                rois = load_rois(the_project.project_name, the_sample.sample_name, \
                                                 the_sample.sample_property, the_grain, ft_type)
             else:
                 rois = None

@@ -34,13 +34,11 @@ def genearate_working_grain_uinfo(request):
                     continue #for next project
                 else:
                     for the_sample in sorted_rand(samples):  # changed jhe 2014-10-26
-                        total_grain = the_sample.total_grains
                         all_grains = set()
                         user_finished_grains = set() #a
-                        for i in range(total_grain):
-                            #all_grains.add((i+1, 'I')) # Induced # changed jhe 2015-02-10
-                            if the_sample.sample_property != 'D':
-                                all_grains.add((i+1, 'S')) # Spontaneous
+                        if the_sample.sample_property != 'D':
+                            for g in the_sample.grain_set.values('index').iterator():
+                                all_grains.add((g['index'], 'S')) # Spontaneous
                         grains = the_sample.fissiontracknumbering_set.all()
                         g_count = dict()
                         for g in grains:

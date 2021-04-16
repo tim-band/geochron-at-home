@@ -215,6 +215,7 @@ class CountingPage(BasePage):
 
         # find the URI of the last image
         src = images[-1].get_attribute("src")
+        src = src.rstrip("/")
         # we assume this is the visible one (assuming that
         # all the images are visible and have the same z-index)
         index = src.rfind("/") + 1
