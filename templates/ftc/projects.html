@@ -6,15 +6,13 @@
 
 <h1>Projects</h1>
 
-<a href="{% url 'project_create' %}">Create new project</a>
+<a id="create-project" href="{% url 'project_create' %}">Create new project</a>
 
 <ul>
     {% for p in projects %}
     <li><a href="{% url 'project' p.pk %}">{{ p.project_name }}</a></li>
     {% endfor %}
 </ul>
-
-<p>Form for creating a new project should go here</p>
 
 {% endblock %}
 

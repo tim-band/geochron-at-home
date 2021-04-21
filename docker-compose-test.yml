@@ -30,10 +30,12 @@ services:
   django:
     build: .
     environment:
+      - "DJANGO_SETTINGS_MODULE=geochron.settings"
       - "ALLOWED_HOSTS=*"
       - "BASE_URL=/"
       - SSL_ONLY=false
       - DJANGO_DEBUG=0
+      - STATIC_ROOT=/static
       - DB_HOST=db
       - POSTGRES_DB=geochron
       - POSTGRES_USER=geochron
@@ -55,7 +57,7 @@ services:
       - FAKE_MAIL_SERVER=1
     volumes:
       - "./test/xrays:/code/test/xrays"
-      - "web_static:/code/static/"
+      - "web_static:/static/"
       - "./vendor:/code/vendor"
     depends_on:
       db:

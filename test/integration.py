@@ -7,6 +7,9 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 import subprocess
 import time
+import glob
+import os
+import base64
 
 def retrying(retries, f, delay=1):
     if retries == 1:
@@ -46,6 +49,27 @@ class DockerCompose:
 class BasePage:
     def __init__(self, driver):
         self.driver = driver
+
+    def fill_form(self, fields):
+        for k,v in fields.items():
+            elt = self.driver.find_element_by_css_selector('*[name="{0}"]'.format(k))
+            if type(v) is bool:
+                if v != elt.is_selected():
+                    elt.click()
+            else:
+                if elt.tag_name.lower() == 'select':
+                    elt.click()
+                    opt = elt.find_element_by_css_selector('option[value="{0}"]'.format(v))
+                    assert opt
+                    opt.click()
+                else:
+                    elt.clear()
+                    elt.send_keys(v)
+
+    def submit(self):
+        url = self.driver.current_url
+        self.driver.find_element_by_css_selector('input[type="submit"]').click()
+        return url != self.driver.current_url
 
 
 class WebMail(BasePage):
@@ -197,7 +221,7 @@ class CountingPage(BasePage):
         actions.drag_and_drop_by_offset(handle, 0, dy).pause(1.0).perform()
         return self
 
-    def image_displayed_id(self):
+    def image_displayed_url(self):
 
         class ElementsLoaded:
             def __init__(self, locator_type, locator_string, count):
@@ -213,39 +237,37 @@ class CountingPage(BasePage):
         images = WebDriverWait(self.driver, 3).until(
             ElementsLoaded(By.CLASS_NAME, "leaflet-image-layer", 4))
 
-        # find the URI of the last image
-        src = images[-1].get_attribute("src")
-        src = src.rstrip("/")
-        # we assume this is the visible one (assuming that
-        # all the images are visible and have the same z-index)
-        index = src.rfind("/") + 1
-        return int(src[index:])
+        return images[-1].get_attribute("src")
 
 
 class NavBar(BasePage):
-    def check(self):
-        self.driver.find_element_by_css_selector(
+    def get_dropdown(self):
+        return self.driver.find_element_by_css_selector(
             ".navbar-fixed-top .navbar-right a.dropdown-toggle"
         )
+
+    def check(self):
+        self.get_dropdown()
         return self
 
     def logout(self):
-        self.driver.find_element_by_css_selector(
-            ".navbar-fixed-top .navbar-right a.dropdown-toggle"
-        ).click()
+        self.get_dropdown().click()
         self.driver.find_element_by_css_selector(
             'a[href="/accounts/logout/"]'
         ).click()
         return HomePage(self.driver)
 
     def go_manage_projects(self):
-        self.driver.find_element_by_css_selector(
-            ".navbar-fixed-top .navbar-right a.dropdown-toggle"
-        ).click()
+        self.get_dropdown().click()
         self.driver.find_element_by_css_selector(
             'a[href="/ftc/report/"]'
         ).click()
         return ReportPage(self.driver)
+
+    def go_edit_projects(self):
+        self.get_dropdown().click()
+        self.driver.find_element_by_id('projects-link').click()
+        return ProjectsPage(self.driver)
 
 
 class ReportPage(BasePage):
@@ -282,21 +304,188 @@ class ReportPage(BasePage):
         return retrying(4, lambda: self.result_or_fail(grain_number), 0.1)
 
 
+class ProjectsPage(BasePage):
+    def create_project(self):
+        self.driver.find_element_by_id('create-project').click()
+        return ProjectCreatePage(self.driver)
+
+
+class ProjectCreatePage(BasePage):
+    def create(self, name, description, priority, closed):
+        self.fill_form({
+            'project_name': name,
+            'project_description': description,
+            'priority': priority,
+            'closed': closed
+        })
+        assert self.submit()
+        return ProjectPage(self.driver)
+
+
+class ProjectPage(BasePage):
+    def create_sample(self):
+        self.driver.find_element_by_id('create-sample').click()
+        return SampleCreatePage(self.driver)
+
+
+class SampleCreatePage(BasePage):
+    def create(self, name, property_, priority, min_contributor_num, completed):
+        self.fill_form({
+            'sample_name': name,
+            'sample_property': property_,
+            'priority': priority,
+            'min_contributor_num': min_contributor_num,
+            'completed': completed
+        })
+        assert self.submit()
+        return SamplePage(self.driver)
+
+
+class SamplePage(BasePage):
+    def create_grain(self):
+        self.driver.find_element_by_id('create-grain').click()
+        return GrainCreatePage(self.driver)
+
+
+class GrainCreatePage(BasePage):
+    def create(self, paths):
+        browse = self.driver.find_element_by_id('id_images')
+        for p in paths:
+            browse.send_keys(p)
+        assert self.submit()
+        return GrainPage(self.driver)
+
+
+class GrainPage(BasePage):
+    def edit(self):
+        zoom_outs = self.driver.find_elements_by_class_name('leaflet-control-zoom-out')
+        assert len(zoom_outs) == 1
+        imgs = self.driver.find_elements_by_css_selector('img.leaflet-image-layer')
+        while (600 < imgs[0].rect['width']
+                and 'leaflet-disabled' not in
+                zoom_outs[0].get_attribute('class').split(' ')):
+            zoom_outs[0].click()
+        self.driver.find_element_by_id('edit').click()
+        return self
+
+    def save(self):
+        self.driver.find_element_by_id('save').click()
+        return self
+
+    def do_drag(self, dragee, dest_x, dest_y):
+        ActionChains(self.driver).click_and_hold(dragee).perform()
+        for n in range(3):
+            drag_x_by = dest_x - (
+                dragee.rect['x'] + dragee.rect['width']/2)
+            drag_y_by = dest_y - (
+                dragee.rect['y'] + dragee.rect['height'])
+            ActionChains(self.driver).move_by_offset(
+                drag_x_by, drag_y_by
+            ).perform()
+        ActionChains(self.driver).release().perform()
+
+    def drag_marker(self, marker_index, to_x, to_y):
+        imgs = self.driver.find_elements_by_css_selector('img.leaflet-image-layer')
+        rect = imgs[0].rect
+        markers = self.driver.find_elements_by_css_selector(
+            'img.leaflet-marker-icon')
+        marker = markers[marker_index]
+        self.do_drag(
+            marker,
+            to_x * rect['width'] + rect['x'],
+            to_y * rect['height'] + rect['y']
+        )
+        return self
+
+
+class ScriptUploader:
+    def __init__(self, driver):
+        self.driver = driver
+
+    def upload_projects(self, directory):
+        self.dc.exec("python3", "upload_projects.py",
+            "-s", "geochron.settings",
+            "-i", directory,
+        )
+
+    def get_index(self, file_url):
+        src = file_url.rstrip("/")
+        index = src.rfind("/") + 1
+        return int(src[index:])
+
+
+class WebUploader:
+    def __init__(self, driver):
+        self.driver = driver
+        self.script="""
+        var url=arguments[0];
+        var done=arguments[1];
+        var x=new XMLHttpRequest();
+        x.open("GET", url);
+        x.responseType="arraybuffer";
+        x.onload=function() {
+            var r=new Uint8Array(x.response);
+            var b='';
+            var n=r.byteLength;
+            for(var i=0;i<n;++i){
+                b+=String.fromCharCode(r[i]);
+            }
+            done(b);
+        };
+        x.send();
+        """
+
+    def upload_projects(self, directory):
+        xray_path = os.path.abspath(directory + '/*/*/*/*/*.jpg')
+        files = glob.glob(xray_path)
+        self.hashes = {}
+        for f in files:
+            number = int( f[ f.rindex('-') + 1 : f.rindex('.') ] )
+            with open(f, 'rb') as h:
+                contents = h.read()
+                hash_ = hash(contents)
+                self.hashes[hash_] = number
+        navbar = NavBar(self.driver)
+        edit_projects = navbar.go_edit_projects()
+        project_page = edit_projects.create_project().create('p1', 'description', 1, False)
+        sample_page = project_page.create_sample().create('s1', 'T', 1, 1, False)
+        grain_page = sample_page.create_grain().create(files)
+        grain_page.edit()
+        grain_page.drag_marker(0, 0.01, 0.01)
+        grain_page.drag_marker(1, 0.01, 0.99)
+        grain_page.drag_marker(3, 0.99, 0.01)
+        grain_page.drag_marker(2, 0.01, 0.99) # delete by dragging onto 3
+        grain_page.save()
+
+    def get_index(self, file_url):
+        ba = self.driver.execute_async_script(self.script, file_url)
+        hash_ = hash(ba)
+        return self.hashes.get(hash_)
+
+
 class DjangoTests(unittest.TestCase):
     def setUp(self):
         self.dc = DockerCompose("./docker-compose-test.yml").down().up().init()
         self.driver = webdriver.Firefox()
 
     def test_onboard(self):
-        # upload x-rays
-        self.dc.exec("python3", "upload_projects.py",
-            "-s", "geochron.settings",
-            "-i", "test/xrays",
-        )
+        # Upload X-ray images
+        test_user = User("tester", "tester@test.com", "MyPaSsW0rd")
+        project_user = User("john", "john@test.com", "john")
+        HomePage(self.driver).go()
+        profile = SignInPage(self.driver).go().sign_in(project_user)
+        WebMail(self.driver).go().click_first_body_link()
+        ConfirmPage(self.driver).check(project_user).confirm()
+        HomePage(self.driver).go()
+        profile = SignInPage(self.driver).go().sign_in(project_user)
+        uploader = WebUploader(self.driver)
+        #uploader = new ScriptUploader(self.driver)
+        uploader.upload_projects('test/xrays')
+        navbar = NavBar(self.driver)
+        navbar.logout()
 
         # create user
         join_page = HomePage(self.driver).go().join()
-        test_user = User("tester", "tester@test.com", "MyPaSsW0rd")
         join_page.check().fill_in(test_user).check(test_user)
         WebMail(self.driver).go().click_first_body_link()
         ConfirmPage(self.driver).check(test_user).confirm()
@@ -306,10 +495,10 @@ class DjangoTests(unittest.TestCase):
 
         # start counting tracks
         counting = profile.go_start_counting().check()
-        self.assertEqual(counting.image_displayed_id(), 1)
-        self.assertEqual(counting.drag_layer_handle(0.33).image_displayed_id(), 2)
-        self.assertEqual(counting.drag_layer_handle(0.67).image_displayed_id(), 4)
-        self.assertEqual(counting.drag_layer_handle(-0.33).image_displayed_id(), 3)
+        self.assertEqual(uploader.get_index(counting.image_displayed_url()), 1)
+        self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.33).image_displayed_url()), 2)
+        self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.67).image_displayed_url()), 4)
+        self.assertEqual(uploader.get_index(counting.drag_layer_handle(-0.33).image_displayed_url()), 3)
         counting.check_count("000")
         counting.click_at(0.6, 0.35)
         counting.check_count("001")
@@ -328,13 +517,8 @@ class DjangoTests(unittest.TestCase):
 
         # save intermediate result and logout
         counting.save()
-        navbar = NavBar(self.driver)
         navbar.logout()
-        # confirm project admin account
-        project_user = User("john", "john@test.com", "john")
-        profile = SignInPage(self.driver).go().sign_in(project_user)
-        WebMail(self.driver).go().click_first_body_link()
-        ConfirmPage(self.driver).check(project_user).confirm()
+
         # login, check no results yet
         profile = SignInPage(self.driver).go().sign_in(project_user)
         report = navbar.go_manage_projects()

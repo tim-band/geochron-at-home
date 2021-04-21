@@ -4,7 +4,7 @@
 
 {% block content %}
 
-<h1> Create new sample in project <strong>{{ parent.name }}</strong></h1>
+<h1> Create new sample in project <strong>{{ parent.project_name }}</strong></h1>
 <div><a href="{% url 'project' parent.pk %}">Cancel</a></div>
 <div>
     <form action="{% url 'sample_create' parent.pk %}" method="POST">

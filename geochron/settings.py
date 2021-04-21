@@ -127,7 +127,7 @@ STATICFILES_DIRS = [
 ]
 if STATIC_ROOT == '':
     STATICFILES_DIRS.append(os.path.join(BASE_DIR, 'static'))
-else:
+elif not os.path.isabs(STATIC_ROOT):
     STATIC_ROOT = os.path.join(BASE_DIR, STATIC_ROOT)
 
 #

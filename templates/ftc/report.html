@@ -139,12 +139,16 @@ footer {
                     <li class="divider"></li>
                     <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i> &nbsp;fission track counting</a></li>
                 {% endif %}
+                {% if user.is_staff or user.is_superuser %}
+                    <li><a id='projects-link' href="{% url 'projects'%}"><i class="fa fa-flash"></i> &nbsp;Edit your projects</a></li>
+                {% endif %}
             {% endblock %}
 
 {% block content %}
    <div class="container">
 
       <div class="row row-offcanvas row-offcanvas-right">
+      Usering: {% if user.is_staff %}Staff{% endif %}? {% if user.is_superuser %}Superuser{% endif %}? {{ user.name }}
 <!--
        <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
           <ul class="nav nav-sidebar">

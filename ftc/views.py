@@ -132,7 +132,7 @@ class ProjectUpdateView(CreatorOrSuperuserMixin, UpdateView):
     template_name = "ftc/project_update.html"
 
 
-class SampleDetailView(StaffRequiredMixin, DetailView):
+class SampleDetailView(CreatorOrSuperuserMixin, DetailView):
     model = Sample
     template_name = "ftc/sample.html"
 

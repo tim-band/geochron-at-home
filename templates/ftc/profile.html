@@ -84,6 +84,9 @@ footer {
         {% if user.is_staff %}
         <li><a href="{% url 'report'%}"><i class="fa fa-cubes"></i> &nbsp;Manage your projects</a></li>
         {% endif %}
+        {% if user.is_staff or user.is_superuser %}
+        <li><a id='projects-link' href="{% url 'projects'%}"><i class="fa fa-flash"></i> &nbsp;Edit your projects</a></li>
+        {% endif %}
     {% endif %}
 {% endblock %}
 

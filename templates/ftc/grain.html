@@ -125,10 +125,8 @@ window.addEventListener('load', function() {
         in sample <strong>{{ object.sample.sample_name }}</strong>,
         in project <strong>{{ object.sample.in_project.project_name }}</strong>
     </span>
-    {% if user.is_superuser or is_creator %}
     <button id="edit" onclick="beginEdit(xray_control)">Edit</button>
     <button id="save" onclick="save(xray_control, &quot;{% url 'grain_update' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
-    {% endif %}
 </div>
 
 <div id="map"></div>
@@ -143,4 +141,3 @@ window.addEventListener('load', function() {
     {% csrf_token %}
 </form>
 {% endblock %}
-
