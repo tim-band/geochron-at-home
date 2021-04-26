@@ -436,8 +436,8 @@ class WebUploader:
         """
 
     def upload_projects(self, directory):
-        xray_path = os.path.abspath(directory + '/*/*/*/*/*.jpg')
-        files = glob.glob(xray_path)
+        crystal_path = os.path.abspath(directory + '/*/*/*/*/*.jpg')
+        files = glob.glob(crystal_path)
         self.hashes = {}
         for f in files:
             number = int( f[ f.rindex('-') + 1 : f.rindex('.') ] )
@@ -469,7 +469,7 @@ class DjangoTests(unittest.TestCase):
         self.driver = webdriver.Firefox()
 
     def test_onboard(self):
-        # Upload X-ray images
+        # Upload Crystal images
         test_user = User("tester", "tester@test.com", "MyPaSsW0rd")
         project_user = User("john", "john@test.com", "john")
         HomePage(self.driver).go()
@@ -480,7 +480,7 @@ class DjangoTests(unittest.TestCase):
         profile = SignInPage(self.driver).go().sign_in(project_user)
         uploader = WebUploader(self.driver)
         #uploader = new ScriptUploader(self.driver)
-        uploader.upload_projects('test/xrays')
+        uploader.upload_projects('test/crystals')
         navbar = NavBar(self.driver)
         navbar.logout()
 

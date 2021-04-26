@@ -56,7 +56,7 @@ services:
       - SECRET_KEY=1234abcd
       - FAKE_MAIL_SERVER=1
     volumes:
-      - "./test/xrays:/code/test/xrays"
+      - "./test/crystals:/code/test/crystals"
       - "web_static:/static/"
       - "./vendor:/code/vendor"
     depends_on:

@@ -210,7 +210,7 @@ location /geochronathome/ {
 
 (note the deleted slash from the `proxy_pass` line)
 
-## Uploading x-ray images
+## Uploading crystal images
 
 You can upload a new set of images by giving them the following paths:
 `user_upload/<user-name>/<project-name>/<sample-name>/<grain-name>/<image-name>.jpg`

@@ -160,7 +160,7 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
     template_name = "ftc/grain.html"
 
 
-class XrayImageInput(ClearableFileInput):
+class CrystalImageInput(ClearableFileInput):
     def value_from_datadict(self, data, files, name):
         return files.getlist(name)
 
@@ -192,7 +192,7 @@ class GrainForm(ModelForm):
         fields = ['images']
 
     images = ImageStackField(
-        widget=XrayImageInput(attrs={'multiple': True}),
+        widget=CrystalImageInput(attrs={'multiple': True}),
         validators=[validate_file_image])
 
     def clean(self):

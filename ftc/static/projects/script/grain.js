@@ -184,28 +184,28 @@ function makeMap(image_height, image_width, image_urls, region_points) {
     };
 }
 
-function wantsToMerge(xray, v, i, region) {
+function wantsToMerge(crystal, v, i, region) {
     if (region.length < 2) {
         return false;
     }
     var lasti = i === 0? region.length - 1 : i - 1;
     var nexti = i === region.length - 1? 0 : i + 1;
-    var lastp = xray.map.latLngToLayerPoint(region[lasti]);
-    var nextp = xray.map.latLngToLayerPoint(region[nexti]);
-    var p = xray.map.latLngToLayerPoint(v);
+    var lastp = crystal.map.latLngToLayerPoint(region[lasti]);
+    var nextp = crystal.map.latLngToLayerPoint(region[nexti]);
+    var p = crystal.map.latLngToLayerPoint(v);
     return pointsClose(p, lastp, 10) || pointsClose(p, nextp, 10);
 }
 
-function mergePoints(xray, i, region, region_index) {
-    if (region.length === 2 && 1 < xray.region_points.length) {
+function mergePoints(crystal, i, region, region_index) {
+    if (region.length === 2 && 1 < crystal.region_points.length) {
         // gone down to a single point. If there are more regions,
         // just delete the whole region.
-        return xray.region_points.slice(0, region_index).concat(
-            xray.region_points.slice(region_index + 1));
+        return crystal.region_points.slice(0, region_index).concat(
+            crystal.region_points.slice(region_index + 1));
     }
     var r = region.slice(0, i).concat(region.slice(i + 1));
-    var new_regions = xray.region_points.slice(0, region_index).concat(
-        [r], xray.region_points.slice(region_index + 1));
+    var new_regions = crystal.region_points.slice(0, region_index).concat(
+        [r], crystal.region_points.slice(region_index + 1));
     return new_regions;
 }
 
@@ -330,16 +330,16 @@ function reconfigureRegions(regions, region_index, region, i) {
     return mergeRegions(regions, region_index, region, i);
 }
 
-function moveMarker(ev, xray, v, i, region, region_index) {
+function moveMarker(ev, crystal, v, i, region, region_index) {
     v[0] = ev.latlng.lat;
     v[1] = ev.latlng.lng;
     var new_regions;
-    if (wantsToMerge(xray, v, i, region)) {
-        new_regions = mergePoints(xray, i, region, region_index);
+    if (wantsToMerge(crystal, v, i, region)) {
+        new_regions = mergePoints(crystal, i, region, region_index);
     } else {
-        new_regions = reconfigureRegions(xray.region_points, region_index, region, i);
+        new_regions = reconfigureRegions(crystal.region_points, region_index, region, i);
     }
-    xray.region_layer.setLatLngs(new_regions);
+    crystal.region_layer.setLatLngs(new_regions);
     return new_regions;
 }
 
@@ -376,34 +376,34 @@ function normalizeRegions(regions) {
     return regions;
 }
 
-function removeRegionMarkers(xray) {
-    xray.marker_layer.clearLayers();
-    xray.mid_marker_layer.clearLayers();
+function removeRegionMarkers(crystal) {
+    crystal.marker_layer.clearLayers();
+    crystal.mid_marker_layer.clearLayers();
 }
 
-function addRegionMarkers(xray) {
+function addRegionMarkers(crystal) {
     var midIcon = L.icon({
         iconUrl: '/static/home/ring.svg',
         iconSize: [20, 20],
         iconAnchor: [10, 10],
     });
-    xray.region_points = normalizeRegions(xray.region_points);
+    crystal.region_points = normalizeRegions(crystal.region_points);
     var new_regions;
-    forEach(xray.region_points, function(region, region_index) {
+    forEach(crystal.region_points, function(region, region_index) {
         forEach(region, function(vertex, index) {
             var v = L.marker(vertex, {
                 draggable: true,
-            }).addTo(xray.marker_layer);
+            }).addTo(crystal.marker_layer);
             L.DomEvent.on(v, 'dragstart', function() {
-                xray.mid_marker_layer.clearLayers();
+                crystal.mid_marker_layer.clearLayers();
             });
             L.DomEvent.on(v, 'drag', function(ev) {
-                new_regions = moveMarker(ev, xray, vertex, index, region, region_index);
+                new_regions = moveMarker(ev, crystal, vertex, index, region, region_index);
             });
             L.DomEvent.on(v, 'dragend', function() {
-                xray.region_points = new_regions;
-                removeRegionMarkers(xray);
-                addRegionMarkers(xray);
+                crystal.region_points = new_regions;
+                removeRegionMarkers(crystal);
+                addRegionMarkers(crystal);
             });
         });
         forEachInCycle(region, function(v0, v1, i0, i1) {
@@ -411,46 +411,46 @@ function addRegionMarkers(xray) {
             var m = L.marker(v, {
                 draggable: true,
                 icon: midIcon,
-            }).addTo(xray.mid_marker_layer);
+            }).addTo(crystal.mid_marker_layer);
             L.DomEvent.on(m, 'dragstart', function() {
                 region.splice(i1, 0, v);
             });
             L.DomEvent.on(m, 'drag', function(ev) {
-                new_regions = moveMarker(ev, xray, v, i1, region, region_index);
+                new_regions = moveMarker(ev, crystal, v, i1, region, region_index);
             });
             L.DomEvent.on(m, 'dragend', function() {
-                xray.region_points = new_regions;
-                removeRegionMarkers(xray);
-                addRegionMarkers(xray);
+                crystal.region_points = new_regions;
+                removeRegionMarkers(crystal);
+                addRegionMarkers(crystal);
             });
         });
     });
 }
 
-function beginEdit(xray) {
-    addRegionMarkers(xray);
+function beginEdit(crystal) {
+    addRegionMarkers(crystal);
     var edit = document.getElementById("edit");
     var save = document.getElementById("save");
     edit.setAttribute('disabled', true);
     save.removeAttribute('disabled');
 }
 
-function save(xray, url, form, error_callback) {
+function save(crystal, url, form, error_callback) {
     const xhr = new XMLHttpRequest();
     const fd = new FormData(form);
-    forEach(xray.region_points, function(region, ri) {
+    forEach(crystal.region_points, function(region, ri) {
         forEach(region, function(v, vi) {
             fd.append('vertex_' + ri + '_' + vi + '_x', v[1]);
             fd.append('vertex_' + ri + '_' + vi + '_y', v[0]);
         });
     });
     xhr.addEventListener("load", function() {
-        removeRegionMarkers(xray);
+        removeRegionMarkers(crystal);
         var edit = document.getElementById("edit");
         var save = document.getElementById("save");
         edit.removeAttribute('disabled');
         save.setAttribute('disabled', true);
-        xray.marker_layer.clearLayers();
+        crystal.marker_layer.clearLayers();
     });
     if (error_callback) {
         xhr.addEventListener("error", function() {
