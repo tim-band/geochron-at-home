@@ -1,5 +1,6 @@
 from django.conf.urls import include
 from django.urls import path
+from rest_framework_simplejwt import views as jwt_views
 
 from ftc.views import home, signmeup, report, getTableData, \
     get_grain_images, updateTFNResult, counting, saveWorkingGrain, \
@@ -7,6 +8,7 @@ from ftc.views import home, signmeup, report, getTableData, \
     ProjectDetailView, ProjectUpdateView, \
     SampleDetailView, SampleUpdateView, SampleCreateView, \
     GrainDetailView, GrainCreateView, grain_update
+from ftc.apiviews import ProjectView
 
 urlpatterns = [
     # Ex: /ftc/
@@ -30,4 +32,8 @@ urlpatterns = [
     path('counting/', counting, name='counting'),
     path('saveWorkingGrain/', saveWorkingGrain, name='saveWorkingGrain'),
     path('image/<pk>/', get_image, name="get_image"),
+
+    path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get-jwt-token'),
+    path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh-jwt-token'),
+    path('api/project/<pk>/', ProjectView.as_view(), name='api-project'),
 ]
