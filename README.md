@@ -283,3 +283,19 @@ these images, you may have uploaded images that are not readable by
 all users. You can correct this by entering the `django` container with
 `docker-compose exec django sh`, navigating to the offending
 directory within `/code/static/grain_pool` and using `chmod ao+r *`.
+
+## Using the API
+
+There is an API available (with the same users) at `/ftc/api`, secured
+with Java Web Tokens.
+
+A couple of scripts are provided that interface with this API, marshalling
+the Json Web Tokens you need along the way.
+
+Firstly, you will need to run `./api/login.py -u <URL> <USERNAME>`
+if you have not done this in the last 24 hours. (`<URL>` defaults to
+`http://localhost:8000` if you don't use the `-u` option). This
+creates two files (`access.token` and `refresh.token`) that allow
+you to access the API for the next 24 hours without logging in again.
+
+You can now run `./api/projects -u <URL>` to get the list of project IDs.

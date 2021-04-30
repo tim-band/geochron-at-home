@@ -8,7 +8,7 @@ from ftc.views import home, signmeup, report, getTableData, \
     ProjectDetailView, ProjectUpdateView, \
     SampleDetailView, SampleUpdateView, SampleCreateView, \
     GrainDetailView, GrainCreateView, grain_update
-from ftc.apiviews import ProjectView
+from ftc.apiviews import ProjectView, ProjectsView
 
 urlpatterns = [
     # Ex: /ftc/
@@ -33,7 +33,8 @@ urlpatterns = [
     path('saveWorkingGrain/', saveWorkingGrain, name='saveWorkingGrain'),
     path('image/<pk>/', get_image, name="get_image"),
 
-    path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get-jwt-token'),
-    path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh-jwt-token'),
-    path('api/project/<pk>/', ProjectView.as_view(), name='api-project'),
+    path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get_jwt_token'),
+    path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh_jwt_token'),
+    path('api/projects/', ProjectsView.as_view(), name='api_projects'),
+    path('api/project/<pk>/', ProjectView.as_view(), name='api_project'),
 ]

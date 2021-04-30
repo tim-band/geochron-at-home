@@ -4,16 +4,18 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-class AdminApiView(APIView):
-    authentication_classes = [TokenAuthentication]
+from ftc.models import Project
+
+class ProjectsView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
-class ProjectsView(AdminApiView):
     def get(self, request):
-        projects = Projects.objects.values_list('id', flat=True)
-        return Response(projects)
+        projects = Project.objects.values_list('id', flat=True)
+        return Response({'projects':projects, 'user':request.user.username})
 
-class ProjectView(AdminApiView):
+class ProjectView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
     def get(self, request):
         project = get_object_or_404(Project, pk=self.kwargs['pk'])
         samples = Sample.objects.values_list('id', flat=True)

@@ -5,3 +5,4 @@ production.env
 /user_upload/
 .vscode
 geckodriver.log
+*.token
