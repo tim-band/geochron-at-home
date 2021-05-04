@@ -11,7 +11,7 @@ class ProjectsView(APIView):
 
     def get(self, request):
         projects = Project.objects.values_list('id', flat=True)
-        return Response({'projects':projects, 'user':request.user.username})
+        return Response(projects)
 
 class ProjectView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
