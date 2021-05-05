@@ -25,6 +25,10 @@ def set_config(opts, config):
 
 
 def refresh_token(config):
+    if 'refresh' not in config:
+        print("Please log in:")
+        print("{0} login".format(sys.argv[0]))
+        exit(2)
     url = get_url(config)
     req = Request(url + "/ftc/api/refresh-token", method='POST')
     data = urlencode({
@@ -44,6 +48,20 @@ def refresh_token(config):
         else:
             raise("HTTPError {0}: {1}", e.code, e.reason)
     return config
+
+
+def token_refresh(func):
+    def rf(options, config, *args, **kwargs):
+        try:
+            config_altered = func(options, config, *args, **kwargs)
+        except HTTPError as e:
+            if e.code == 403 or e.code == 401:
+                refreshed_config = refresh_token(config)
+                config_altered = func(options, refreshed_config, *args, **kwargs) or refreshed_config
+            else:
+                raise("HTTPError {0}: {1}", e.code, e.reason)
+        return config_altered
+    return rf
 
 
 def login(opts, config):
@@ -72,20 +90,42 @@ def login(opts, config):
     return config
 
 
+def api_get(config, *args):
+    url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args))
+    req = Request(url, method='GET')
+    req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
+    return urlopen(req)
+
+
+@token_refresh
 def projects(opts, config):
-    url = get_url(config)
-    req = Request(url + "/ftc/api/projects", method='GET')
-
-    req.add_header('Authorization', 'Bearer ' + config['access'])
-
-    with urlopen(req) as response:
+    with api_get(config, 'projects') as response:
         body = response.read()
         result = json.loads(body)
         if type(result) is list:
             for v in result:
-                print(v)
+                print(v['id'], v['project_name'])
         else:
             print(result)
+
+
+@token_refresh
+def project(opts, config):
+    with api_get(config, 'project', opts.id) as response:
+        body = response.read()
+        result = json.loads(body)
+        print('ID:', result.get('id'))
+        print('name:', result.get('project_name'))
+        print('creator:', result.get('creator'))
+        print('creation date:', result.get('create_date'))
+        print('priority:', result.get('priority'))
+        print('closed:', result.get('closed'))
+        samples = result.get('sample_set')
+        if type(samples) is list:
+            samples = ', '.join(map(str,sorted(samples)))
+        print('sample IDs:', samples)
+        print('description:')
+        print(result.get('project_description'))
 
 
 usage = "usage: %prog -s SETTINGS | --settings=SETTINGS"
@@ -110,6 +150,9 @@ login_parser.add_argument('--password', help='password to pass, for use in scrip
 login_parser.add_argument('--user', help='name of the user to log in as')
 projects_parser = subparsers.add_parser('projects', help="lists project IDs")
 projects_parser.set_defaults(func=projects)
+project_parser = subparsers.add_parser('project', help="return information on the given project")
+project_parser.set_defaults(func=project)
+project_parser.add_argument('id', help="ID of the project to return", type=int)
 
 options = parser.parse_args()
 
@@ -124,15 +167,11 @@ config = {}
 if len(config_file) != 0:
     config = json.loads(config_file)
 
-try:
-    config_altered = options.func(options, config)
-except HTTPError as e:
-    if e.code == 403 or e.code == 401:
-        refreshed_config = refresh_token(config)
-        config_altered = options.func(options, refreshed_config) or refreshed_config
-    else:
-        raise("HTTPError {0}: {1}", e.code, e.reason)
+config_altered = options.func(options, config)
 
 if config_altered:
     config_fh.seek(0)
     json.dump(config_altered, config_fh)
+    config_fh.truncate()
+
+config_fh.close()
