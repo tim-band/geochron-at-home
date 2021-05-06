@@ -383,7 +383,7 @@ function removeRegionMarkers(crystal) {
 
 function addRegionMarkers(crystal) {
     var midIcon = L.icon({
-        iconUrl: '/static/home/ring.svg',
+        iconUrl: static_ring_svg_url,
         iconSize: [20, 20],
         iconAnchor: [10, 10],
     });
