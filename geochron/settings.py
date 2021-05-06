@@ -34,6 +34,8 @@ SESSION_COOKIE_SECURE = sslOnly
 CSRF_COOKIE_SECURE = sslOnly
 
 def add_newlines_to_pem(x):
+    if x == None:
+        return None
     return x.replace(
         'KEY-----', 'KEY-----\n').replace(
             '-----END', '\n-----END')
@@ -234,17 +236,15 @@ USE_X_FORWARDED_HOST = True
 
 LOGGING = {
     'version': 1,
-    'disable_existing_handlers': False,
+    'disable_existing_loggers': False,
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
         },
     },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
-        }
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
     },
 }
 
