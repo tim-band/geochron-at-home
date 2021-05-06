@@ -286,16 +286,67 @@ directory within `/code/static/grain_pool` and using `chmod ao+r *`.
 
 ## Using the API
 
-There is an API available (with the same users) at `/ftc/api`, secured
+There is an API available (with the same users), secured
 with Java Web Tokens.
 
 A couple of scripts are provided that interface with this API, marshalling
 the Json Web Tokens you need along the way.
 
-Firstly, you will need to run `./api/login.py -u <URL> <USERNAME>`
-if you have not done this in the last 24 hours. (`<URL>` defaults to
-`http://localhost:8000` if you don't use the `-u` option). This
-creates two files (`access.token` and `refresh.token`) that allow
-you to access the API for the next 24 hours without logging in again.
+### Initializing the JWT
 
-You can now run `./api/projects -u <URL>` to get the list of project IDs.
+Before using the API you must initialize the JWT. Also,
+periodically, or if you susupect the JWT might have leaked
+you should also re-initialize the JWT.
+
+Firstly, remove any lines beginning `JWT_` from your
+`.env` file (for local development) or `production.env`
+(for production). Then, from the Pipenv shell:
+
+```sh
+(geochron-at-home) $ ./gen_jwt >> .env
+```
+
+for local development, or
+
+```sh
+(geochron-at-home) $ ./gen_jwt >> production.env
+```
+
+for production.
+
+Now restart geochron@home:
+
+```sh
+docker-compose build django
+docker-compose down
+docker-compose up -d
+```
+
+### Using the API
+
+You can use the `./gah.py` script from any machine that
+can see the API endpoints. But first, you have to tell it where
+the endpoints are:
+
+```sh
+./gah.py set url https://my.domain.com/geochron@home
+```
+
+Do not include any `/ftc` or `/api`. This produces a file
+`gah.config` that stores this and other information. As long
+as you run `./gah.py` from a directory containing such a
+file, you will be able to use these settings.
+
+Next, you need to log in with `./gah.py login`. You can use
+any admin user on the site. This login session will last for
+one day, beyond which a further login will be required.
+
+Now you can use the other commands of `gah`. Currently only
+three exist:
+
+* `./gah.py` on its own lists help and commands
+* `./gah.py projects` lists all the project IDs
+* `./gah.py project <ID>` gives information on project with ID `<ID>`
+
+Commands to be added include creating projects and samples,
+uploading grains, and downloading results.
