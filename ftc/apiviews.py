@@ -1,4 +1,5 @@
 from django.shortcuts import get_object_or_404
+from rest_framework import generics, serializers, status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -6,26 +7,25 @@ from rest_framework.views import APIView
 
 from ftc.models import Project, Sample
 
-class ProjectsView(APIView):
+class ProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = ['id', 'project_name', 'creator', 'create_date',
+            'project_description', 'priority', 'closed', 'sample_set']
+
+    creator = serializers.PrimaryKeyRelatedField(required=False, read_only=True)
+
+
+class ProjectListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer
 
-    def get(self, request, *args, **kwargs):
-        projects = Project.objects.values()
-        return Response(projects)
+    def perform_create(self, serializer):
+        serializer.save(creator=self.request.user)
 
-class ProjectView(APIView):
+
+class ProjectInfoView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
-
-    def get(self, request, *args, **kwargs):
-        project = get_object_or_404(Project, pk=kwargs['pk'])
-        samples = Sample.objects.values_list('id', flat=True)
-        return Response({
-            'id': project.id,
-            'project_name': project.project_name,
-            'creator': project.creator.username,
-            'create_date': project.create_date,
-            'project_description': project.project_description,
-            'priority': project.priority,
-            'closed': project.closed,
-            'sample_set': samples,
-        })
+    queryset = Project.objects.all()
+    serializer_class = ProjectSerializer

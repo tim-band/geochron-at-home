@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 from getpass import getpass
+from html.parser import HTMLParser
 import json
 import os.path
 import sys
@@ -39,14 +40,14 @@ def refresh_token(config):
             body = response.read()
             result = json.loads(body)
             if 'access' not in result:
-                raise "No access token returned"
+                raise Exception("No access token returned")
             config['access'] = result['access']
     except HTTPError as e:
         if e.code == 403 or e.code == 401:
             print("Your login has expired. Please log in again using:")
             print("{0} login".format(sys.argv[0]))
         else:
-            raise("HTTPError {0}: {1}", e.code, e.reason)
+            raise e
     return config
 
 
@@ -59,7 +60,7 @@ def token_refresh(func):
                 refreshed_config = refresh_token(config)
                 config_altered = func(options, refreshed_config, *args, **kwargs) or refreshed_config
             else:
-                raise("HTTPError {0}: {1}", e.code, e.reason)
+                raise e
         return config_altered
     return rf
 
@@ -71,18 +72,18 @@ def login(opts, config):
 
     req = Request(url + "/ftc/api/get-token", method='POST')
     data = urlencode({
-    'username': user,
-    'password': password,
+        'username': user,
+        'password': password,
     }).encode('ascii')
 
     with urlopen(req, data=data) as response:
         #TODO: urlopen raises an HTTP Error if not-OK response is returned.
         if response.status != 200:
-            raise "Token acquisition failed with status {0}".format(response.status)
+            raise Exception("Token acquisition failed with status {0}".format(response.status))
         body = response.read()
         result = json.loads(body)
         if 'refresh' not in result:
-            raise "No refresh token returned"
+            raise Exception("No refresh token returned")
         config['refresh'] = result['refresh']
         if 'access' in result:
             config['access'] = result['access']
@@ -97,9 +98,17 @@ def api_get(config, *args):
     return urlopen(req)
 
 
+def api_post(config, *args, **kwargs):
+    url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args)) + '/'
+    data = urlencode(kwargs)
+    req = Request(url, data=data.encode('ascii'), method='POST')
+    req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
+    return urlopen(req)
+
+
 @token_refresh
-def projects(opts, config):
-    with api_get(config, 'projects') as response:
+def project_list(opts, config):
+    with api_get(config, 'project') as response:
         body = response.read()
         result = json.loads(body)
         if type(result) is list:
@@ -110,7 +119,7 @@ def projects(opts, config):
 
 
 @token_refresh
-def project(opts, config):
+def project_info(opts, config):
     with api_get(config, 'project', opts.id) as response:
         body = response.read()
         result = json.loads(body)
@@ -128,6 +137,65 @@ def project(opts, config):
         print(result.get('project_description'))
 
 
+@token_refresh
+def project_create(opts, config):
+    with api_post(config, 'project',
+        project_name=opts.name,
+        project_description=opts.description,
+        priority=opts.priority,
+        closed=False,
+    ) as response:
+        print(response.read())
+
+
+def add_set_subparser(subparsers):
+    set_parser = subparsers.add_parser('set')
+    set_parser.set_defaults(func=set_config)
+    set_parser.add_argument('key', help="name of the config setting to set, for example 'url'")
+    set_parser.add_argument('value', help="value of the config setting to set")
+
+
+def add_login_subparser(subparsers):
+    login_parser = subparsers.add_parser('login')
+    login_parser.set_defaults(func=login)
+    login_parser.add_argument('--password', help='password to pass, for use in scripts only')
+    login_parser.add_argument('--user', help='name of the user to log in as')
+
+
+def add_project_subparser(subparsers):
+    # project has verbs list, info, create, update and delete
+    project_parser = subparsers.add_parser('project', help='operations on projects')
+    verbs = project_parser.add_subparsers()
+    list_projects = verbs.add_parser('list', help='list projects')
+    list_projects.set_defaults(func=project_list)
+    info = verbs.add_parser('info', help='return information on the given project')
+    info.set_defaults(func=project_info)
+    info.add_argument('id', help="ID of the project to return", type=int)
+    create = verbs.add_parser('create', help='create a project')
+    create.set_defaults(func=project_create)
+    create.add_argument('name', help='Project name')
+    create.add_argument('description', help='Project description')
+    create.add_argument('priority', help='Priority', type=int)
+
+
+class ExceptionExtractor(HTMLParser):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.levels = 0
+
+    def handle_starttag(self, tag, attrs):
+        if self.levels != 0 or ('class', 'exception_value') in attrs:
+            self.levels += 1
+
+    def handle_endtag(self, tag):
+        if self.levels != 0:
+            self.levels -= 1
+
+    def handle_data(self, data):
+        if self.levels != 0:
+            print(data)                
+
+
 usage = "usage: %prog -s SETTINGS | --settings=SETTINGS"
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -140,19 +208,9 @@ parser.add_argument(
 )
 parser.set_defaults(func=None)
 subparsers = parser.add_subparsers()
-set_parser = subparsers.add_parser('set')
-set_parser.set_defaults(func=set_config)
-set_parser.add_argument('key', help="name of the config setting to set, for example 'url'")
-set_parser.add_argument('value', help="value of the config setting to set")
-login_parser = subparsers.add_parser('login')
-login_parser.set_defaults(func=login)
-login_parser.add_argument('--password', help='password to pass, for use in scripts only')
-login_parser.add_argument('--user', help='name of the user to log in as')
-projects_parser = subparsers.add_parser('projects', help="lists project IDs")
-projects_parser.set_defaults(func=projects)
-project_parser = subparsers.add_parser('project', help="return information on the given project")
-project_parser.set_defaults(func=project)
-project_parser.add_argument('id', help="ID of the project to return", type=int)
+add_set_subparser(subparsers)
+add_login_subparser(subparsers)
+add_project_subparser(subparsers)
 
 options = parser.parse_args()
 
@@ -167,7 +225,14 @@ config = {}
 if len(config_file) != 0:
     config = json.loads(config_file)
 
-config_altered = options.func(options, config)
+# Actually perform the action!
+try:
+    config_altered = options.func(options, config)
+except HTTPError as e:
+    print("Failed (with HTTP code {0}: {1})".format(e.code, e.reason))
+    body = e.read().decode()
+    ExceptionExtractor().feed(body)
+    exit(1)
 
 if config_altered:
     config_fh.seek(0)

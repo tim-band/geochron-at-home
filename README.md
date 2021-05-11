@@ -138,27 +138,33 @@ Run 2 workers with:
 (this is a work in progress)
 
 Firstly copy the file `production_env` to `production.env` and edit the copy
-to your liking. `DB_HOST` must remain set to `db`.
+to your liking.
 
-We must build the docker swarm, setting the hosts and base URL. In this
-example, the service is being hosted at `www.myhost.com/geochron@home`,
-behind a reverse proxy that strips the initial `/geochron@home`. Multiple hosts
-can be specified in `ALLOWED_HOSTS` as a comma-separated list. Any host can
-be allowed with `ALLOWED_HOSTS='*'`.
+We must build the docker swarm, setting the hosts and base URL. For
+example, if the service is being hosted at `www.myhost.com/geochron@home`
+behind a reverse proxy that strips the initial `/geochron@home`
+then you need to set:
 
-```sh
-$ ALLOWED_HOSTS=www.myhost.com BASE_URL=/geochron@home docker-compose build
-$ docker-compose up -d
 ```
+SITE_DOMAIN=www.myhost.com
+ALLOWED_HOSTS=www.myhost.com
+BASE_URL=/geochron@home
+```
+
+Multiple hosts can be specified in `ALLOWED_HOSTS` as a
+comma-separated list. Any host can be allowed with `ALLOWED_HOSTS='*'`.
+You can ignore (or delete) the settings for `DB_HOST` and `STATIC_ROOT`
+as these are overridden in the compose file.
+
+Now you can build it with `docker-compose build` and run it with
+`docker-compose up -d`. Or you can do both with at once with
+`docker-compose up -d --build`.
 
 To set up the database, run:
 
 ```
 $ docker-compose exec django ./site_init.sh
 ```
-
-(you can ignore warnings about `ALLOWED_HOSTS` and `BASE_URL` not
-being defined)
 
 You can now browse to [http://localhost:3830/ftc] to see it running.
 
@@ -184,24 +190,6 @@ location /geochronathome/ {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_redirect off;
-        location /geochronathome/static/ {
-                proxy_pass http://127.0.0.1:3830/static/;
-        }
-}
-```
-
-Or, if you are not using `ALLOWED_HOSTS` you need:
-
-```
-location /geochronathome/ {
-        proxy_pass http://127.0.0.1:3830;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header SCRIPT_NAME /geochronathome;
-		proxy_redirect /geochronathome/ /geochronathome/;
-        proxy_redirect / /geochronathome/;
         location /geochronathome/static/ {
                 proxy_pass http://127.0.0.1:3830/static/;
         }
