@@ -6,3 +6,4 @@ production.env
 .vscode
 geckodriver.log
 /gah.config
+/db/
