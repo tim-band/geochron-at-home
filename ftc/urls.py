@@ -2,13 +2,15 @@ from django.conf.urls import include
 from django.urls import path
 from rest_framework_simplejwt import views as jwt_views
 
-from ftc.views import home, signmeup, report, getTableData, \
-    get_grain_images, updateTFNResult, counting, saveWorkingGrain, \
-    get_image, projects, ProjectCreateView, \
-    ProjectDetailView, ProjectUpdateView, \
-    SampleDetailView, SampleUpdateView, SampleCreateView, \
-    GrainDetailView, GrainCreateView, grain_update
-from ftc.apiviews import ProjectListView, ProjectInfoView
+from ftc.views import (home, signmeup, report, getTableData,
+    get_grain_images, updateTFNResult, counting, saveWorkingGrain,
+    get_image, projects, ProjectCreateView,
+    ProjectDetailView, ProjectUpdateView,
+    SampleDetailView, SampleUpdateView, SampleCreateView,
+    GrainDetailView, GrainCreateView, grain_update)
+from ftc.apiviews import (ProjectListView, ProjectInfoView,
+    SampleListView, SampleInfoView,
+    FissionTrackNumberingView)
 
 urlpatterns = [
     # Ex: /ftc/
@@ -37,4 +39,7 @@ urlpatterns = [
     path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh_jwt_token'),
     path('api/project/', ProjectListView.as_view(), name='api_project_list'),
     path('api/project/<pk>/', ProjectInfoView.as_view(), name='api_project_info'),
+    path('api/sample/', SampleListView.as_view(), name='api_sample_list'),
+    path('api/sample/<pk>/', SampleInfoView.as_view(), name='api_sample_info'),
+    path('api/count/', FissionTrackNumberingView.as_view(), name='api_ftn_list'),
 ]

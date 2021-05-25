@@ -91,9 +91,9 @@ def login(opts, config):
     return config
 
 
-def api_get(config, *args):
+def api_get(config, *args, **kwargs):
     url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args))
-    req = Request(url, method='GET')
+    req = Request(url + '?' + urlencode(kwargs), method='GET')
     req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
     return urlopen(req)
 
@@ -148,6 +148,68 @@ def project_create(opts, config):
         print(response.read())
 
 
+@token_refresh
+def sample_list(opts, config):
+    kwargs = {}
+    if opts.project:
+        kwargs['project'] = opts.project
+    with api_get(config, 'sample', **kwargs) as response:
+        body = response.read()
+        result = json.loads(body)
+        if type(result) is list:
+            for v in result:
+                print(v['id'], v['sample_name'])
+        else:
+            print(result)
+
+
+@token_refresh
+def sample_create(opts, config):
+    with api_post(config, 'sample',
+        sample_name=opts.name,
+        in_project=opts.project,
+        sample_property=opts.property,
+        priority=opts.priority,
+        min_contributor_num=opts.min_contributor_num,
+    ) as response:
+        print(response.read())
+
+
+@token_refresh
+def sample_info(opts, config):
+    with api_get(config, 'sample', opts.id) as response:
+        body = response.read()
+        print(body)
+
+
+def output_as_csv(xs):
+    columns = {}
+    for x in xs:
+        for k in x.keys():
+            columns[k] = True
+    cols = columns.keys()
+    print(*cols, sep=',')
+    for x in xs:
+        row = map(lambda c: x.get(c, ''), cols)
+        print(*row, sep=',')
+
+
+@token_refresh
+def count_list(opts, config):
+    kwargs = opts.all
+    if opts.sample:
+        kwargs['sample'] = opts.sample
+    if opts.grain:
+        kwargs['grain'] = opts.grain
+    with api_get(config, 'count', **kwargs) as response:
+        body = response.read()
+        result = json.loads(body)
+        if type(result) is list:
+            output_as_csv(result)
+        else:
+            print(result)
+
+
 def add_set_subparser(subparsers):
     set_parser = subparsers.add_parser('set')
     set_parser.set_defaults(func=set_config)
@@ -177,6 +239,49 @@ def add_project_subparser(subparsers):
     create.add_argument('description', help='Project description')
     create.add_argument('priority', help='Priority', type=int)
 
+
+def add_sample_subparser(subparsers):
+    # sample has verbs list, info, create, update and delete
+    sample_parser = subparsers.add_parser('sample', help='operations on samples')
+    verbs = sample_parser.add_subparsers()
+    list_samples = verbs.add_parser('list', help='list samples')
+    list_samples.set_defaults(func=sample_list)
+    list_samples.add_argument('--project', help='limit to one project')
+    info = verbs.add_parser('info', help='return information on the given sample')
+    info.set_defaults(func=sample_info)
+    info.add_argument('id', help="ID of the project to return", type=int)
+    create = verbs.add_parser('create', help='create a sample')
+    create.set_defaults(func=sample_create)
+    create.add_argument('name', help='Sample name')
+    create.add_argument('project', help='Project ID the sample is part of')
+    create.add_argument(
+        'property',
+        help='[T]est Sample, [A]ge Standard Sample, or [D]osimeter Sample',
+        choices=['T', 'A', 'D'],
+    )
+    create.add_argument(
+        'priority',
+        help='Priority in showing the sample to the user',
+        default=0,
+        type=int
+    )
+    create.add_argument(
+        'min_contributor_num',
+        help='Number of user contributions required',
+        default=1,
+        type=int
+    )
+
+
+def add_count_subparser(subparsers):
+    # count only has list for now
+    count_parser = subparsers.add_parser('count', help='operations on user count results')
+    verbs = count_parser.add_subparsers()
+    list_counts = verbs.add_parser('list', help='list count results')
+    list_counts.set_defaults(func=count_list)
+    list_counts.add_argument('--all', action='store_const', const={all:None}, default={}, help='report unfinished counts as well')
+    list_counts.add_argument('--sample', help='only report the sample with this name')
+    list_counts.add_argument('--grain', help='only report the grain with this index')
 
 class ExceptionExtractor(HTMLParser):
     def __init__(self, *args, **kwargs):
@@ -211,6 +316,8 @@ subparsers = parser.add_subparsers()
 add_set_subparser(subparsers)
 add_login_subparser(subparsers)
 add_project_subparser(subparsers)
+add_sample_subparser(subparsers)
+add_count_subparser(subparsers)
 
 options = parser.parse_args()
 
