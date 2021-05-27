@@ -16,6 +16,7 @@ services:
     image: nginx:1.19.6-alpine
     ports:
       - 3830:80
+      - 3831:8081
     volumes:
       - "./nginx/conf.d:/etc/nginx/conf.d:ro"
       - "web_static:/var/www/static:ro"

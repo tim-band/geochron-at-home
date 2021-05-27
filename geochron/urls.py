@@ -17,4 +17,5 @@ urlpatterns = [
     # admin
     path('admin/', admin.site.urls),
     path('ftc/', include('ftc.urls')),
+    path('', include('django_prometheus.urls')),
 ]

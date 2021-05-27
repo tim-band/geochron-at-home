@@ -121,6 +121,11 @@ Set the following in the http `server` block of your nginx config:
 location /gah/static/ {
     root /var/www/html/geochron_at_home/static;
 }
+location /gah/metrics {
+    deny all;
+    access_log off;
+    error_log off;
+}
 location /gah/ {
     ###
     ### Different depending on whether we are redirecting to https or not

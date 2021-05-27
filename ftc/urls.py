@@ -13,7 +13,6 @@ from ftc.apiviews import (ProjectListView, ProjectInfoView,
     FissionTrackNumberingView)
 
 urlpatterns = [
-    # Ex: /ftc/
     path('', home, name='home'),
     path('signup', signmeup, name='signmeup'),
     path('report/', report, name='report'),

@@ -2,10 +2,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from django.urls import reverse
+from django_prometheus.models import ExportModelOperationsMixin
 
-# import re
-
-# Create your models here.
 class Project(models.Model):
     alphanumeric = RegexValidator(r'^[0-9a-zA-Z_-]+$', 'Only alphanumeric, "-" and "_" are allowed.')
     project_name = models.CharField(max_length=36, validators=[alphanumeric])
@@ -84,7 +82,7 @@ class Vertex(models.Model):
     y = models.IntegerField()
 
 #
-class Image(models.Model):
+class Image(ExportModelOperationsMixin('image'), models.Model):
     IMAGE_FORMAT=(
         ('J', 'JPEG'),
         ('P', 'PNG'),
@@ -100,7 +98,7 @@ class Image(models.Model):
     data = models.BinaryField()
 
 #
-class FissionTrackNumbering(models.Model):
+class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     FT_TYPE = (
         ('S', 'Spontaneous Fission Tracks'),
         ('I', 'Induced Fission Tracks'),

@@ -86,9 +86,11 @@ INSTALLED_APPS = (
     'ftc',
     # The Django sites framework is required
     'django.contrib.sites',
-    #The Django rest framework
+    # The Django rest framework
     'rest_framework',
     'rest_framework.authtoken',
+    # Export metrics for Prometheus
+    'django_prometheus',
 
     'allauth',
     'allauth.account',
@@ -107,6 +109,7 @@ SITE_ID = 1
 # https://docs.djangoproject.com/en/3.1/ref/middleware/#middleware-ordering
 
 MIDDLEWARE = [
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -114,6 +117,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',
 ]
 
 ROOT_URLCONF = 'geochron.urls'
@@ -140,7 +144,7 @@ TEMPLATES = [
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'ENGINE': 'django_prometheus.db.backends.postgresql',
         'NAME': os.getenv('POSTGRES_DB'),
         'USER': os.getenv('POSTGRES_USER'),
         'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
@@ -248,4 +252,6 @@ LOGGING = {
     },
 }
 
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 IMAGE_UPLOAD_SIZE_LIMIT = os.getenv('IMAGE_UPLOAD_SIZE_LIMIT') or 256 * 1024
+PROMETHEUS_EXPORT_MIGRATIONS = False
