@@ -2,6 +2,7 @@ import os, sys, shutil
 from optparse import OptionParser
 from django.db import transaction
 from ftc.parse_image_name import parse_image_name
+from ftc.save_rois_regions import save_rois_regions
 import json
 
 
@@ -30,13 +31,7 @@ def creategrain(src, sample, grain_nth):
     g = Grain(sample=sample, index=grain_nth,
         image_width=rois['image_width'], image_height=rois['image_height'])
     g.save()
-    for r in rois['regions']:
-        shift = r['shift']
-        region = Region(grain=g, shift_x=shift[0], shift_y=shift[1])
-        region.save()
-        for v in r['vertices']:
-            vertex = Vertex(region=region, x=v[0], y=v[1])
-            vertex.save()
+    save_rois_regions(rois, g)
     return g
 
 
@@ -101,7 +96,7 @@ import django
 django.setup()
 
 from django.contrib.auth.models import User
-from ftc.models import Project, Sample, Grain, Image, Region, Vertex
+from ftc.models import Project, Sample, Grain, Image
 
 # get user id based on username
 input_source_path = options.input or '/code/user_upload/'

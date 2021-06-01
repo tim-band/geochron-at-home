@@ -24,4 +24,5 @@ def parse_image_name(n):
     return {
         'format': img_ext[ext],
         'index': v,
+        'ft_type': 'S', # 'I' for mica
     }

@@ -1,11 +1,19 @@
+import base64
+from django.db.models.aggregates import Max
 from django.shortcuts import get_object_or_404
+import json
 from rest_framework import generics, serializers, status
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from ftc.models import Project, Sample, FissionTrackNumbering
+from ftc.get_image_size import get_image_size_from_handle
+from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering
+from ftc.parse_image_name import parse_image_name
+from ftc.save_rois_regions import save_rois_regions
+
 
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
@@ -60,10 +68,91 @@ class SampleListView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         serializer.save(total_grains=0, completed=False)
 
+
 class SampleInfoView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
     queryset = Sample.objects.all()
     serializer_class = SampleSerializer
+
+
+class GrainSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Grain
+        fields = ['id', 'sample', 'index', 'image_width', 'image_height']
+
+    index = serializers.IntegerField(required=False, read_only=False)
+    sample = serializers.PrimaryKeyRelatedField(required=False, read_only=True)
+    image_width = serializers.IntegerField(required=False, read_only=False)
+    image_height = serializers.IntegerField(required=False, read_only=False)
+
+
+class SampleGrainListView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    serializer_class = GrainSerializer
+    model = Grain
+
+    def get_queryset(self):
+        qs = self.model.objects.filter(sample=self.kwargs['sample'])
+        return qs.order_by('id')
+
+    def perform_create(self, serializer):
+        rois_b64 = serializer.initial_data['rois'].read()
+        rois_json = base64.b64decode(rois_b64)
+        rois = json.loads(rois_json)
+        sample = Sample.objects.get(pk=self.kwargs['sample'])
+        max_index = sample.grain_set.aggregate(Max('index'))['index__max'] or 0
+        grain = serializer.save(
+            index = max_index+1,
+            sample = sample,
+            image_width=rois['image_width'],
+            image_height=rois['image_height']
+        )
+        save_rois_regions(rois, grain)
+
+
+class GrainInfoView(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    queryset = Grain.objects.all()
+    serializer_class = GrainSerializer
+
+
+class ImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Image
+        fields = ['id', 'grain', 'format', 'ft_type', 'index']
+        extra_kwargs = {
+            'name': { 'write_only': True }
+        }
+
+    format = serializers.CharField(required=False, read_only=False)
+    index = serializers.IntegerField(required=False, read_only=False)
+    ft_type = serializers.CharField(required=False, read_only=False)
+    grain = serializers.PrimaryKeyRelatedField(required=False, read_only=True)
+
+
+class GrainImageListView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    serializer_class = ImageSerializer
+    model = Image
+
+    def get_queryset(self):
+        qs = self.model.objects.filter(grain=self.kwargs['grain'])
+        return qs.order_by('id')
+
+    def perform_create(self, serializer):
+        filename = serializer.initial_data['data'].name
+        info = parse_image_name(filename)
+        data_b64 = serializer.initial_data['data'].read()
+        data = base64.b64decode(data_b64)
+        grain = Grain.objects.get(pk=self.kwargs['grain'])
+        breakpoint()
+        serializer.save(
+            index=info['index'],
+            grain=grain,
+            format=info['format'],
+            ft_type=info['ft_type'],
+            data=data
+        )
 
 
 class FissionTrackNumberingSerializer(serializers.ModelSerializer):
