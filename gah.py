@@ -106,11 +106,19 @@ def add_login_subparser(subparsers):
     login_parser.add_argument('--user', help='name of the user to log in as')
 
 
-def api_get(config, *args, **kwargs):
+def api_verb(verb, config, *args, **kwargs):
     url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args))
-    req = Request(url + '?' + urlencode(kwargs), method='GET')
+    if kwargs:
+        url += '?' + urlencode(kwargs)
+    else:
+        url += '/'
+    req = Request(url, method=verb)
     req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
     return urlopen(req)
+
+
+def api_get(config, *args, **kwargs):
+    return api_verb('GET', config, *args, **kwargs)
 
 
 def api_post(config, *args, **kwargs):
@@ -121,21 +129,36 @@ def api_post(config, *args, **kwargs):
     return urlopen(req)
 
 
-def api_upload(config, *args, **kwargs):
+def api_upload_verb(verb, config, *args, **kwargs):
     boundary='auf98arnu8furpaurh83ryiruhvtbt43v!'
     url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args)) + '/'
     data = ''
     for k,v in kwargs.items():
-        with open(v, 'rb') as fd:
-            data += '--{0}\r\nContent-Disposition: form-data; name="{1}"; filename="{2}"\r\n\r\n{3}\r\n'.format(
-                boundary, k, os.path.basename(v), base64.b64encode(fd.read()).decode('ascii')
+        if hasattr(v, 'read'):
+            data += ('--{0}\r\nContent-Disposition: form-data;'
+            + ' name="{1}"; filename="{2}"\r\n\r\n{3}\r\n'
+            ).format(
+                boundary,
+                k,
+                os.path.basename(v.name),
+                base64.b64encode(v.read()).decode('ascii')
+            )
+        else:
+            data += ('--{0}\r\nContent-Disposition: form-data;'
+            + ' name="{1}"\r\n\r\n{2}\r\n'
+            ).format(
+                boundary, k, v
             )
     data += '--' + boundary + '--'
-    req = Request(url, data=data.encode('ascii'), method='POST')
+    req = Request(url, data=data.encode('ascii'), method=verb)
     req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
     req.add_header('Content-Type', 'multipart/form-data; boundary={0}'.format(boundary))
     req.add_header('Content-Length', len(data))
     return urlopen(req)
+
+
+def api_upload(config, *args, **kwargs):
+    return api_upload_verb('POST', config, *args, **kwargs)
 
 
 @token_refresh
@@ -277,7 +300,9 @@ def grain_list(opts, config):
 
 @token_refresh
 def grain_upload(opts, config):
-    with api_upload(config, 'sample', opts.sample, 'grain', rois=opts.rois) as response:
+    with api_upload(
+        config, 'sample', opts.sample, 'grain', rois=open(opts.rois, 'r')
+    ) as response:
         print(response.read())
 
 
@@ -326,8 +351,39 @@ def image_list(opts, config):
 
 @token_refresh
 def image_upload(opts, config):
-    with api_upload(config, 'grain', opts.grain, 'image', data=opts.image) as response:
+    with api_upload(
+        config, 'grain', opts.grain, 'image', data=open(opts.image, 'rb')
+    ) as response:
         print(response.read())
+
+
+@token_refresh
+def image_update(opts, config):
+    with api_upload_verb(
+        'PATCH',
+        config,
+        'image',
+        opts.id,
+        data=open(opts.image, 'rb'),
+        grain=opts.grain,
+    ) as response:
+        print(response.read())
+
+
+@token_refresh
+def image_info(opts, config):
+    with api_get(config, 'image', opts.id) as response:
+        body = response.read()
+        v = json.loads(body)
+        print('image ID: {0}\grain ID: {1}\nindex: {2}\nfission track type: {3}\n'.format(
+            v.get('id'), v.get('grain'), v.get('index'), v.get('ft_type')
+        ))
+
+
+@token_refresh
+def image_delete(opts, config):
+    with api_verb('DELETE', config, 'image', opts.id) as response:
+        print('delete')
 
 
 def add_image_subparser(subparsers):
@@ -339,7 +395,18 @@ def add_image_subparser(subparsers):
     create = verbs.add_parser('create', help='upload an image for a grain')
     create.set_defaults(func=image_upload)
     create.add_argument('grain', help='Grain ID')
-    create.add_argument('image', help='Path to image')
+    create.add_argument('image', help='Path to image file (PNG or JPG)')
+    info = verbs.add_parser('info', help='information about image')
+    info.set_defaults(func=image_info)
+    info.add_argument('id', help='Image ID')
+    update = verbs.add_parser('update', help='update image')
+    update.set_defaults(func=image_update)
+    update.add_argument('id', help='Image ID to update')
+    update.add_argument('grain', help='Grain ID')
+    update.add_argument('image', help='Path to image file (PNG or JPG)')
+    delete = verbs.add_parser('delete', help='delete image')
+    delete.set_defaults(func=image_delete)
+    delete.add_argument('id', help='Image ID to delete')
 
 
 def output_as_csv(xs):

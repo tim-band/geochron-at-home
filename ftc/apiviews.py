@@ -110,7 +110,7 @@ class SampleGrainListView(generics.ListCreateAPIView):
         save_rois_regions(rois, grain)
 
 
-class GrainInfoView(generics.RetrieveAPIView):
+class GrainInfoView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
     queryset = Grain.objects.all()
     serializer_class = GrainSerializer
@@ -145,7 +145,6 @@ class GrainImageListView(generics.ListCreateAPIView):
         data_b64 = serializer.initial_data['data'].read()
         data = base64.b64decode(data_b64)
         grain = Grain.objects.get(pk=self.kwargs['grain'])
-        breakpoint()
         serializer.save(
             index=info['index'],
             grain=grain,
@@ -153,6 +152,27 @@ class GrainImageListView(generics.ListCreateAPIView):
             ft_type=info['ft_type'],
             data=data
         )
+
+class ImageInfoView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    queryset = Image.objects.all()
+    serializer_class = ImageSerializer
+
+    def delete(self, request, *args, **kwargs):
+        breakpoint()
+        return super().delete(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        kwargs={}
+        if 'data' in serializer.initial_data:
+            filename = serializer.initial_data['data'].name
+            info = parse_image_name(filename)
+            data_b64 = serializer.initial_data['data'].read()
+            kwargs.update(info)
+            kwargs['data'] = base64.b64decode(data_b64)
+        if 'grain' in self.kwargs and self.kwargs['grain'].isnumeric():
+            kwargs['grain'] = Grain.objects.get(pk=self.kwargs['grain'])
+        serializer.save(**kwargs)
 
 
 class FissionTrackNumberingSerializer(serializers.ModelSerializer):
