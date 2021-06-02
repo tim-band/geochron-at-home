@@ -334,10 +334,7 @@ def add_grain_subparser(subparsers):
 
 @token_refresh
 def image_list(opts, config):
-    kwargs = {}
-    if opts.grain:
-        kwargs['grain'] = opts.grain
-    with api_get(config, 'image', **kwargs) as response:
+    with api_get(config, 'grain', opts.grain or '-', 'image') as response:
         body = response.read()
         result = json.loads(body)
         if type(result) is list:
@@ -383,7 +380,7 @@ def image_info(opts, config):
 @token_refresh
 def image_delete(opts, config):
     with api_verb('DELETE', config, 'image', opts.id) as response:
-        print('delete')
+        print('deleted')
 
 
 def add_image_subparser(subparsers):

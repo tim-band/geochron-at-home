@@ -136,7 +136,9 @@ class GrainImageListView(generics.ListCreateAPIView):
     model = Image
 
     def get_queryset(self):
-        qs = self.model.objects.filter(grain=self.kwargs['grain'])
+        qs = self.model.objects.all()
+        if 'grain' in self.kwargs and self.kwargs['grain'].isnumeric():
+            qs = qs.filter(grain=self.kwargs['grain'])
         return qs.order_by('id')
 
     def perform_create(self, serializer):
@@ -157,10 +159,6 @@ class ImageInfoView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
     queryset = Image.objects.all()
     serializer_class = ImageSerializer
-
-    def delete(self, request, *args, **kwargs):
-        breakpoint()
-        return super().delete(request, *args, **kwargs)
 
     def perform_update(self, serializer):
         kwargs={}
