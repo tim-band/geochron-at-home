@@ -431,7 +431,7 @@ def grain_upload(opts, config):
         if rois_name in files:
             opts.rois = os.path.join(root, rois_name)
             grain = grain_rois_upload(opts, config)
-            images = [f for f in files if os.path.splitext(f)[1] in ('.jpg', '.png')]
+            images = [os.path.join(root, f) for f in files if os.path.splitext(f)[1] in ('.jpg', '.jpeg', '.png')]
             image_opts = argparse.Namespace(grain=grain, image=images)
             index = get_name_index(root)
             if index is not None:
