@@ -54,8 +54,7 @@ class ApiProjectCreate(TestCase):
     fixtures = ['users.json']
 
     def setUp(self):
-        self.c = Client()
-        self.headers = log_in_headers(self.c, 'admin', 'admin_password')
+        self.headers = log_in_headers(self.client, 'admin', 'admin_password')
         self.project_fields = {
             'project_name': 'pa',
             'project_description': 'test project create A',
@@ -63,14 +62,14 @@ class ApiProjectCreate(TestCase):
         }
 
     def test_counter_cannot_create(self):
-        headers = log_in_headers(self.c, 'counter', 'counter_password')
-        r2 = self.c.post('/ftc/api/project/', self.project_fields, **headers)
+        headers = log_in_headers(self.client, 'counter', 'counter_password')
+        r2 = self.client.post('/ftc/api/project/', self.project_fields, **headers)
         self.assertEqual(r2.status_code, 403)
 
     def project_create(self, fields):
-        r1 = self.c.post('/ftc/api/project/', fields, **self.headers)
+        r1 = self.client.post('/ftc/api/project/', fields, **self.headers)
         self.assertEqual(r1.status_code, 201)
-        r2 = self.c.get('/ftc/api/project/', **self.headers)
+        r2 = self.client.get('/ftc/api/project/', **self.headers)
         self.assertEqual(r2.status_code, 200)
         ps = json.loads(r2.content)
         self.assertEqual(len(ps), 1)
@@ -96,12 +95,11 @@ class ApiProjectUpdate(TestCase):
     fixtures = ['users.json', 'projects.json']
 
     def setUp(self):
-        self.c = Client()
-        self.headers = log_in_headers(self.c, 'counter', 'counter_password')
+        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
 
     def test_update(self):
         new_text = 'amended'
-        r = self.c.patch('/ftc/api/project/2/', {
+        r = self.client.patch('/ftc/api/project/2/', {
             'project_description' : new_text
         }, content_type='application/json', **self.headers)
         self.assertEqual(r.status_code, 200)
@@ -110,15 +108,15 @@ class ApiProjectUpdate(TestCase):
         self.assertEqual(j['project_description'], new_text)
 
     def test_cannot_update_others_project(self):
-        r = self.c.patch('/ftc/api/project/1/', {
+        r = self.client.patch('/ftc/api/project/1/', {
             'project_description' : 'cannot'
         }, content_type='application/json', **self.headers)
         self.assertEqual(r.status_code, 404)
 
     def test_superuser_can_update_any_project(self):
-        super_headers = log_in_headers(self.c, 'super', 'super_password')
+        super_headers = log_in_headers(self.client, 'super', 'super_password')
         new_text = 'amended by super'
-        r = self.c.patch('/ftc/api/project/1/', {
+        r = self.client.patch('/ftc/api/project/1/', {
             'project_description' : new_text
         }, content_type='application/json', **super_headers)
         self.assertEqual(r.status_code, 200)
@@ -128,14 +126,13 @@ class ApiProjectUpdate(TestCase):
 
 class DeleteTestBaseMixin:
     def setUp(self):
-        self.c = Client()
-        self.headers = log_in_headers(self.c, 'counter', 'counter_password')
-        self.super_headers = log_in_headers(self.c, 'super', 'super_password')
+        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
+        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
 
     def test_delete(self):
-        r = self.c.delete('/ftc/api/'+self.path+str(self.counter_id)+'/', **self.headers)
+        r = self.client.delete('/ftc/api/'+self.path+str(self.counter_id)+'/', **self.headers)
         self.assertEqual(r.status_code, 204)
-        r2 = self.c.get('/ftc/api/'+self.path, **self.super_headers)
+        r2 = self.client.get('/ftc/api/'+self.path, **self.super_headers)
         ps = json.loads(r2.content)
         self.assertEqual(len(ps), len(self.ids) - 1)
         actual_ids = [p['id'] for p in ps]
@@ -145,16 +142,16 @@ class DeleteTestBaseMixin:
         self.assertListEqual(actual_ids, expected_ids)
 
     def test_cannot_delete_others(self):
-        r = self.c.delete('/ftc/api/'+self.path+str(self.admin_id)+'/', **self.headers)
+        r = self.client.delete('/ftc/api/'+self.path+str(self.admin_id)+'/', **self.headers)
         self.assertEqual(r.status_code, 404)
-        r2 = self.c.get('/ftc/api/project/', **self.super_headers)
+        r2 = self.client.get('/ftc/api/project/', **self.super_headers)
         ps = json.loads(r2.content)
         self.assertEqual(len(ps), len(self.ids))
 
     def test_superuser_can_delete_any(self):
-        r = self.c.delete('/ftc/api/'+self.path+str(self.admin_id)+'/', **self.super_headers)
+        r = self.client.delete('/ftc/api/'+self.path+str(self.admin_id)+'/', **self.super_headers)
         self.assertEqual(r.status_code, 204)
-        r2 = self.c.get('/ftc/api/'+self.path, **self.super_headers)
+        r2 = self.client.get('/ftc/api/'+self.path, **self.super_headers)
         ps = json.loads(r2.content)
         self.assertEqual(len(ps), len(self.ids) - 1)
         actual_ids = [p['id'] for p in ps]
@@ -188,10 +185,9 @@ class ApiSampleCreate(TestCase):
     fixtures = ['users.json', 'projects.json']
 
     def setUp(self):
-        self.c = Client()
-        self.admin_headers = log_in_headers(self.c, 'admin', 'admin_password')
-        self.counter_headers = log_in_headers(self.c, 'counter', 'counter_password')
-        self.super_headers = log_in_headers(self.c, 'super', 'super_password')
+        self.admin_headers = log_in_headers(self.client, 'admin', 'admin_password')
+        self.counter_headers = log_in_headers(self.client, 'counter', 'counter_password')
+        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
         self.admin_sample_fields = {
             'sample_name': 'this_sample',
             'in_project': 1,
@@ -209,17 +205,17 @@ class ApiSampleCreate(TestCase):
         }
 
     def test_counter_cannot_create_sample_in_others_project(self):
-        r = self.c.post('/ftc/api/sample/', self.admin_sample_fields, **self.counter_headers)
+        r = self.client.post('/ftc/api/sample/', self.admin_sample_fields, **self.counter_headers)
         self.assertEqual(r.status_code, 403)
 
     def test_create_sample(self):
-        r = self.c.post('/ftc/api/sample/', self.counter_sample_fields, **self.admin_headers)
+        r = self.client.post('/ftc/api/sample/', self.counter_sample_fields, **self.admin_headers)
         self.assertEqual(r.status_code, 201)
         j = json.loads(r.content)
         self.assertEqual(j['sample_name'], self.counter_sample_fields['sample_name'])
 
     def test_superuser_can_create_sample_in_others_project(self):
-        r = self.c.post('/ftc/api/sample/', self.admin_sample_fields, **self.super_headers)
+        r = self.client.post('/ftc/api/sample/', self.admin_sample_fields, **self.super_headers)
         self.assertEqual(r.status_code, 201)
         j = json.loads(r.content)
         self.assertEqual(j['sample_name'], self.admin_sample_fields['sample_name'])
@@ -228,12 +224,11 @@ class ApiSampleUpdate(TestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json']
 
     def setUp(self):
-        self.c = Client()
-        self.headers = log_in_headers(self.c, 'counter', 'counter_password')
+        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
 
     def test_sample_update(self):
         new_priority = 23
-        r = self.c.patch('/ftc/api/sample/2/', {
+        r = self.client.patch('/ftc/api/sample/2/', {
             'priority' : new_priority
         }, content_type='application/json', **self.headers)
         self.assertEqual(r.status_code, 200)
@@ -242,15 +237,15 @@ class ApiSampleUpdate(TestCase):
         self.assertEqual(j['priority'], new_priority)
 
     def test_cannot_update_others_sample(self):
-        r = self.c.patch('/ftc/api/sample/1/', {
+        r = self.client.patch('/ftc/api/sample/1/', {
             'priority' : 43
         }, content_type='application/json', **self.headers)
         self.assertEqual(r.status_code, 404)
 
     def test_superuser_can_update_any_sample(self):
-        super_headers = log_in_headers(self.c, 'super', 'super_password')
+        super_headers = log_in_headers(self.client, 'super', 'super_password')
         new_priority = 22
-        r = self.c.patch('/ftc/api/sample/1/', {
+        r = self.client.patch('/ftc/api/sample/1/', {
             'priority' : new_priority
         }, content_type='application/json', **super_headers)
         self.assertEqual(r.status_code, 200)
