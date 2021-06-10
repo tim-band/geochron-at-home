@@ -138,9 +138,12 @@ class GrainSerializer(serializers.ModelSerializer):
         rois_json = base64.b64decode(rois_b64)
         rois = json.loads(rois_json)
         sample = Sample.objects.get(sample)
-        max_index = sample.grain_set.aggregate(Max('index'))['index__max'] or 0
+        index = self.validated_data.get('index')
+        if index == None:
+            max_index = sample.grain_set.aggregate(Max('index'))['index__max'] or 0
+            index = max_index + 1
         grain = self.save(
-            index = max_index+1,
+            index = index,
             sample = sample,
             image_width=rois['image_width'],
             image_height=rois['image_height']
