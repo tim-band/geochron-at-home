@@ -24,8 +24,12 @@ class Project(models.Model):
     def get_absolute_url(self):
         return reverse('project', args=[self.pk])
 
-    def get_creator(self):
+    def get_owner(self):
         return self.creator
+
+    @classmethod
+    def filter_owned_by(cls, qs, user):
+        return qs.filter(creator=user)
 
 #
 class Sample(models.Model):
@@ -53,8 +57,12 @@ class Sample(models.Model):
     def get_absolute_url(self):
         return reverse('sample', args=[self.pk])
 
-    def get_creator(self):
-        return self.in_project.get_creator()
+    def get_owner(self):
+        return self.in_project.get_owner()
+
+    @classmethod
+    def filter_owned_by(cls, qs, user):
+        return qs.filter(in_project__creator=user)
 
 #
 class Grain(models.Model):
@@ -63,8 +71,12 @@ class Grain(models.Model):
     image_width = models.IntegerField()
     image_height = models.IntegerField()
 
-    def get_creator(self):
-        return self.sample.get_creator()
+    def get_owner(self):
+        return self.sample.get_owner()
+
+    @classmethod
+    def filter_owned_by(cls, qs, user):
+        return qs.filter(sample__in_project__creator=user)
 
     def get_images(self):
         return self.image_set.order_by('index')
@@ -97,6 +109,13 @@ class Image(ExportModelOperationsMixin('image'), models.Model):
     index = models.IntegerField()
     data = models.BinaryField()
 
+    def get_owner(self):
+        return self.grain.get_owner()
+
+    @classmethod
+    def filter_owned_by(cls, qs, user):
+        return qs.filter(grain__sample__in_project__creator=user)
+
 #
 class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     FT_TYPE = (
@@ -119,3 +138,7 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
 
     def __unicode__(self):
         return '%s-%s-%d-%s-%s: %d' %(self.in_sample.in_project, self.in_sample.sample_name, self.grain, self.ft_type, self.worker.username, self.result)
+
+    @classmethod
+    def objects_owned_by(cls, user):
+        return cls.objects.filter(in_sample__in_project__creator=user)

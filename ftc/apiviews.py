@@ -1,11 +1,13 @@
 import base64
+from django.contrib.auth.models import User
 from django.db.models.aggregates import Max
 from django.shortcuts import get_object_or_404
+from rest_framework import exceptions
 import json
 from rest_framework import generics, serializers, status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -15,27 +17,69 @@ from ftc.parse_image_name import parse_image_name
 from ftc.save_rois_regions import save_rois_regions
 
 
+def models_owned(model_class, request):
+    qs = model_class.objects.all()
+    user = request.user
+    if user:
+        if user.is_superuser:
+            return qs
+        return model_class.filter_owned_by(qs, user)
+    return qs.none()
+
+
+class RetrieveUpdateDeleteView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return models_owned(self.model, self.request)
+
+
+class ListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return models_owned(self.model, self.request)
+
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = ['id', 'project_name', 'creator', 'create_date',
             'project_description', 'priority', 'closed', 'sample_set']
 
-    creator = serializers.PrimaryKeyRelatedField(required=False, read_only=True)
+    creator = serializers.SlugRelatedField(
+        required=False,
+        read_only=True,
+        slug_field='username',
+    )
 
 
 class ProjectListView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-    queryset = Project.objects.all()
+    permission_classes = [IsAuthenticated]
+    model = Project
     serializer_class = ProjectSerializer
 
+    def get_queryset(self):
+        params = self.request.query_params
+        qs = Project.objects.all()
+        if 'project' in params:
+            project = params['project']
+            if project.isnumeric():
+                qs = qs.filter(in_project=project)
+            else:
+                qs = qs.filter(in_project__project_name__iexact=project)
+        return qs.order_by('id')
+
     def perform_create(self, serializer):
-        serializer.save(creator=self.request.user)
+        user = self.request.user
+        if not user.is_staff:
+            raise exceptions.PermissionDenied
+        if 'user' in self.request.data:
+            user = User.objects.get(username=self.request.data['user'])
+        serializer.save(creator=user)
 
 
-class ProjectInfoView(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-    queryset = Project.objects.all()
+class ProjectInfoView(RetrieveUpdateDeleteView):
+    model = Project
     serializer_class = ProjectSerializer
 
 
@@ -49,16 +93,15 @@ class SampleSerializer(serializers.ModelSerializer):
     completed = serializers.BooleanField(required=False, read_only=True)
 
 
-class SampleListView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+class SampleListView(ListCreateView):
     serializer_class = SampleSerializer
     model = Sample
 
     def get_queryset(self):
+        qs = super().get_queryset()
         params = self.request.query_params
-        qs = self.model.objects.all()
-        if 'project' in params:
-            project = params['project']
+        if 'in_project' in params:
+            project = params['in_project']
             if project.isnumeric():
                 qs = qs.filter(in_project=project)
             else:
@@ -66,12 +109,14 @@ class SampleListView(generics.ListCreateAPIView):
         return qs.order_by('id')
 
     def perform_create(self, serializer):
+        if (not self.request.user.is_superuser and
+            serializer.validated_data['in_project'].get_owner() != self.request.user):
+            raise exceptions.PermissionDenied
         serializer.save(total_grains=0, completed=False)
 
 
-class SampleInfoView(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-    queryset = Sample.objects.all()
+class SampleInfoView(RetrieveUpdateDeleteView):
+    model = Sample
     serializer_class = SampleSerializer
 
 
@@ -85,23 +130,16 @@ class GrainSerializer(serializers.ModelSerializer):
     image_width = serializers.IntegerField(required=False, read_only=False)
     image_height = serializers.IntegerField(required=False, read_only=False)
 
-
-class SampleGrainListView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-    serializer_class = GrainSerializer
-    model = Grain
-
-    def get_queryset(self):
-        qs = self.model.objects.filter(sample=self.kwargs['sample'])
-        return qs.order_by('id')
-
-    def perform_create(self, serializer):
-        rois_b64 = serializer.initial_data['rois'].read()
+    def do_create(self, request, sample):
+        if (not request.user.is_superuser and
+            self.validated_data['sample'].get_owner() != request.user):
+            raise exceptions.PermissionDenied
+        rois_b64 = self.initial_data['rois'].read()
         rois_json = base64.b64decode(rois_b64)
         rois = json.loads(rois_json)
-        sample = Sample.objects.get(pk=self.kwargs['sample'])
+        sample = Sample.objects.get(sample)
         max_index = sample.grain_set.aggregate(Max('index'))['index__max'] or 0
-        grain = serializer.save(
+        grain = self.save(
             index = max_index+1,
             sample = sample,
             image_width=rois['image_width'],
@@ -110,9 +148,29 @@ class SampleGrainListView(generics.ListCreateAPIView):
         save_rois_regions(rois, grain)
 
 
-class GrainInfoView(generics.RetrieveUpdateAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-    queryset = Grain.objects.all()
+class SampleGrainListView(ListCreateView):
+    serializer_class = GrainSerializer
+    model = Grain
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        qs = qs.filter(sample=self.kwargs['sample'])
+        return qs.order_by('id')
+
+    def perform_create(self, serializer):
+        serializer.do_create(self.request, self.kwargs['sample'])
+
+
+class GrainListView(ListCreateView):
+    serializer_class = GrainSerializer
+    model = Grain
+
+    def perform_create(self, serializer):
+        serializer.do_create(self.request, self.initial_data['sample'])
+
+
+class GrainInfoView(RetrieveUpdateDeleteView):
+    model = Grain
     serializer_class = GrainSerializer
 
 
@@ -130,18 +188,20 @@ class ImageSerializer(serializers.ModelSerializer):
     grain = serializers.PrimaryKeyRelatedField(required=False, read_only=True)
 
 
-class GrainImageListView(generics.ListCreateAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+class GrainImageListView(ListCreateView):
     serializer_class = ImageSerializer
     model = Image
 
     def get_queryset(self):
-        qs = self.model.objects.all()
+        qs = super().get_queryset()
         if 'grain' in self.kwargs and self.kwargs['grain'].isnumeric():
             qs = qs.filter(grain=self.kwargs['grain'])
         return qs.order_by('id')
 
     def perform_create(self, serializer):
+        if (not self.request.user.is_superuser and
+            serializer.validated_data['grain'].get_owner() != self.request.user):
+            raise exceptions.PermissionDenied
         filename = serializer.initial_data['data'].name
         info = parse_image_name(filename)
         data_b64 = serializer.initial_data['data'].read()
@@ -149,15 +209,14 @@ class GrainImageListView(generics.ListCreateAPIView):
         grain = Grain.objects.get(pk=self.kwargs['grain'])
         serializer.save(
             index=info['index'],
-            grain=grain,
+            grain=grain, 
             format=info['format'],
             ft_type=info['ft_type'],
             data=data
         )
 
-class ImageInfoView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
-    queryset = Image.objects.all()
+class ImageInfoView(RetrieveUpdateDeleteView):
+    model = Image
     serializer_class = ImageSerializer
 
     def perform_update(self, serializer):
@@ -181,7 +240,6 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
 
 
 class FissionTrackNumberingView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
     serializer_class = FissionTrackNumberingSerializer
     model = FissionTrackNumbering
 

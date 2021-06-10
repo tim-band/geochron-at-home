@@ -1,0 +1,24 @@
+[
+    {
+        "model": "ftc.project",
+        "pk": 1,
+        "fields": {
+            "project_name": "proj1",
+            "project_description": "First project, owned by Admin",
+            "priority": 1,
+            "creator": 102,
+            "create_date": "2021-01-01 09:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.project",
+        "pk": 2,
+        "fields": {
+            "project_name": "proj2",
+            "project_description": "Project owned by Counter",
+            "priority": 2,
+            "creator": 103,
+            "create_date": "2021-01-02 09:00:00Z"
+        }
+    }
+]

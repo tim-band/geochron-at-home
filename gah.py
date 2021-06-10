@@ -11,6 +11,14 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
+def get_values(d, ks):
+    r = {}
+    for k in ks:
+        if hasattr(d, k):
+            r[k] = getattr(d, k)
+    return r
+
+
 def get_url(config):
     if 'url' in config:
         return config['url']
@@ -194,12 +202,8 @@ def project_info(opts, config):
 
 @token_refresh
 def project_create(opts, config):
-    with api_post(config, 'project',
-        project_name=opts.name,
-        project_description=opts.description,
-        priority=opts.priority,
-        closed=False,
-    ) as response:
+    o = get_values(opts, ['project_name', 'project_description', 'priority', 'closed', 'user'])
+    with api_post(config, 'project', **o) as response:
         print(response.read())
 
 
@@ -214,16 +218,30 @@ def add_project_subparser(subparsers):
     info.add_argument('id', help="ID of the project to return", type=int)
     create = verbs.add_parser('create', help='create a project')
     create.set_defaults(func=project_create)
-    create.add_argument('name', help='Project name')
-    create.add_argument('description', help='Project description')
+    create.add_argument('project_name', help='Project name', metavar='name')
+    create.add_argument(
+        'project_description',
+        help='Project description',
+        metavar='description',
+    )
     create.add_argument('priority', help='Priority', type=int)
+    create.add_argument(
+        '--user',
+        help='The user that will own this project, if not you',
+        type=str,
+    )
+    create.add_argument(
+        '--closed',
+        help='This project will not be shown to counters',
+        action='store_true',
+    )
 
 
 @token_refresh
 def sample_list(opts, config):
     kwargs = {}
     if opts.project:
-        kwargs['project'] = opts.project
+        kwargs['in_project'] = opts.project
     with api_get(config, 'sample', **kwargs) as response:
         body = response.read()
         result = json.loads(body)
@@ -266,7 +284,7 @@ def add_sample_subparser(subparsers):
     create = verbs.add_parser('create', help='create a sample')
     create.set_defaults(func=sample_create)
     create.add_argument('name', help='Sample name')
-    create.add_argument('project', help='Project ID the sample is part of')
+    create.add_argument('in_project', metavar='project', help='Project ID the sample is part of')
     create.add_argument(
         'property',
         help='[T]est Sample, [A]ge Standard Sample, or [D]osimeter Sample',
