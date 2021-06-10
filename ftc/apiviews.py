@@ -130,14 +130,14 @@ class GrainSerializer(serializers.ModelSerializer):
     image_width = serializers.IntegerField(required=False, read_only=False)
     image_height = serializers.IntegerField(required=False, read_only=False)
 
-    def do_create(self, request, sample):
+    def do_create(self, request, sample_id):
         if (not request.user.is_superuser and
             self.validated_data['sample'].get_owner() != request.user):
             raise exceptions.PermissionDenied
         rois_b64 = self.initial_data['rois'].read()
         rois_json = base64.b64decode(rois_b64)
         rois = json.loads(rois_json)
-        sample = Sample.objects.get(sample)
+        sample = Sample.objects.get(id=sample_id)
         index = self.validated_data.get('index')
         if index == None:
             max_index = sample.grain_set.aggregate(Max('index'))['index__max'] or 0

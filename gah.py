@@ -436,7 +436,7 @@ def grain_upload(opts, config):
             index = get_name_index(root)
             if index is not None:
                 image_opts.index = index
-            image_upload(image_opts, config)
+            images_upload(image_opts, config)
             n += 1
     print("Uploaded grain count:", n)
 
