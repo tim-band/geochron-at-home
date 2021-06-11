@@ -1,0 +1,22 @@
+[
+    {
+        "model": "ftc.grain",
+        "pk": 1,
+        "fields": {
+            "sample": 1,
+            "index": 1,
+            "image_width": 400,
+            "image_height": 400
+        }
+    },
+    {
+        "model": "ftc.grain",
+        "pk": 2,
+        "fields": {
+            "sample": 2,
+            "index": 1,
+            "image_width": 500,
+            "image_height": 500
+        }
+    }
+]

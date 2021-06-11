@@ -1,11 +1,11 @@
 import os
 
 def get_image_index(f):
-    if f.lower() == 'reflstackflat':
+    if f == 'reflstackflat':
         return -1
-    elif f.lower() == 'stackflat':
+    elif f == 'stackflat':
         return 0
-    elif f[0:6].lower() == 'stack-':
+    elif f[0:6] == 'stack-':
         try:
             return int(f[6:])
         except:
@@ -14,15 +14,18 @@ def get_image_index(f):
 img_ext = { '.png' : 'P', '.jpeg': 'J', '.jpg': 'J' }
 
 def parse_image_name(n):
-    name_ext = os.path.splitext(n)
-    ext = name_ext[1]
+    [ name, ext ] = os.path.splitext(n.lower())
     if ext not in img_ext:
         return None
-    v = get_image_index(name_ext[0])
+    ft_type = 'S'
+    if name[:4] == 'mica':
+        name = name[4:]
+        ft_type = 'I'
+    v = get_image_index(name)
     if v == None:
         return None
     return {
         'format': img_ext[ext],
         'index': v,
-        'ft_type': 'S', # 'I' for mica
+        'ft_type': ft_type,
     }

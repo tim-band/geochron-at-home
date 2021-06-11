@@ -76,7 +76,7 @@ class CreatorOrSuperuserMixin(UserPassesTestMixin):
     def test_func(self):
         self.object = self.model.objects.get(pk=self.kwargs['pk'])
         return (
-            self.request.user == self.object.get_creator()
+            self.request.user == self.object.get_owner()
             or self.request.user.is_superuser
         )
 
@@ -99,7 +99,7 @@ class ParentCreatorOrSuperuserMixin(UserPassesTestMixin):
     def test_func(self):
         self.parent_object = self.parent.objects.get(pk=self.kwargs['pk'])
         return (
-            self.request.user == self.parent_object.get_creator()
+            self.request.user == self.parent_object.get_owner()
             or self.request.user.is_superuser
         )
 

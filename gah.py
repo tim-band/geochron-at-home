@@ -11,6 +11,16 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
+def get_values(d, ks):
+    r = {}
+    for k in ks:
+        if hasattr(d, k):
+            a = getattr(d, k)
+            if a is not None:
+                r[k] = a
+    return r
+
+
 def get_url(config):
     if 'url' in config:
         return config['url']
@@ -194,12 +204,8 @@ def project_info(opts, config):
 
 @token_refresh
 def project_create(opts, config):
-    with api_post(config, 'project',
-        project_name=opts.name,
-        project_description=opts.description,
-        priority=opts.priority,
-        closed=False,
-    ) as response:
+    o = get_values(opts, ['project_name', 'project_description', 'priority', 'closed', 'user'])
+    with api_post(config, 'project', **o) as response:
         print(response.read())
 
 
@@ -214,16 +220,30 @@ def add_project_subparser(subparsers):
     info.add_argument('id', help="ID of the project to return", type=int)
     create = verbs.add_parser('create', help='create a project')
     create.set_defaults(func=project_create)
-    create.add_argument('name', help='Project name')
-    create.add_argument('description', help='Project description')
+    create.add_argument('project_name', help='Project name', metavar='name')
+    create.add_argument(
+        'project_description',
+        help='Project description',
+        metavar='description',
+    )
     create.add_argument('priority', help='Priority', type=int)
+    create.add_argument(
+        '--user',
+        help='The user that will own this project, if not you',
+        type=str,
+    )
+    create.add_argument(
+        '--closed',
+        help='This project will not be shown to counters',
+        action='store_true',
+    )
 
 
 @token_refresh
 def sample_list(opts, config):
     kwargs = {}
     if opts.project:
-        kwargs['project'] = opts.project
+        kwargs['in_project'] = opts.project
     with api_get(config, 'sample', **kwargs) as response:
         body = response.read()
         result = json.loads(body)
@@ -236,13 +256,13 @@ def sample_list(opts, config):
 
 @token_refresh
 def sample_create(opts, config):
-    with api_post(config, 'sample',
-        sample_name=opts.name,
-        in_project=opts.project,
-        sample_property=opts.property,
-        priority=opts.priority,
-        min_contributor_num=opts.min_contributor_num,
-    ) as response:
+    with api_post(config, 'sample', **get_values(opts, [
+        'sample_name',
+        'in_project',
+        'sample_property',
+        'priority',
+        'min_contributor_num'
+    ])) as response:
         print(response.read())
 
 
@@ -265,10 +285,19 @@ def add_sample_subparser(subparsers):
     info.add_argument('id', help="ID of the project to return", type=int)
     create = verbs.add_parser('create', help='create a sample')
     create.set_defaults(func=sample_create)
-    create.add_argument('name', help='Sample name')
-    create.add_argument('project', help='Project ID the sample is part of')
     create.add_argument(
-        'property',
+        'sample_name',
+        metavar='name',
+        help='Sample name',
+    )
+    create.add_argument(
+        'in_project',
+        metavar='project',
+        help='Project ID the sample is part of'
+    )
+    create.add_argument(
+        'sample_property',
+        metavar='property',
         help='[T]est Sample, [A]ge Standard Sample, or [D]osimeter Sample',
         choices=['T', 'A', 'D'],
     )
@@ -299,11 +328,15 @@ def grain_list(opts, config):
 
 
 @token_refresh
-def grain_upload(opts, config):
+def grain_rois_upload(opts, config):
     with api_upload(
-        config, 'sample', opts.sample, 'grain', rois=open(opts.rois, 'r')
+        config, 'sample', opts.sample, 'grain', rois=open(opts.rois, 'rb')
     ) as response:
-        print(response.read())
+        body = response.read()
+        result = json.loads(body)
+        id = result['id']
+        print("Created new grain", id)
+        return id
 
 
 @token_refresh
@@ -326,7 +359,12 @@ def add_grain_subparser(subparsers):
     create = verbs.add_parser('create', help='upload a rois.json')
     create.set_defaults(func=grain_upload)
     create.add_argument('sample', help='Sample ID to add this grain to', type=int)
-    create.add_argument('rois', help='Path to rois.json')
+    create.add_argument('rois', help='Path to rois.json (or directory containing images)')
+    create.add_argument(
+        '--index',
+        help='Index of the grain within the sample (default will choose the next integer)',
+        type=int
+    )
     info = verbs.add_parser('info', help='show information for a grain')
     info.set_defaults(func=grain_info)
     info.add_argument('id', help='grain ID', type=int)
@@ -351,7 +389,56 @@ def image_upload(opts, config):
     with api_upload(
         config, 'grain', opts.grain, 'image', data=open(opts.image, 'rb')
     ) as response:
-        print(response.read())
+        body = response.read()
+        result = json.loads(body)
+        print("Uploaded image", opts.image, "as image", result.get('id'))
+
+
+def images_upload(opts, config):
+    images = opts.image
+    last_error = None
+    for attempt in [1,2,3]:
+        for_retry = []
+        for i in images:
+            opts.image = i
+            try:
+                image_upload(opts, config)
+            except HTTPError as e:
+                last_error = e
+                if 500 <= e.status_code:
+                    for_retry.append(i)
+        if len(for_retry) == 0:
+            return
+        images = for_retry
+    print("Some uploads failed:", images)
+    print("Last error was", last_error)
+
+
+def get_name_index(name):
+    for i in [-4, -3, -2, -1]:
+        n = name[i:]
+        if n.isnumeric():
+            return int(n)
+    return None
+
+
+def grain_upload(opts, config):
+    rois_name = 'rois.json'
+    if os.path.basename(opts.rois) == rois_name:
+        return grain_rois_upload(opts, config)
+    n = 0
+    for root, dirs, files in os.walk(opts.rois):
+        if rois_name in files:
+            opts.rois = os.path.join(root, rois_name)
+            grain = grain_rois_upload(opts, config)
+            images = [os.path.join(root, f) for f in files if os.path.splitext(f)[1] in ('.jpg', '.jpeg', '.png')]
+            image_opts = argparse.Namespace(grain=grain, image=images)
+            index = get_name_index(root)
+            if index is not None:
+                image_opts.index = index
+            images_upload(image_opts, config)
+            n += 1
+    print("Uploaded grain count:", n)
 
 
 @token_refresh
@@ -390,9 +477,13 @@ def add_image_subparser(subparsers):
     list_images.set_defaults(func=image_list)
     list_images.add_argument('--grain', help='only report images for this grain ID')
     create = verbs.add_parser('create', help='upload an image for a grain')
-    create.set_defaults(func=image_upload)
+    create.set_defaults(func=images_upload)
     create.add_argument('grain', help='Grain ID')
-    create.add_argument('image', help='Path to image file (PNG or JPG)')
+    create.add_argument(
+        'image',
+        help='Paths to image files (PNG or JPG)',
+        nargs='+',
+    )
     info = verbs.add_parser('info', help='information about image')
     info.set_defaults(func=image_info)
     info.add_argument('id', help='Image ID')
@@ -484,7 +575,7 @@ add_count_subparser(subparsers)
 
 options = parser.parse_args()
 
-if options.func == None:
+if options.func is None:
     parser.print_help()
     exit(0)
 

@@ -140,8 +140,6 @@ Run 2 workers with:
 
 ## Running in production with docker-compose
 
-(this is a work in progress)
-
 Firstly copy the file `production_env` to `production.env` and edit the copy
 to your liking.
 
@@ -152,12 +150,13 @@ then you need to set:
 
 ```
 SITE_DOMAIN=www.myhost.com
-ALLOWED_HOSTS=www.myhost.com
-BASE_URL=/geochron@home
+ALLOWED_HOSTS=localhost,www.myhost.com
 ```
 
 Multiple hosts can be specified in `ALLOWED_HOSTS` as a
 comma-separated list. Any host can be allowed with `ALLOWED_HOSTS='*'`.
+The `localhost,` setting is needed if you want any local access, for
+example a local prometheus collecting metrics.
 You can ignore (or delete) the settings for `DB_HOST` and `STATIC_ROOT`
 as these are overridden in the compose file.
 
@@ -188,20 +187,18 @@ To proxy to this docker swarm with nginx (using the path
 `/geochronathome`), you can use:
 
 ```
-location /geochronathome/ {
+location /geochron@home/ {
         proxy_pass http://127.0.0.1:3830/;
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_redirect off;
-        location /geochronathome/static/ {
+        location /geochron@home/static/ {
                 proxy_pass http://127.0.0.1:3830/static/;
         }
 }
 ```
-
-(note the deleted slash from the `proxy_pass` line)
 
 ## Uploading crystal images
 

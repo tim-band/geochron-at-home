@@ -25,6 +25,7 @@ fi
 psql -v PW=\'${pass}\' -v DB=${POSTGRES_DB} -v GUSER=${POSTGRES_USER} ${conn}<<SQL
 drop database :DB;
 create role :GUSER with login encrypted password :PW;
+alter role :GUSER with CREATEDB;
 create database :DB with owner :GUSER;
 SQL
 fi

@@ -32,7 +32,6 @@ services:
     environment:
       - "DJANGO_SETTINGS_MODULE=geochron.settings"
       - "ALLOWED_HOSTS=*"
-      - "BASE_URL=/"
       - SSL_ONLY=false
       - DJANGO_DEBUG=0
       - STATIC_ROOT=/static
