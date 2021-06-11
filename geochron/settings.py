@@ -230,10 +230,9 @@ DEFAULT_TO_EMAIL = DEFAULT_FROM_EMAIL
 ## sub url
 FORCE_SCRIPT_NAME = os.getenv('BASE_URL') or None
 
-base_url = FORCE_SCRIPT_NAME or ''
-LOGIN_REDIRECT_URL = os.path.join('/', base_url, 'accounts/profile/')
-LOGIN_URL = os.path.join('/', base_url, 'accounts/login/')
-LOGOUT_REDIRECT_URL = os.path.join('/', base_url, 'ftc/')
+LOGIN_REDIRECT_URL = 'profile'
+LOGIN_URL = 'login'
+LOGOUT_REDIRECT_URL = 'home'
 
 # social auth
 USE_X_FORWARDED_HOST = True
