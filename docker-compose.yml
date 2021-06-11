@@ -27,7 +27,7 @@ services:
     env_file:
       - production.env
     environment:
-      - STATIC_ROOT=/static
+      - STATIC_ROOT=/code/static
       - DB_HOST=db
     volumes:
       - "./user_upload:/code/user_upload"
