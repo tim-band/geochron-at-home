@@ -200,7 +200,21 @@ location /geochron@home/ {
 }
 ```
 
-## Uploading crystal images
+### Backup and restore
+
+Back up the entire database like this:
+
+```sh
+docker-compose exec db pg_dump -c -U geochron | gzip -c > ../gah.gz
+```
+
+Restore it like this:
+
+```sh
+gunzip -c ../gah.gz | docker-compose exec -T db psql -U geochron -f-
+```
+
+## Uploading crystal images (old style)
 
 You can upload a new set of images by giving them the following paths:
 `user_upload/<user-name>/<project-name>/<sample-name>/<grain-name>/<image-name>.jpg`
@@ -265,6 +279,17 @@ From the pipenv shell:
 ```sh
 (geochron-at-home) $ python test/integration.py
 ```
+
+for the Selenium test, or
+
+```sh
+(geochron-at-home) $ ./manage.py test
+```
+
+for the lower-level tests. There are no unit tests.
+
+At some point the Selenium test should probably be brought
+under `./manage.py test`
 
 ### Troubleshooting image upload
 
