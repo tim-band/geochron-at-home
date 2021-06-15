@@ -332,9 +332,16 @@ for production.
 Now restart geochron@home:
 
 ```sh
-docker-compose build django
-docker-compose down
-docker-compose up -d
+(geochron-at-home) exit
+$ pipenv shell
+(geochron-at-home) ./manage.py runserver
+```
+
+or for production:
+
+```sh
+$ docker-compose down
+$ docker-compose up -d --build
 ```
 
 ### Using the API
@@ -356,12 +363,16 @@ Next, you need to log in with `./gah.py login`. You can use
 any admin user on the site. This login session will last for
 one day, beyond which a further login will be required.
 
-Now you can use the other commands of `gah`. Currently only
-three exist:
+Now you can use the other commands of `gah`, for example:
 
 * `./gah.py` on its own lists help and commands
-* `./gah.py projects` lists all the project IDs
-* `./gah.py project <ID>` gives information on project with ID `<ID>`
-
-Commands to be added include creating projects and samples,
-uploading grains, and downloading results.
+* `./gah/py project -h` to get help on the project commands
+* `./gah.py project list` lists all the project IDs
+* `./gah.py project info <ID>` gives information on project with ID `<ID>`
+* `./gah.py project create <project-name> "<description>" <priority>`
+* `./gah.py sample -h` to get help on the sample commands
+* `./gah.py grain <sample-ID> <path>` to upload all the grains in the
+directory under `<path>`. Every directory that contains a file called
+`rois.json` will become a grain, and all image files in the same directory
+with the right sort of file name will become images in the grain (see
+the Upload Image Files section above).
