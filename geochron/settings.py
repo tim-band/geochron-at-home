@@ -252,3 +252,8 @@ LOGGING = {
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 IMAGE_UPLOAD_SIZE_LIMIT = os.getenv('IMAGE_UPLOAD_SIZE_LIMIT') or 256 * 1024
 PROMETHEUS_EXPORT_MIGRATIONS = False
+prom_port_range = os.getenv('PROMETHEUS_METRICS_EXPORT_PORT_RANGE')
+if prom_port_range is not None:
+    (start, end) = prom_port_range.split('-',1)
+    PROMETHEUS_METRICS_EXPORT_PORT_RANGE = range(int(start), int(end))
+    PROMETHEUS_METRICS_EXPORT_ADDRESS = ''
