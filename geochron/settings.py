@@ -229,7 +229,7 @@ DEFAULT_TO_EMAIL = DEFAULT_FROM_EMAIL
 
 ## sub url
 LOGIN_REDIRECT_URL = 'profile'
-LOGIN_URL = 'login'
+LOGIN_URL = 'account_login'
 LOGOUT_REDIRECT_URL = 'home'
 
 # social auth
