@@ -1,4 +1,3 @@
-import base64
 from django.contrib.auth.models import User
 from django.db.models.aggregates import Max
 from django.shortcuts import get_object_or_404
@@ -131,13 +130,13 @@ class GrainSerializer(serializers.ModelSerializer):
     image_height = serializers.IntegerField(required=False, read_only=False)
 
     def do_create(self, request, sample_id):
-        if (not request.user.is_superuser and
-            self.validated_data['sample'].get_owner() != request.user):
-            raise exceptions.PermissionDenied
-        rois_b64 = self.initial_data['rois'].read()
-        rois_json = base64.b64decode(rois_b64)
-        rois = json.loads(rois_json)
         sample = Sample.objects.get(id=sample_id)
+        if (not request.user.is_superuser and
+            sample.get_owner() != request.user):
+            raise exceptions.PermissionDenied
+        data = self.initial_data['rois'].read()
+        rois_json = data.decode('utf-8')
+        rois = json.loads(rois_json)
         index = self.validated_data.get('index')
         if index == None:
             max_index = sample.grain_set.aggregate(Max('index'))['index__max'] or 0
@@ -207,8 +206,7 @@ class GrainImageListView(ListCreateView):
             raise exceptions.PermissionDenied
         filename = serializer.initial_data['data'].name
         info = parse_image_name(filename)
-        data_b64 = serializer.initial_data['data'].read()
-        data = base64.b64decode(data_b64)
+        data = serializer.initial_data['data'].read()
         grain = Grain.objects.get(pk=self.kwargs['grain'])
         serializer.save(
             index=info['index'],
@@ -227,9 +225,8 @@ class ImageInfoView(RetrieveUpdateDeleteView):
         if 'data' in serializer.initial_data:
             filename = serializer.initial_data['data'].name
             info = parse_image_name(filename)
-            data_b64 = serializer.initial_data['data'].read()
             kwargs.update(info)
-            kwargs['data'] = base64.b64decode(data_b64)
+            kwargs['data'] = serializer.initial_data['data'].read().decode('utf-8')
         if 'grain' in self.kwargs and self.kwargs['grain'].isnumeric():
             kwargs['grain'] = Grain.objects.get(pk=self.kwargs['grain'])
         serializer.save(**kwargs)

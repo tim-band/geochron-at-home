@@ -7,7 +7,7 @@ import json
 import os.path
 import sys
 from urllib.error import HTTPError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 from urllib.request import Request, urlopen
 
 
@@ -140,29 +140,30 @@ def api_post(config, *args, **kwargs):
 
 
 def api_upload_verb(verb, config, *args, **kwargs):
-    boundary='auf98arnu8furpaurh83ryiruhvtbt43v!'
+    boundary = b'auf98arnu8furpaurh83ryiruhvtbt43v!'
     url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args)) + '/'
-    data = ''
+    data = b''
     for k,v in kwargs.items():
         if hasattr(v, 'read'):
-            data += ('--{0}\r\nContent-Disposition: form-data;'
-            + ' name="{1}"; filename="{2}"\r\n\r\n{3}\r\n'
-            ).format(
-                boundary,
-                k,
-                os.path.basename(v.name),
-                base64.b64encode(v.read()).decode('ascii')
+            content = v.read()
+            if type(content) is str:
+                content = content.encode('utf-8')
+            data += (
+                b'--' + boundary + b'\r\nContent-Disposition: form-data;'
+                + b' name="' + k.encode('ascii')
+                + b'"; filename="' + quote(os.path.basename(v.name)).encode('ascii')
+                + b'"\r\n\r\n' + content + b'\r\n'
             )
         else:
-            data += ('--{0}\r\nContent-Disposition: form-data;'
-            + ' name="{1}"\r\n\r\n{2}\r\n'
-            ).format(
-                boundary, k, v
+            data += (
+                b'--' + boundary + b'\r\nContent-Disposition: form-data;'
+                + b' name="' + k.encode('ascii')
+                + b'"\r\n\r\n' + v.encode('ascii') + b'\r\n'
             )
-    data += '--' + boundary + '--'
-    req = Request(url, data=data.encode('ascii'), method=verb)
+    data += b'--' + boundary + b'--'
+    req = Request(url, data=data, method=verb)
     req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
-    req.add_header('Content-Type', 'multipart/form-data; boundary={0}'.format(boundary))
+    req.add_header('Content-Type', b'multipart/form-data; boundary='+boundary)
     req.add_header('Content-Length', len(data))
     return urlopen(req)
 
@@ -405,7 +406,7 @@ def images_upload(opts, config):
                 image_upload(opts, config)
             except HTTPError as e:
                 last_error = e
-                if 500 <= e.status_code:
+                if 500 <= e.code:
                     for_retry.append(i)
         if len(for_retry) == 0:
             return

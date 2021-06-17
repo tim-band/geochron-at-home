@@ -252,3 +252,34 @@ class ApiSampleUpdate(TestCase):
         j = json.loads(r.content)
         self.assertEqual(j['sample_name'], 'adm_samp') # unchanged
         self.assertEqual(j['priority'], new_priority)
+
+class ApiGrainCreate(TestCase):
+    fixtures = ['users.json', 'projects.json', 'samples.json']
+
+    def setUp(self):
+        self.counter_headers = log_in_headers(self.client, 'counter', 'counter_password')
+        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+ 
+    def upload_rois(self, sample_id, rois, headers):
+        with open(rois, 'rb') as fh:
+            return self.client.post(
+                '/ftc/api/sample/' + str(sample_id) + '/grain/',
+                { 'rois': fh },
+                **headers,
+            )
+
+    def test_counter_cannot_create_grain_in_others_sample(self):
+        r = self.upload_rois(1, 'test/crystals/john/p1/s1/Grain01/rois.json', self.counter_headers)
+        self.assertEqual(r.status_code, 403)
+
+    def test_create_grain(self):
+        r = self.upload_rois(2, 'test/crystals/john/p1/s1/Grain01/rois.json', self.counter_headers)
+        self.assertEqual(r.status_code, 201)
+        j = json.loads(r.content)
+        self.assertEqual(j['index'], 1)
+
+    def test_superuser_can_create_grain_in_others_sample(self):
+        r = self.upload_rois(1, 'test/crystals/john/p1/s1/Grain01/rois.json', self.super_headers)
+        self.assertEqual(r.status_code, 201)
+        j = json.loads(r.content)
+        self.assertEqual(j['index'], 1)
