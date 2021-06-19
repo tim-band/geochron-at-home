@@ -39,6 +39,7 @@ class ListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         return models_owned(self.model, self.request)
 
+
 class ProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
@@ -149,6 +150,17 @@ class GrainSerializer(serializers.ModelSerializer):
         )
         save_rois_regions(rois, grain)
 
+    def do_update(self, request):
+        kwargs = {}
+        # Check the grain is not going to be passed to another user
+        sample_id = self.initial_data.get('sample')
+        if sample_id != None:
+            sample = Sample.objects.get(pk=sample_id)
+            kwargs['sample'] = sample
+            if not request.user.is_superuser and sample.get_owner() != request.user:
+                raise exceptions.PermissionDenied
+        self.save(**kwargs)
+
 
 class SampleGrainListView(ListCreateView):
     serializer_class = GrainSerializer
@@ -174,6 +186,9 @@ class GrainListView(ListCreateView):
 class GrainInfoView(RetrieveUpdateDeleteView):
     model = Grain
     serializer_class = GrainSerializer
+
+    def perform_update(self, serializer):
+        serializer.do_update(self.request)
 
 
 class ImageSerializer(serializers.ModelSerializer):

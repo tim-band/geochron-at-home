@@ -225,6 +225,7 @@ class ApiSampleUpdate(TestCase):
 
     def setUp(self):
         self.headers = log_in_headers(self.client, 'counter', 'counter_password')
+        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
 
     def test_sample_update(self):
         new_priority = 23
@@ -243,15 +244,28 @@ class ApiSampleUpdate(TestCase):
         self.assertEqual(r.status_code, 404)
 
     def test_superuser_can_update_any_sample(self):
-        super_headers = log_in_headers(self.client, 'super', 'super_password')
         new_priority = 22
         r = self.client.patch('/ftc/api/sample/1/', {
             'priority' : new_priority
-        }, content_type='application/json', **super_headers)
+        }, content_type='application/json', **self.super_headers)
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content)
         self.assertEqual(j['sample_name'], 'adm_samp') # unchanged
         self.assertEqual(j['priority'], new_priority)
+
+    def test_cannot_change_sample_ownership(self):
+        r = self.client.patch('/ftc/api/sample/1/', {
+            'in_project': 2
+        }, content_type='application/json', **self.headers)
+        self.assertEqual(r.status_code, 404)
+
+    def test_superuser_can_change_sample_ownership(self):
+        r = self.client.patch('/ftc/api/sample/1/', {
+            'in_project': 2
+        }, content_type='application/json', **self.super_headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content)
+        self.assertEqual(j['in_project'], 2)
 
 class ApiGrainCreate(TestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json']
@@ -283,3 +297,50 @@ class ApiGrainCreate(TestCase):
         self.assertEqual(r.status_code, 201)
         j = json.loads(r.content)
         self.assertEqual(j['index'], 1)
+
+class ApiGrainUpdate(TestCase):
+    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
+
+    def setUp(self):
+        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
+        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+
+    def test_grain_update(self):
+        new_index = 23
+        r = self.client.patch('/ftc/api/grain/2/', {
+            'index' : new_index
+        }, content_type='application/json', **self.headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content)
+        self.assertEqual(j['image_width'], 502) # unchanged
+        self.assertEqual(j['index'], new_index)
+
+    def test_cannot_update_others_grain(self):
+        r = self.client.patch('/ftc/api/grain/1/', {
+            'index' : 43
+        }, content_type='application/json', **self.headers)
+        self.assertEqual(r.status_code, 404)
+
+    def test_superuser_can_update_any_grain(self):
+        new_index = 22
+        r = self.client.patch('/ftc/api/grain/1/', {
+            'index' : new_index
+        }, content_type='application/json', **self.super_headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content)
+        self.assertEqual(j['image_width'], 402) # unchanged
+        self.assertEqual(j['index'], new_index)
+
+    def test_cannot_change_grain_ownership(self):
+        r = self.client.patch('/ftc/api/grain/2/', {
+            'sample': 1
+        }, content_type='application/json', **self.headers)
+        self.assertEqual(r.status_code, 403)
+
+    def test_superuser_can_change_grain_ownership(self):
+        r = self.client.patch('/ftc/api/grain/2/', {
+            'sample': 1
+        }, content_type='application/json', **self.super_headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content)
+        self.assertEqual(j['sample'], 1)
