@@ -12,6 +12,7 @@ services:
       - PGDATA=/var/lib/postgresql/data/pgdata
     env_file:
       - production.env
+    restart: unless-stopped
   web:
     image: nginx:1.19.6-alpine
     ports:
@@ -20,6 +21,7 @@ services:
     volumes:
       - "./nginx/conf.d:/etc/nginx/conf.d:ro"
       - "web_static:/var/www/static:ro"
+    restart: unless-stopped
     depends_on:
       - django
   django:
@@ -36,5 +38,6 @@ services:
       - "./user_upload:/code/user_upload"
       - "web_static:/code/static/"
       - "./vendor:/code/vendor"
+    restart: unless-stopped
     depends_on:
       - db
