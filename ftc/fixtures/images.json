@@ -1,0 +1,24 @@
+[
+    {
+        "model": "ftc.image",
+        "pk": 1,
+        "fields": {
+            "grain": 1,
+            "index": 1,
+            "format": "J",
+            "ft_type": "S",
+            "data": "1234"
+        }
+    },
+    {
+        "model": "ftc.image",
+        "pk": 2,
+        "fields": {
+            "grain": 2,
+            "index": 1,
+            "format": "J",
+            "ft_type": "S",
+            "data": "2345"
+        }
+    }
+]

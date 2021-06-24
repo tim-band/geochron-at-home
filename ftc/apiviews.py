@@ -204,6 +204,22 @@ class ImageSerializer(serializers.ModelSerializer):
     ft_type = serializers.CharField(required=False, read_only=False)
     grain = serializers.PrimaryKeyRelatedField(required=False, read_only=True)
 
+    def do_create(self, request, grain_id):
+        grain = Grain.objects.get(pk=grain_id)
+        if (not request.user.is_superuser and
+            grain.get_owner() != request.user):
+            raise exceptions.PermissionDenied
+        filename = self.initial_data['data'].name
+        info = parse_image_name(filename)
+        data = self.initial_data['data'].read()
+        self.save(
+            index=info['index'],
+            grain=grain, 
+            format=info['format'],
+            ft_type=info['ft_type'],
+            data=data
+        )
+
 
 class GrainImageListView(ListCreateView):
     serializer_class = ImageSerializer
@@ -216,20 +232,16 @@ class GrainImageListView(ListCreateView):
         return qs.order_by('id')
 
     def perform_create(self, serializer):
-        if (not self.request.user.is_superuser and
-            serializer.validated_data['grain'].get_owner() != self.request.user):
-            raise exceptions.PermissionDenied
-        filename = serializer.initial_data['data'].name
-        info = parse_image_name(filename)
-        data = serializer.initial_data['data'].read()
-        grain = Grain.objects.get(pk=self.kwargs['grain'])
-        serializer.save(
-            index=info['index'],
-            grain=grain, 
-            format=info['format'],
-            ft_type=info['ft_type'],
-            data=data
-        )
+        serializer.do_create(self.request, self.kwargs['grain'])
+
+
+class ImageListView(ListCreateView):
+    serializer_class = ImageSerializer
+    model = Image
+
+    def perform_create(self, serializer):
+        serializer.do_create(self.request, self.initial_data['grain'])
+
 
 class ImageInfoView(RetrieveUpdateDeleteView):
     model = Image
@@ -237,13 +249,17 @@ class ImageInfoView(RetrieveUpdateDeleteView):
 
     def perform_update(self, serializer):
         kwargs={}
+        if 'grain' in serializer.initial_data:
+            grain = Grain.objects.get(pk=serializer.initial_data['grain'])
+            kwargs['grain'] = grain
+            if (not self.request.user.is_superuser
+                    and grain.get_owner() != self.request.user):
+                raise exceptions.PermissionDenied
         if 'data' in serializer.initial_data:
             filename = serializer.initial_data['data'].name
             info = parse_image_name(filename)
             kwargs.update(info)
             kwargs['data'] = serializer.initial_data['data'].read().decode('utf-8')
-        if 'grain' in self.kwargs and self.kwargs['grain'].isnumeric():
-            kwargs['grain'] = Grain.objects.get(pk=self.kwargs['grain'])
         serializer.save(**kwargs)
 
 

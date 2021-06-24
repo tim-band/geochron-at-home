@@ -181,6 +181,13 @@ class ApiGrainDelete(DeleteTestBaseMixin, TestCase):
     counter_id = 2
     admin_id = 1
 
+class ApiImageDelete(DeleteTestBaseMixin, TestCase):
+    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
+    path = 'image/'
+    ids = [1,2]
+    counter_id = 2
+    admin_id = 1
+
 class ApiSampleCreate(TestCase):
     fixtures = ['users.json', 'projects.json']
 
@@ -344,3 +351,102 @@ class ApiGrainUpdate(TestCase):
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content)
         self.assertEqual(j['sample'], 1)
+
+class ApiImageCreate(TestCase):
+    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
+
+    def setUp(self):
+        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
+        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+
+    def upload_image(self, grain_id, image, headers):
+        with open(image, 'rb') as fh:
+            return self.client.post(
+                '/ftc/api/grain/' + str(grain_id) + '/image/',
+                { 'data': fh },
+                **headers,
+            )
+
+    def test_image_create(self):
+        r1 = self.upload_image(
+            2,
+            'test/crystals/john/p1/s1/Grain01/stack-01.jpg',
+            self.headers,
+        )
+        self.assertEqual(r1.status_code, 201)
+        j1 = json.loads(r1.content)
+        id = j1['id']
+        r2 = self.client.get('/ftc/api/grain/2/image/', **self.super_headers)
+        j2 = json.loads(r2.content)
+        self.assertEqual(len(j2), 1)
+        self.assertEqual(j2[0]['id'], id)
+        r3 = self.client.get('/ftc/api/grain/1/image/', **self.super_headers)
+        j3 = json.loads(r3.content)
+        self.assertEqual(len(j3), 0)
+
+    def test_cannot_create_image_for_other(self):
+        r = self.upload_image(
+            1,
+            'test/crystals/john/p1/s1/Grain01/stack-01.jpg',
+            self.headers,
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_superuser_can_create_image_for_other(self):
+        r1 = self.upload_image(
+            1,
+            'test/crystals/john/p1/s1/Grain01/stack-01.jpg',
+            self.super_headers,
+        )
+        self.assertEqual(r1.status_code, 201)
+        j1 = json.loads(r1.content)
+        id = j1['id']
+        r2 = self.client.get('/ftc/api/grain/1/image/', **self.super_headers)
+        j2 = json.loads(r2.content)
+        ids = [x['id'] for x in j2]
+        self.assertIn(id, ids)
+
+class ApiImageUpdate(TestCase):
+    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
+
+    def setUp(self):
+        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
+        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+
+    def test_image_update(self):
+        new_index = 23
+        r = self.client.patch('/ftc/api/image/2/', {
+            'index' : new_index
+        }, content_type='application/json', **self.headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content)
+        self.assertEqual(j['index'], new_index)
+
+    def test_cannot_update_others_grain(self):
+        r = self.client.patch('/ftc/api/image/1/', {
+            'index' : 43
+        }, content_type='application/json', **self.headers)
+        self.assertEqual(r.status_code, 404)
+
+    def test_superuser_can_update_any_image(self):
+        new_index = 22
+        r = self.client.patch('/ftc/api/image/1/', {
+            'index' : new_index
+        }, content_type='application/json', **self.super_headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content)
+        self.assertEqual(j['index'], new_index)
+
+    def test_cannot_change_image_ownership(self):
+        r = self.client.patch('/ftc/api/image/2/', {
+            'grain': 1
+        }, content_type='application/json', **self.headers)
+        self.assertEqual(r.status_code, 403)
+
+    def test_superuser_can_change_image_ownership(self):
+        r = self.client.patch('/ftc/api/image/2/', {
+            'grain': 1
+        }, content_type='application/json', **self.super_headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content)
+        self.assertEqual(j['grain'], 1)
