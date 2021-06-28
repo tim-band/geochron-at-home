@@ -178,21 +178,23 @@ class CountingPage(BasePage):
 
     def click_at(self, x, y):
         mp = self.driver.find_element_by_id("map")
+        lil = mp.find_element_by_css_selector('img.leaflet-image-layer')
         actions = ActionChains(self.driver)
-        actions.move_to_element_with_offset(mp,
-            x * mp.size["width"], y * mp.size["height"])
+        actions.move_to_element_with_offset(lil,
+            x * lil.size["width"], y * lil.size["height"])
         actions.click().pause(1.0).perform()
         return self
 
     def delete_from(self, minx, maxx, miny, maxy):
         self.driver.find_element_by_id("ftc-btn-select").click()
         mp = self.driver.find_element_by_id("map")
-        w = mp.size["width"]
-        h = mp.size["height"]
+        lil = mp.find_element_by_css_selector('img.leaflet-image-layer')
+        w = lil.size["width"]
+        h = lil.size["height"]
         actions = ActionChains(self.driver)
-        actions.move_to_element_with_offset(mp, minx * w, miny * h)
+        actions.move_to_element_with_offset(lil, minx * w, miny * h)
         actions.click().pause(0.1)
-        actions.move_to_element_with_offset(mp, maxx * w, maxy * h)
+        actions.move_to_element_with_offset(lil, maxx * w, maxy * h)
         actions.click().pause(0.1).perform()
         self.driver.find_element_by_id("ftc-btn-delete").click()
         return self
