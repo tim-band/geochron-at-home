@@ -277,19 +277,13 @@ the new samples.
 From the pipenv shell:
 
 ```sh
-(geochron-at-home) $ python test/integration.py
-```
-
-for the Selenium test, or
-
-```sh
 (geochron-at-home) $ ./manage.py test
 ```
 
-for the lower-level tests. There are no unit tests.
+You can test only the API tests by adding the option `--tag api` or
+only the selenium test by adding the option `--tag selenium`.
 
-At some point the Selenium test should probably be brought
-under `./manage.py test`
+At present there are only these two types of test.
 
 ### Troubleshooting image upload
 

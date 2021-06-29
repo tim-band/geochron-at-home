@@ -1,4 +1,4 @@
-from django.test import Client, TestCase
+from django.test import Client, TestCase, tag
 from ftc.models import (
     Project,
     Sample,
@@ -7,6 +7,26 @@ from ftc.models import (
 )
 import json
 
+
+def log_in_headers(client, username, password):
+    r = client.post('/ftc/api/get-token', {
+        'username': username,
+        'password': password,
+    })
+    j = json.loads(r.content)
+    return {
+        'HTTP_AUTHORIZATION': 'Bearer ' + j['access'],
+    }
+
+
+@tag('api')
+class ApiTestMixin:
+    def setUp(self):
+        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
+        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+
+
+@tag('api')
 class ApiJwt(TestCase):
     fixtures = ['users.json']
 
@@ -40,16 +60,7 @@ class ApiJwt(TestCase):
         self.assertEqual(resp3.status_code, 200)
 
 
-def log_in_headers(client, username, password):
-    r = client.post('/ftc/api/get-token', {
-        'username': username,
-        'password': password,
-    })
-    j = json.loads(r.content)
-    return {
-        'HTTP_AUTHORIZATION': 'Bearer ' + j['access'],
-    }
-
+@tag('api')
 class ApiProjectCreate(TestCase):
     fixtures = ['users.json']
 
@@ -91,11 +102,9 @@ class ApiProjectCreate(TestCase):
         })
         self.assertEqual(ps[0]['creator'], user)
 
-class ApiProjectUpdate(TestCase):
-    fixtures = ['users.json', 'projects.json']
 
-    def setUp(self):
-        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
+class ApiProjectUpdate(ApiTestMixin, TestCase):
+    fixtures = ['users.json', 'projects.json']
 
     def test_update(self):
         new_text = 'amended'
@@ -114,16 +123,17 @@ class ApiProjectUpdate(TestCase):
         self.assertEqual(r.status_code, 404)
 
     def test_superuser_can_update_any_project(self):
-        super_headers = log_in_headers(self.client, 'super', 'super_password')
         new_text = 'amended by super'
         r = self.client.patch('/ftc/api/project/1/', {
             'project_description' : new_text
-        }, content_type='application/json', **super_headers)
+        }, content_type='application/json', **self.super_headers)
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content)
         self.assertEqual(j['project_name'], 'proj1') # unchanged
         self.assertEqual(j['project_description'], new_text)
 
+
+@tag('api')
 class DeleteTestBaseMixin:
     def setUp(self):
         self.headers = log_in_headers(self.client, 'counter', 'counter_password')
@@ -160,12 +170,14 @@ class DeleteTestBaseMixin:
         expected_ids.sort()
         self.assertListEqual(actual_ids, expected_ids)
 
+
 class ApiProjectDelete(DeleteTestBaseMixin, TestCase):
     fixtures = ['users.json', 'projects.json']
     path = 'project/'
     ids = [1,2]
     counter_id = 2
     admin_id = 1
+
 
 class ApiSampleDelete(DeleteTestBaseMixin, TestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json']
@@ -174,12 +186,14 @@ class ApiSampleDelete(DeleteTestBaseMixin, TestCase):
     counter_id = 2
     admin_id = 1
 
+
 class ApiGrainDelete(DeleteTestBaseMixin, TestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
     path = 'grain/'
     ids = [1,2]
     counter_id = 2
     admin_id = 1
+
 
 class ApiImageDelete(DeleteTestBaseMixin, TestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
@@ -188,13 +202,13 @@ class ApiImageDelete(DeleteTestBaseMixin, TestCase):
     counter_id = 2
     admin_id = 1
 
-class ApiSampleCreate(TestCase):
+
+class ApiSampleCreate(ApiTestMixin, TestCase):
     fixtures = ['users.json', 'projects.json']
 
     def setUp(self):
+        super().setUp()
         self.admin_headers = log_in_headers(self.client, 'admin', 'admin_password')
-        self.counter_headers = log_in_headers(self.client, 'counter', 'counter_password')
-        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
         self.admin_sample_fields = {
             'sample_name': 'this_sample',
             'in_project': 1,
@@ -212,7 +226,7 @@ class ApiSampleCreate(TestCase):
         }
 
     def test_counter_cannot_create_sample_in_others_project(self):
-        r = self.client.post('/ftc/api/sample/', self.admin_sample_fields, **self.counter_headers)
+        r = self.client.post('/ftc/api/sample/', self.admin_sample_fields, **self.headers)
         self.assertEqual(r.status_code, 403)
 
     def test_create_sample(self):
@@ -227,12 +241,9 @@ class ApiSampleCreate(TestCase):
         j = json.loads(r.content)
         self.assertEqual(j['sample_name'], self.admin_sample_fields['sample_name'])
 
-class ApiSampleUpdate(TestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json']
 
-    def setUp(self):
-        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
-        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+class ApiSampleUpdate(ApiTestMixin, TestCase):
+    fixtures = ['users.json', 'projects.json', 'samples.json']
 
     def test_sample_update(self):
         new_priority = 23
@@ -274,13 +285,10 @@ class ApiSampleUpdate(TestCase):
         j = json.loads(r.content)
         self.assertEqual(j['in_project'], 2)
 
-class ApiGrainCreate(TestCase):
+
+class ApiGrainCreate(ApiTestMixin, TestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json']
 
-    def setUp(self):
-        self.counter_headers = log_in_headers(self.client, 'counter', 'counter_password')
-        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
- 
     def upload_rois(self, sample_id, rois, headers):
         with open(rois, 'rb') as fh:
             return self.client.post(
@@ -290,11 +298,11 @@ class ApiGrainCreate(TestCase):
             )
 
     def test_counter_cannot_create_grain_in_others_sample(self):
-        r = self.upload_rois(1, 'test/crystals/john/p1/s1/Grain01/rois.json', self.counter_headers)
+        r = self.upload_rois(1, 'test/crystals/john/p1/s1/Grain01/rois.json', self.headers)
         self.assertEqual(r.status_code, 403)
 
     def test_create_grain(self):
-        r = self.upload_rois(2, 'test/crystals/john/p1/s1/Grain01/rois.json', self.counter_headers)
+        r = self.upload_rois(2, 'test/crystals/john/p1/s1/Grain01/rois.json', self.headers)
         self.assertEqual(r.status_code, 201)
         j = json.loads(r.content)
         self.assertEqual(j['index'], 1)
@@ -305,12 +313,9 @@ class ApiGrainCreate(TestCase):
         j = json.loads(r.content)
         self.assertEqual(j['index'], 1)
 
-class ApiGrainUpdate(TestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
 
-    def setUp(self):
-        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
-        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+class ApiGrainUpdate(ApiTestMixin, TestCase):
+    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
 
     def test_grain_update(self):
         new_index = 23
@@ -352,12 +357,9 @@ class ApiGrainUpdate(TestCase):
         j = json.loads(r.content)
         self.assertEqual(j['sample'], 1)
 
-class ApiImageCreate(TestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
 
-    def setUp(self):
-        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
-        self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+class ApiImageCreate(ApiTestMixin, TestCase):
+    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
 
     def upload_image(self, grain_id, image, headers):
         with open(image, 'rb') as fh:
@@ -406,7 +408,8 @@ class ApiImageCreate(TestCase):
         ids = [x['id'] for x in j2]
         self.assertIn(id, ids)
 
-class ApiImageUpdate(TestCase):
+
+class ApiImageUpdate(ApiTestMixin, TestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
 
     def setUp(self):

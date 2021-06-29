@@ -1,4 +1,4 @@
-import unittest
+from django.test import Client, tag, TestCase
 from selenium import webdriver
 from selenium.webdriver.common.alert import Alert
 from selenium.webdriver.common.by import By
@@ -465,7 +465,8 @@ class WebUploader:
         return self.hashes.get(hash_)
 
 
-class DjangoTests(unittest.TestCase):
+@tag('selenium')
+class DjangoTests(TestCase):
     def setUp(self):
         self.dc = DockerCompose("./docker-compose-test.yml").down().up().init()
         self.driver = webdriver.Firefox()
@@ -526,7 +527,7 @@ class DjangoTests(unittest.TestCase):
         # (as it is a partial save, not a submission)
         self.assertRaises(AssertionError, report.result, "1")
         # start counting, logout
-        counting.go().dismiss_well_done_message().check_count("000")
+        counting.go().check_count("000")
         navbar.check().logout()
 
         # login as test user, we should still see the saved result
@@ -549,6 +550,3 @@ class DjangoTests(unittest.TestCase):
         self.driver.close()
         self.dc.down()
 
-
-if __name__ == '__main__':
-    unittest.main()

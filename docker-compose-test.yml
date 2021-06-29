@@ -8,7 +8,7 @@ services:
   db:
     image: postgres:13.1-alpine
     environment:
-      - POSTGRES_DB=geochron
+      - POSTGRES_DB=geochron-int-test
       - POSTGRES_USER=geochron
       - POSTGRES_PASSWORD=geochron
     volumes:
@@ -36,7 +36,7 @@ services:
       - DJANGO_DEBUG=0
       - STATIC_ROOT=/static
       - DB_HOST=db
-      - POSTGRES_DB=geochron
+      - POSTGRES_DB=geochron-int-test
       - POSTGRES_USER=geochron
       - POSTGRES_PASSWORD=geochron
       - "SITE_DOMAIN=localhost:18080"
