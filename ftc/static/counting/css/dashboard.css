@@ -178,8 +178,8 @@ section {
 	font-weight: bold;
 	color: #1C94C4;
 	outline: none;
-	top: -8px;
-	margin-left: -12px;
+	margin-left: -9px;
+	margin-bottom: -12px;
 }
 .ui-slider-range {
 	background: #ffffff; /* Old browsers */
@@ -208,14 +208,14 @@ section {
 	background: white;
 	font-size: 4em;
 	color: #707070;
-	
+
 	position: absolute;
 	left: 50%; top: 0px;
 	margin-left: -50px; margin-top: 0;
-	
+
 	text-align: center;
 	line-height: 45px;
-	
+
 	border-top: 5px solid #E54B6B;
 	background-image: linear-gradient(#f0f0f0, white);
 } */

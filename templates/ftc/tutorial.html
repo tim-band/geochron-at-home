@@ -1,0 +1,43 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block head %}
+<style>
+body {font-family: sans-serif;}
+div.separator {width:20px; height:20px;}
+.left {float: left;}
+.right {float: right;}
+div#slider {width: 10px; height: 200px;}
+div.box {border: 1px solid; padding: 5px;}
+div#results {width: 400px;}
+#container {position: relative;}
+#container canvas #focus #slider {position: absolute;}
+#slider {left: 50px; top: 50px;}
+#canvas {left: 0px}
+</style>
+<script>var tutorialDir = "{% static 'tutorial' %}";</script>
+<script type='text/javascript' src="{% static 'counting/script/tutorial.js' %}"></script>
+{% endblock %}
+{% block content %}
+
+<div class="left" id="container">
+    <canvas id="myCanvas"></canvas>
+    <div id="slider" class="left"></div>
+</div>
+
+<div class="separator left">&nbsp;</div>
+
+<div class="left">
+    <button id="previous" class="left" disabled>Previous</button>
+    &nbsp;
+    <button id="next" class="left">Next</button>
+
+    <div class="separator left">&nbsp;</div>
+
+    <div class="left">
+        <div class="box left" id="results"></div>
+    </div>
+</div>
+
+{% endblock %}

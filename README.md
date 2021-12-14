@@ -365,8 +365,13 @@ Now you can use the other commands of `gah`, for example:
 * `./gah.py project info <ID>` gives information on project with ID `<ID>`
 * `./gah.py project create <project-name> "<description>" <priority>`
 * `./gah.py sample -h` to get help on the sample commands
-* `./gah.py grain <sample-ID> <path>` to upload all the grains in the
-directory under `<path>`. Every directory that contains a file called
+* `./gah.py grain create <sample-ID> <path>` to upload all the grains in
+the directory under `<path>`. Every directory that contains a file called
 `rois.json` will become a grain, and all image files in the same directory
 with the right sort of file name will become images in the grain (see
 the Upload Image Files section above).
+
+#### TODO:
+
+* Need a better way to add samples. Currently you have to `./gah.py sample create <PN> <DESC> <PRI>`, see the ID created, then `./gah.py grain create <ID> <path-to-grains-folder>`, which is a bit painful.
+* Need a way to find out which grain in the DB came from which folder on the file system; presumably this will need a database migration to give every grain an origin note.

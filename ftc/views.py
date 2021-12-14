@@ -35,7 +35,10 @@ def signmeup(request):
         # logout guest
         logout(request)
     return redirect('account_signup')
-       
+
+def tutorial(request):
+    return render(request, 'ftc/tutorial.html')
+
 # Fission tracks measuring report
 from django.contrib.auth.decorators import login_required, user_passes_test
 
