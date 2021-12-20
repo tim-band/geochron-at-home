@@ -63,6 +63,7 @@ $(function() {
     $("#previous").removeAttr("disabled");
     if (ft.samplenum == ft.samples.length - 1 && ft.grainnum == numgrains - 1) {
         $("#next").attr("disabled", true);
+        $("#finish").removeAttr("disabled");
     }
 	clearCanvas();
 	ft.displaySample(-1);
@@ -73,6 +74,27 @@ $(function() {
 	} else {
 	    slider.hide();
 	}
+    });
+
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            xhr.setRequestHeader('X-CSRFToken', atoken);
+        }
+    });
+
+    $("#finish").click(function(ev) {
+        $.ajax({
+            url: tutorialResult_url,
+            type: 'POST',
+            dataType: 'text',
+            success: function(result) {
+                console.log('submitted tutorial result' );
+                window.location.href = return_url;
+            },
+            error: function(xhr, errmsg, err) {
+                console.log(xhr.status + ": " + xhr.responseText);
+            }
+        });
     });
 
     function clearCanvas(){

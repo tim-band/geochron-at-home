@@ -2,7 +2,8 @@ from django.shortcuts import render, get_object_or_404
 from django.db import transaction
 from django.db.models import Q
 from django.db.models.aggregates import Max
-from django.forms import ModelForm, CharField, Textarea, FileField, ClearableFileInput, ValidationError
+from django.forms import (ModelForm, CharField, Textarea, FileField,
+    ClearableFileInput, ValidationError)
 from django.views.decorators.csrf import csrf_protect
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic import DetailView
@@ -17,7 +18,8 @@ from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 import base64
 import io
 
-from ftc.models import Project, Sample, FissionTrackNumbering, Image, Grain, Region, Vertex
+from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
+    TutorialResult, Region, Vertex)
 
 #
 def home(request):
@@ -26,7 +28,9 @@ def home(request):
 # the view for /accounts/profile/
 def profile(request):
     if request.user.is_authenticated:
-        return render(request, 'ftc/profile.html', {})
+        return render(request, 'ftc/profile.html', {
+            'tutorial_completed': tutorialCompleted(request)
+        })
     else:
         return redirect('account_login') # 'home'
 
@@ -437,10 +441,21 @@ def get_grain_images(request):
 
 
 from django.contrib.auth.models import User
+def tutorialCompleted(request):
+    if request.user.username == 'guest':
+        return TutorialResult.objects.filter(session=request.session.session_key).exists()
+    if request.user.is_authenticated:
+        return TutorialResult.objects.filter(user=request.user).exists()
+    return False
+
+
 def counting(request, uname=None):
-    #return HttpResponse("Hello, world. You're counting." + '--' + uname)
-    if uname is None and request.user.is_authenticated:
-       return render(request, 'ftc/counting.html', {})
+    if request.user.is_authenticated:
+        if tutorialCompleted(request):
+            return render(request, 'ftc/counting.html', {})
+        return render(request, 'ftc/profile.html', {
+            'tutorial_completed': False
+        })
     elif uname == 'guest':
         passwd = 'guestsitest'
         user = User.objects.get(username__exact='guest')
@@ -448,23 +463,10 @@ def counting(request, uname=None):
         user.save()
         user = authenticate(username='guest', password=passwd)
         login(request, user)
-        return render(request, 'ftc/profile.html', {})
-        #2016-sept-03: return render(request, 'ftc/counting.html', {})
-        #return HttpResponse("Hello, world. You're counting." + '--' + uname)
-    else:
-        return redirect('home')
+    return render(request, 'ftc/profile.html', {
+        'tutorial_completed': tutorialCompleted(request)
+    })
 
-#@login_required
-#def counting(request):
-#    return render(request, 'ftc/counting.html', {})
-
-    #return HttpResponse("Hello, world. You're counting.")
-    #if guest:
-    #    pass #request.user = 
-    #if request.user.is_active:
-    #    return render(request, 'ftc/counting.html', {})
-    #else:
-    #    redirect('home')
 
 @login_required
 def updateTFNResult(request):
@@ -530,3 +532,12 @@ def saveWorkingGrain(request):
     else:
         return HttpResponse("Sorry, You have to active your account first.")
 
+@login_required
+def saveTutorialResult(request):
+    if request.user.is_active:
+        tr = TutorialResult(
+            user=request.user,
+            session=request.session.session_key
+        )
+        tr.save()
+        return HttpResponse("OK")

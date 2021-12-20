@@ -460,7 +460,7 @@ def image_info(opts, config):
     with api_get(config, 'image', opts.id) as response:
         body = response.read()
         v = json.loads(body)
-        print('image ID: {0}\grain ID: {1}\nindex: {2}\nfission track type: {3}\n'.format(
+        print('image ID: {0}\ngrain ID: {1}\nindex: {2}\nfission track type: {3}\n'.format(
             v.get('id'), v.get('grain'), v.get('index'), v.get('ft_type')
         ))
 

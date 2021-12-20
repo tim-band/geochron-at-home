@@ -1,5 +1,5 @@
 from django.contrib import admin
-from ftc.models import Project, Sample, FissionTrackNumbering
+from ftc.models import Project, Sample, FissionTrackNumbering, TutorialResult
 
 class SampleInline(admin.TabularInline):
     model = Sample
@@ -15,8 +15,13 @@ class FissionTrackNumberingAdmin(admin.ModelAdmin):
                     'ft_type', 'worker', 'result', 'create_date')
     list_filter = ['grain']
 
+class TutorialResultAdmin(admin.ModelAdmin):
+    list_display = ('user', 'session', 'date')
+
 admin.site.register(Project, ProjectAdmin)
 
 admin.site.register(FissionTrackNumbering, FissionTrackNumberingAdmin)
+
+admin.site.register(TutorialResult, TutorialResultAdmin)
 
 #admin.site.register(Sample)

@@ -142,3 +142,9 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     @classmethod
     def objects_owned_by(cls, user):
         return cls.objects.filter(in_sample__in_project__creator=user)
+
+#
+class TutorialResult(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    session = models.TextField()
+    date = models.DateTimeField(auto_now_add=True)

@@ -15,8 +15,14 @@ div#results {width: 400px;}
 #container canvas #focus #slider {position: absolute;}
 #slider {left: 50px; top: 50px;}
 #canvas {left: 0px}
+#buttons {display: inline-block;}
 </style>
-<script>var tutorialDir = "{% static 'tutorial' %}";</script>
+<script>
+var tutorialDir = "{% static 'tutorial' %}";
+var return_url = "{% url 'counting' %}";
+var tutorialResult_url = "{% url 'tutorialResult' %}";
+var atoken = '{{ csrf_token }}';
+</script>
 <script type='text/javascript' src="{% static 'counting/script/tutorial.js' %}"></script>
 {% endblock %}
 {% block content %}
@@ -29,9 +35,26 @@ div#results {width: 400px;}
 <div class="separator left">&nbsp;</div>
 
 <div class="left">
-    <button id="previous" class="left" disabled>Previous</button>
-    &nbsp;
-    <button id="next" class="left">Next</button>
+    <table id="buttons" class="left">
+        <tbody>
+            <tr>
+                <td>
+                    <button id="previous" class="left" disabled>Previous</button>
+                </td>
+                <td>
+                    <button id="next" class="left">Next</button>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <button id="finish" class="left" disabled>Finish and start counting!</button>
+                </td>
+            </tr>
+        </tbody>
+        <div>
+            &nbsp;
+        </div>
+    </table>
 
     <div class="separator left">&nbsp;</div>
 

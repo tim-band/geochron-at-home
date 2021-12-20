@@ -90,6 +90,12 @@ class HomePage(BasePage):
         self.driver.find_element_by_css_selector("a.btn-success").click()
         return JoinPage(self.driver)
 
+    def become_guest(self):
+        # log on as guest. ProfilePage is returned, which will be wrong if
+        # the guest has already done the tutorial (then it will be CountingPage)
+        self.driver.get("http://localhost:18080/ftc/counting/guest")
+        return ProfilePage(self.driver)
+
 
 class User:
     def __init__(self, identity, email, password):
@@ -143,13 +149,81 @@ class SignInPage(BasePage):
         return ProfilePage(self.driver)
 
 
+class TutorialPage(BasePage):
+    def check_text_contains(self, text):
+        tut_text = self.driver.find_element_by_id('results').text
+        assert text in tut_text
+        return self
+
+    def go_next(self):
+        self.driver.find_element_by_id('next').click()
+        return self
+
+    def go_previous(self):
+        self.driver.find_element_by_id('previous').click()
+        return self
+
+    def get_finish_link(self):
+        return self.driver.find_element_by_id('finish')
+
+    def go_finish(self):
+        self.get_finish_link().click()
+        return CountingPage(self.driver)
+
+    def get_to_end_and_finish(self):
+        while not self.finish_available():
+            self.go_next()
+        return self.go_finish()
+
+    def finish_available(self):
+        link = self.get_finish_link()
+        return link.get_attribute('disabled') != 'true'
+
+    def check_finish_available(self):
+        link = self.get_finish_link()
+        assert link.get_attribute('disabled') != 'true'
+        return self
+
+    def check_finish_not_available(self):
+        link = self.get_finish_link()
+        assert link.get_attribute('disabled') == 'true'
+        return self
+
+
 class ProfilePage(BasePage):
     def login_name(self):
         return self.driver.find_element_by_class_name('fa-user').text
 
+    def go(self):
+        self.driver.get("http://localhost:18080/accounts/profile")
+        return self
+
+    def get_counting_link(self):
+        return self.driver.find_element_by_id('start-counting-link')
+
     def go_start_counting(self):
-        self.driver.find_element_by_id("start-counting-link").click()
+        self.get_counting_link().click()
         return CountingPage(self.driver)
+
+    def check_can_count(self):
+        link = self.get_counting_link()
+        danger = self.driver.find_elements_by_class_name('text-danger')
+        assert link.get_attribute('disabled') != 'true'
+        assert link.get_attribute('href')
+        assert not any(['must finish the tutorial' in e.text for e in danger])
+        return self
+
+    def check_cannot_count(self):
+        link = self.get_counting_link()
+        danger = self.driver.find_elements_by_class_name('text-danger')
+        assert link.get_attribute('disabled') == 'true'
+        assert link.get_attribute('href') == None
+        assert any(['must finish the tutorial' in e.text for e in danger])
+        return self
+
+    def go_tutorial(self):
+        self.driver.find_element_by_id('tutorial-link').click()
+        return TutorialPage(self.driver)
 
 
 class CountingPage(BasePage):
@@ -492,8 +566,44 @@ class DjangoTests(TestCase):
         # sign in as this new user
         profile = SignInPage(self.driver).go().sign_in(test_user)
 
+        # attempt to count, get a refusal, so do the tutorial
+        profile.check_cannot_count()
+        tutorial = profile.go_tutorial()
+        tutorial.check_text_contains('etched with acid'
+        ).check_finish_not_available().go_next(
+        ).check_text_contains('These are fission tracks'
+        ).go_previous().check_text_contains('etched with acid'
+        ).go_next().check_text_contains('These are fission tracks'
+        ).check_finish_not_available().go_next(
+        ).check_text_contains('too small to distinguish'
+        ).check_finish_not_available().go_next(
+        ).check_text_contains('crystal defect'
+        ).check_finish_not_available().go_next(
+        ).check_text_contains('outside the region of interest'
+        ).check_finish_available().go_finish().check()
+        navbar.logout()
+
+        # do the same thing with John
+        profile = SignInPage(self.driver).go().sign_in(project_user)
+        profile.check_cannot_count().go_tutorial().get_to_end_and_finish()
+        profile.go().check_can_count()
+        navbar.logout()
+
+        # check guest cannot count
+        HomePage(self.driver).become_guest().check_cannot_count(
+        ).go_tutorial().get_to_end_and_finish().check()
+        # but then can
+        HomePage(self.driver).become_guest()
+        CountingPage(self.driver).check()
+        # but then cannot
+        navbar.logout()
+        HomePage(self.driver).become_guest().check_cannot_count()
+
+        # check we can still get counting after logging back in
+        navbar.logout()
+        counting = SignInPage(self.driver).go().sign_in(test_user).go_start_counting().check()
+
         # start counting tracks
-        counting = profile.go_start_counting().check()
         self.assertEqual(uploader.get_index(counting.image_displayed_url()), 1)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.33).image_displayed_url()), 2)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.67).image_displayed_url()), 4)
