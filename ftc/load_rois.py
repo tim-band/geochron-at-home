@@ -15,14 +15,14 @@ def load_rois(project_name, sample_name, sample_property, grain_nth, ft_type):
 
     rois = list()
     for index, item in enumerate(grain.region_set.all()):
-        coords = item.vertex_set.all()
+        coords = item.vertex_set.order_by('id')
         latlng = list()
         # only 'Induced Fission Tracks' will shift coordinates
         # positive sx or sy mean move along the image positive axis directions
         if ft_type == 'I':
             for coord in coords:
-                x = w - (float(coord.x) + item.shit_x)
-                y = float(coord.y) + item.shift_x
+                x = w - (float(coord.x) + item.shift_x)
+                y = float(coord.y) + item.shift_y
                 latlng.append([(h-y)/w, x/w])
         else:
             for coord in coords:

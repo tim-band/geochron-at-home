@@ -184,7 +184,7 @@ to show just the messages currently logged)
 ### nginx stanza
 
 To proxy to this docker swarm with nginx (using the path
-`/geochronathome`), you can use:
+`/geochron@home`), you can use:
 
 ```
 location /geochron@home/ {
@@ -373,5 +373,4 @@ the Upload Image Files section above).
 
 #### TODO:
 
-* Need a better way to add samples. Currently you have to `./gah.py sample create <PN> <DESC> <PRI>`, see the ID created, then `./gah.py grain create <ID> <path-to-grains-folder>`, which is a bit painful.
 * Need a way to find out which grain in the DB came from which folder on the file system; presumably this will need a database migration to give every grain an origin note.
