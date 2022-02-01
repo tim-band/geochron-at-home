@@ -73,6 +73,19 @@ Password for user geochron:
 geochron=>
 ```
 
+#### Resetting the database in docker-compose
+
+Normally a "production" server running inside docker-compose will
+keep its database even if `docker-compose down -v` is used. To
+clear it out and start again:
+
+```sh
+$ docker-compose down -v
+$ sudo rm db/pgdata -rf
+$ docker-compose up -d
+$ docker-compose exec django ./site_init.sh
+```
+
 ### Starting Geochron@Home
 
 If any static files have changed you might have to:
@@ -188,13 +201,15 @@ To proxy to this docker swarm with nginx (using the path
 
 ```
 location /geochron@home/ {
-        proxy_pass http://127.0.0.1:3830/;
+        proxy_pass http://127.0.0.1:3830; # note: no trailing /
         proxy_http_version 1.1;
         proxy_set_header Host $http_host;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_redirect off;
         location /geochron@home/static/ {
+                # This is necessary because the static files are not
+                # served under /geochron@home within the app
                 proxy_pass http://127.0.0.1:3830/static/;
         }
 }
@@ -345,7 +360,7 @@ can see the API endpoints. But first, you have to tell it where
 the endpoints are:
 
 ```sh
-./gah.py set url https://my.domain.com/geochron@home
+(geochron-at-home) $ ./gah.py set url https://my.domain.com/geochron@home
 ```
 
 Do not include any `/ftc` or `/api`. This produces a file
@@ -370,6 +385,48 @@ the directory under `<path>`. Every directory that contains a file called
 `rois.json` will become a grain, and all image files in the same directory
 with the right sort of file name will become images in the grain (see
 the Upload Image Files section above).
+
+So, for example, to create a new sample with all its images in an
+existing project (say `ProjectDEF`), you might do this:
+```sh
+(geochron-at-home) $ ./gah.py project list
+1 ProjectABC
+2 ProjectDEF
+3 SomeOtherProject
+```
+
+So we need project ID `2`. We'll arbitrarily pick `20` as the priority (so
+this sample will be shown before any with a lower number for the
+priority and after any with a higher number) and `50` as the number of
+contributors required to finish this sample. We will look for the
+`"id":<N>` property of the JSON returned to feed to the `grain create`
+function:
+
+```sh
+(geochron-at-home) $ ./gah.py sample create Sample123 2 T 20 50
+b'{"id":199,"sample_name":"Sample123","in_project":2,"sample_property":"T","total_grains":0,"priority":20,"min_contributor_num":50,"completed":false}'
+(geochron-at-home) $ ./gah.py grain create 199 /path/to/directory/of/grains
+Created new grain 28
+Uploaded image /path/to/directory/of/grains/Grain01/Stack-09.jpg as image 469
+Uploaded image /path/to/directory/of/grains/Grain01/Stack-07.jpg as image 470
+Uploaded image /path/to/directory/of/grains/Grain01/Stack-02.jpg as image 471
+Uploaded image /path/to/directory/of/grains/Grain01/Stack-10.jpg as image 472
+Uploaded image /path/to/directory/of/grains/Grain01/ReflStackFlat.jpg as image 473
+Uploaded image /path/to/directory/of/grains/Grain01/Stack-12.jpg as image 474
+...
+```
+
+The structure of your grains directory should be `GrainNN/Stack-NN.jpg` to
+get predictable grain and image numbers. The capitalisation (or indeed spelling)
+of `Grain` does not matter as long as it is followed by two digits. The acceptable
+names for the images are:
+
+* `Stack-NN.jpg` for transmitted light apatite image, lower number is shallower
+* `ReflStackFlat.jpg` for reflected light apatite image
+* `MicaStack-NN.jpg` for transmitted light reflected image, lower number is shallower
+* `MicaReflStackFlat.jpg` for reflected light apatite image
+* as above, but `.jpeg` instead of `.jpg`
+* as above, but `.png` instead of `.jpg` (for PNG image)
 
 #### TODO:
 

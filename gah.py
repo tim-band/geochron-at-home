@@ -304,7 +304,7 @@ def add_sample_subparser(subparsers):
     )
     create.add_argument(
         'priority',
-        help='Priority in showing the sample to the user',
+        help='Priority in showing the sample to the user (higher number means users will see it earlier)',
         default=0,
         type=int
     )
