@@ -1,6 +1,10 @@
 # Geochron@Home
 
-Copyright 2014 Jiangping He, geochron.home@gmail.com
+Copyright 2014-2022 Jiangping He (geochron.home@gmail.com)
+and Tim Band.
+
+This work was in part funded by the Natural Environment Research Council
+(grant number 09 NE/T001518/1 ("Beyond Isoplot")).
 
 ## Instructions not using Docker
 
@@ -23,7 +27,7 @@ variables when you enter your pipenv shell (see next section).
 
 ### Setting up a Python environment
 
-You can set up a pipenv to run Geochron@home like so (after installing Python 2.7):
+You can set up a pipenv to run Geochron@home like so (after installing Python 3):
 
 ```sh
 $ pip install pipenv
