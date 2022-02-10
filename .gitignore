@@ -5,5 +5,5 @@ production.env
 /user_upload/
 .vscode
 geckodriver.log
-/gah.config
+/*.config
 /db/

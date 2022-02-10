@@ -10,6 +10,11 @@ def get_image_index(f):
             return int(f[6:])
         except:
             return None
+    elif f[0:10] == 'reflstack-':
+        try:
+            return int(f[10:]) - 100
+        except:
+            return None
 
 img_ext = { '.png' : 'P', '.jpeg': 'J', '.jpg': 'J' }
 
