@@ -1,6 +1,7 @@
 {% extends "ftc/base.html" %}
 
 {% load static %}
+{% load order_by %}
 
 {% block head %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -103,7 +104,7 @@ function makeGrainMap() {
     var region_points = [
         //{% for region in object.region_set.all %}
         [
-            //{% for v in region.vertex_set.all %}
+            //{% for v in region.vertex_set.all|order_by:"id" %}
             [(image_height - {{v.y}}) / image_width, {{v.x}} / image_width],
             //{% endfor %}
         ],

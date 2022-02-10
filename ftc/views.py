@@ -309,12 +309,14 @@ def grain_update(request, pk):
             and ps[1].isnumeric()
             and ps[2].isnumeric()
             and ps[3] in ['x','y']):
-            if ps[1] not in regions:
-                regions[ps[1]] = {}
-            region = regions[ps[1]]
-            if ps[2] not in region:
-                region[ps[2]] = {}
-            vertex = region[ps[2]]
+            region_number = int(ps[1])
+            if region_number not in regions:
+                regions[region_number] = {}
+            region = regions[region_number]
+            vertex_number = int(ps[2])
+            if vertex_number not in region:
+                region[vertex_number] = {}
+            vertex = region[vertex_number]
             if ps[3] not in vertex:
                 vertex[ps[3]] = {}
             vertex[ps[3]] = v
@@ -329,7 +331,8 @@ def grain_update(request, pk):
             for _, v in sorted(vertices.items()):
                 x = float(v['x']) * w
                 y = h - float(v['y']) * w
-                Vertex(region=region, x=x, y=y).save()
+                vertex = Vertex(region=region, x=x, y=y)
+                vertex.save()
 
     return redirect('grain', pk=pk)
 
