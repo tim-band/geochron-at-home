@@ -12,7 +12,8 @@ from ftc.views import (home, signmeup, report, getTableData,
 from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
-    ImageListView, GrainListView, FissionTrackNumberingView)
+    ImageListView, GrainListView, FissionTrackNumberingView,
+    download_rois)
 
 urlpatterns = [
     path('', home, name='home'),
@@ -47,6 +48,7 @@ urlpatterns = [
     path('api/sample/<sample>/grain/', SampleGrainListView.as_view(), name='api_sample_grain_list'),
     path('api/grain/', GrainListView.as_view(), name='api_grain_list'),
     path('api/grain/<pk>/', GrainInfoView.as_view(), name='api_grain_info'),
+    path('api/grain/<pk>/rois/', download_rois, name='api_grain_rois'),
     path('api/grain/<grain>/image/', GrainImageListView.as_view(), name='api_grain_image_list'),
     path('api/image/', ImageListView.as_view(), name='api_image_list'),
     path('api/image/<pk>/', ImageInfoView.as_view(), name='api_image_info'),

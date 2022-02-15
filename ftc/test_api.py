@@ -302,10 +302,15 @@ class ApiGrainCreate(ApiTestMixin, TestCase):
         self.assertEqual(r.status_code, 403)
 
     def test_create_grain(self):
-        r = self.upload_rois(2, 'test/crystals/john/p1/s1/Grain01/rois.json', self.headers)
+        rois_path = 'test/crystals/john/p1/s1/Grain01/rois.json'
+        r = self.upload_rois(2, rois_path, self.headers)
         self.assertEqual(r.status_code, 201)
         j = json.loads(r.content)
         self.assertEqual(j['index'], 1)
+        rr = self.client.get('/ftc/api/grain/{0}/rois'.format(j['id']), **self.headers)
+        with open(rois_path) as rfh:
+            rois_expected = rfh.read()
+        self.assertJSONEqual(rois_expected, rr.content.decode(rr.charset))
 
     def test_superuser_can_create_grain_in_others_sample(self):
         r = self.upload_rois(1, 'test/crystals/john/p1/s1/Grain01/rois.json', self.super_headers)

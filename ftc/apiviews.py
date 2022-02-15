@@ -5,12 +5,13 @@ from rest_framework import exceptions
 import json
 from rest_framework import generics, serializers, status
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from ftc.get_image_size import get_image_size_from_handle
+from ftc.load_rois import get_rois
 from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering
 from ftc.parse_image_name import parse_image_name
 from ftc.save_rois_regions import save_rois_regions
@@ -190,6 +191,11 @@ class GrainInfoView(RetrieveUpdateDeleteView):
     def perform_update(self, serializer):
         serializer.do_update(self.request)
 
+@api_view()
+@permission_classes([IsAuthenticated])
+def download_rois(request, pk):
+    grain = Grain.objects.get(id=pk)
+    return Response(get_rois(grain))
 
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:

@@ -341,6 +341,15 @@ def grain_rois_upload(opts, config):
 
 
 @token_refresh
+def grain_rois_download(opts, config):
+    with api_get(config, 'grain', opts.id, 'rois') as response:
+        body = response.read()
+        v = json.loads(body)
+        indent = None if opts.compact else opts.indent
+        print(json.dumps(v, indent=indent), file=options.file)
+
+
+@token_refresh
 def grain_info(opts, config):
     with api_get(config, 'grain', opts.id) as response:
         body = response.read()
@@ -369,6 +378,26 @@ def add_grain_subparser(subparsers):
     info = verbs.add_parser('info', help='show information for a grain')
     info.set_defaults(func=grain_info)
     info.add_argument('id', help='grain ID', type=int)
+    rois = verbs.add_parser('rois', help='download a ROI file for a grain')
+    rois.set_defaults(func=grain_rois_download)
+    rois.add_argument('id', help='grain ID', type=int)
+    rois.add_argument(
+        '--file',
+        help='o,utput file (default standard out)',
+        type=argparse.FileType('w', encoding='utf-8'),
+        default=sys.stdout
+    )
+    rois.add_argument(
+        '--indent',
+        help='how many spaces to use as the indent (default 2)',
+        type=int,
+        default=2
+    )
+    rois.add_argument(
+        '--compact',
+        help='use compact representation',
+        action='store_true'
+    )
 
 
 @token_refresh

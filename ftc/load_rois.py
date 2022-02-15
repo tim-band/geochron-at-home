@@ -1,6 +1,6 @@
 import os
 import json
-from ftc.models import Grain
+from ftc.models import Grain, Region, Vertex
 
 def load_rois(project_name, sample_name, sample_property, grain_nth, ft_type):
     grains = Grain.objects.filter(
@@ -34,3 +34,30 @@ def load_rois(project_name, sample_name, sample_property, grain_nth, ft_type):
         else:
             rois.append(latlng)
     return rois
+
+def indent(spaces, text):
+    lines = text.split('\n')
+    return spaces + ('\n' + spaces).join(lines)
+
+def rois_vertex(vertex):
+    return [vertex.x, vertex.y]
+
+def rois_region(region):
+    vertices = Vertex.objects.filter(region=region).order_by('id')
+    return {
+        "shift": [region.shift_x, region.shift_y],
+        "vertices": map(rois_vertex, vertices)
+    }
+
+def get_rois(grain):
+    """
+    Returns a python object that represents ROIs (and other
+    metadata) about the Grain.
+    """
+    regions = Region.objects.filter(grain=grain)
+    rjs = map(rois_region, regions)
+    return {
+        "image_width": grain.image_width,
+        "image_height": grain.image_height,
+        "regions": rjs
+    }
