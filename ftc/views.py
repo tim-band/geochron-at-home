@@ -8,7 +8,8 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic import DetailView
 from django.urls import reverse
-from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.http import (HttpResponse, HttpResponseRedirect,
+    HttpResponseForbidden, HttpResponseNotFound)
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.shortcuts import redirect
@@ -475,7 +476,7 @@ def counting(request, uname=None):
 def updateTFNResult(request):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     sep = '~'
-    if request.is_ajax() and request.user.is_active:
+    if request.user.is_active:
         try:
             json_str = request.body.decode(encoding='UTF-8')
             json_obj = json.loads(json_str)
@@ -498,12 +499,12 @@ def updateTFNResult(request):
                 result=-1,
             ).delete()
         except (KeyError, Project.DoesNotExist):
-            return HttpResponse("you have no project currrently.")
+            return HttpResponseNotFound("you have no project currrently.")
         else:
             myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
             return HttpResponse(myjson, content_type='application/json')
     else:
-        return HttpResponse("Sorry, You have to active your account first.")
+        return HttpResponseForbidden("Sorry, You have to active your account first.")
 
 import sys
 import fnmatch

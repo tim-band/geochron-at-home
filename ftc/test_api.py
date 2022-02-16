@@ -307,7 +307,7 @@ class ApiGrainCreate(ApiTestMixin, TestCase):
         self.assertEqual(r.status_code, 201)
         j = json.loads(r.content)
         self.assertEqual(j['index'], 1)
-        rr = self.client.get('/ftc/api/grain/{0}/rois'.format(j['id']), **self.headers)
+        rr = self.client.get('/ftc/api/grain/{0}/rois/'.format(j['id']), **self.headers)
         with open(rois_path) as rfh:
             rois_expected = rfh.read()
         self.assertJSONEqual(rois_expected, rr.content.decode(rr.charset))
@@ -458,3 +458,36 @@ class ApiImageUpdate(ApiTestMixin, TestCase):
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content)
         self.assertEqual(j['grain'], 1)
+
+
+@tag('api')
+class ApiCount(TestCase):
+    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
+
+    def setUp(self):
+        self.latlngs = [
+            [0.1, 0.2],
+            [0.2,0.4],
+            [0.5,0.3]
+        ]
+        logged_in = self.client.login(username='counter', password='counter_password')
+        self.assertTrue(logged_in, 'failed to log in')
+        r = self.client.post('/ftc/updateTFNResult/', {
+            'counting_res': {
+                'track_num': len(self.latlngs),
+                'marker_latlngs': self.latlngs,
+                'proj_id': 1,
+                'sample_id': 1,
+                'grain_num': 1,
+                'ft_type': 'T'
+            }
+        }, content_type='application/json')
+        self.assertEqual(r.status_code, 200)
+        self.headers = log_in_headers(self.client, 'counter', 'counter_password')
+
+    def test_download_count(self):
+        r = self.client.get('/ftc/api/count/', {'all': True}, **self.headers)
+        j = json.loads(r.content.decode(r.charset))
+        jl = json.loads(j[0]['latlngs'])
+        self.assertListEqual(jl, self.latlngs)
+        self.assertEqual(j[0]['worker'], 103)
