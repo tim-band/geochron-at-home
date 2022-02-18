@@ -490,4 +490,4 @@ class ApiCount(TestCase):
         j = json.loads(r.content.decode(r.charset))
         jl = json.loads(j[0]['latlngs'])
         self.assertListEqual(jl, self.latlngs)
-        self.assertEqual(j[0]['worker'], 103)
+        self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'} ,j[0]['worker'])

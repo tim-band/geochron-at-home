@@ -527,15 +527,38 @@ def add_image_subparser(subparsers):
     delete.add_argument('id', help='Image ID to delete')
 
 
+def do_flatten(x, prefix, prefix_dot):
+    if type(x) is not dict:
+        yield (prefix, x)
+    else:
+        for (k,v) in x.items():
+            p = prefix_dot + k
+            yield from do_flatten(v, p, p + '.')
+
+
+def flatten(x):
+    yield from do_flatten(x, '', '')
+
+
+def find_cell(path, x):
+    for p in path:
+        if type(x) is dict and p in x:
+            x = x[p]
+        else:
+            return ''
+    return x
+
+
 def output_as_csv(xs):
     columns = {}
     for x in xs:
-        for k in x.keys():
+        for (k,v) in flatten(x):
             columns[k] = True
     cols = columns.keys()
     print(*cols, sep=',')
+    paths = [c.split('.') for c in cols]
     for x in xs:
-        row = map(lambda c: x.get(c, ''), cols)
+        row = [find_cell(p, x) for p in paths]
         print(*row, sep=',')
 
 

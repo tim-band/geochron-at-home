@@ -25,6 +25,7 @@
         "fields": {
             "username": "counter",
             "password": "pbkdf2_sha256$260000$RppJcFSTBrMq0XBQZWtJIE$5jWcDSaWr/2UbQsAf7vHnd2NPpcqt8HMByf/z4/+vwk=",
+            "email": "counter@uni.ac.uk",
             "is_staff": false,
             "is_superuser": false
         }

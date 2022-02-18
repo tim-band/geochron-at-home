@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.db.models import F
 from django.db.models.aggregates import Max
 from django.shortcuts import get_object_or_404
 from rest_framework import exceptions
@@ -270,6 +271,15 @@ class ImageInfoView(RetrieveUpdateDeleteView):
 
 
 class FissionTrackNumberingSerializer(serializers.ModelSerializer):
+    class UserRelatedField(serializers.RelatedField):
+        def to_representation(self, obj):
+            out = {}
+            for a in ['id', 'username', 'email']:
+                out[a] = getattr(obj, a)
+            return out
+
+    worker = UserRelatedField(read_only=True)
+
     class Meta:
         model = FissionTrackNumbering
         fields = ['id', 'in_sample', 'grain', 'ft_type',
