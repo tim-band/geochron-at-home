@@ -16,7 +16,16 @@ def sorted_rand(qeuryset):
     res.reverse()
     return res
 
-def genearate_working_grain_uinfo(request):
+def generate_working_grain_uinfo(request):
+    """
+    Markes as complete all samples for which the number of non-guest
+    completed results is at least the sample's minimum contributor number,
+    then closes all projects with no incomplete samples. It then chooses
+    the newest out of the highest priority unclosed projects (breaking
+    ties at random), and the highest priority uncompleted sample from that
+    project (breaking ties at random). This function needs a total
+    re-write.
+    """
     all_closed = False
     grain_uinfo = {}
     num_loop = 0

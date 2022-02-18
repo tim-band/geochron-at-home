@@ -343,7 +343,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 
 @login_required
 def getTableData(request):
-    if request.is_ajax() and request.user.is_active and request.user.is_staff:
+    if request.user.is_active and request.user.is_staff:
         try:
             # http://owtrsnc.blogspot.co.uk/2013/12/sending-ajax-data-json-to-django.html
             # http://jonblack.org/2012/06/22/django-ajax-class-based-views/
@@ -376,7 +376,7 @@ from django.templatetags.static import static
 
 from .get_img_list_of_grain  import get_grain_images_list
 from .get_image_size import get_image_size, UnknownImageFormat
-from .grain_uinfo import genearate_working_grain_uinfo, restore_grain_uinfo
+from .grain_uinfo import generate_working_grain_uinfo, restore_grain_uinfo
 from .load_rois import load_rois
 
 @login_required
@@ -388,11 +388,11 @@ def get_image(request, pk):
 @login_required
 def get_grain_images(request):
     res = {}
-    if request.is_ajax() and request.user.is_active:
+    if request.user.is_active:
         uname = request.user.username
         grain_uinfo, ftn = restore_grain_uinfo(uname)
         if len(grain_uinfo) == 0:
-            grain_uinfo = genearate_working_grain_uinfo(request)
+            grain_uinfo = generate_working_grain_uinfo(request)
         else:
             res['num_markers']  = grain_uinfo['num_markers']
             res['marker_latlngs'] = grain_uinfo['marker_latlngs']
@@ -510,7 +510,7 @@ import sys
 import fnmatch
 @login_required
 def saveWorkingGrain(request):
-    if request.is_ajax() and request.user.is_active:
+    if request.user.is_active:
         with transaction.atomic():
             user = User.objects.get(username=request.user.username)
             # Remove any previous partial save state

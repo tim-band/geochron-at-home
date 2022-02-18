@@ -147,9 +147,9 @@ var saveWorkingGrain_url = "{% url 'saveWorkingGrain'%}";
     <span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
   </button>
   <ul class="dropdown-menu">
-      {% ifnotequal user.username "guest"  %}
+      {% if user.username != "guest"  %}
       <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>&nbsp;save intermediate result</a></li>
-      {% endifnotequal %}
+      {% endif %}
     <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>&nbsp;submit result</a></li>
     <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>&nbsp;restart counting</a></li>
   </ul>
