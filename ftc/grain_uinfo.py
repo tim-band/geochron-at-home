@@ -1,4 +1,6 @@
-from ftc.models import Project, Sample, FissionTrackNumbering
+from django.db.models import Count, Exists, F, OuterRef, Subquery
+
+from ftc.models import Project, Sample, Grain, FissionTrackNumbering
 import os, random, itertools, json
 
 def sorted_rand_T(qeuryset):
@@ -18,74 +20,48 @@ def sorted_rand(qeuryset):
 
 def generate_working_grain_uinfo(request):
     """
-    Markes as complete all samples for which the number of non-guest
-    completed results is at least the sample's minimum contributor number,
-    then closes all projects with no incomplete samples. It then chooses
-    the newest out of the highest priority unclosed projects (breaking
-    ties at random), and the highest priority uncompleted sample from that
-    project (breaking ties at random). This function needs a total
-    re-write.
+    Chooses from the highest priority unclosed projects (breaking ties
+    at random), and the highest priority uncompleted sample from that
+    project (breaking ties at random).
     """
-    all_closed = False
-    grain_uinfo = {}
-    num_loop = 0
-    # num_loop: 0 => sample close; 1 => project close; 2 => all closed
-    #min_contributors_per_grain = 1    
-    for num_loop in range(3):
-        projs = Project.objects.filter(closed=False)
-        for the_project in sorted_rand_T(projs):  # changed jhe 2014-10-26
-            samples = the_project.sample_set.filter(completed=False).exclude(sample_property='D')
-            if len(samples) == 0:
-                # update project state to closed
-                the_project.closed = True
-                the_project.save()
-                continue #for next project
-            else:
-                for the_sample in sorted_rand(samples):  # changed jhe 2014-10-26
-                    all_grains = set()
-                    user_finished_grains = set() #a
-                    for g in the_sample.grain_set.values('index').iterator():
-                        all_grains.add((g['index'], 'S')) # Spontaneous
-                    # find existing results
-                    grains = the_sample.fissiontracknumbering_set.exclude(
-                        result=-1 # partial results excluded
-                    ).exclude(
-                        worker__username='guest' # guest results excluded
-                    )
-                    g_count = dict()
-                    for g in grains:
-                        key = (g.grain, g.ft_type)
-                        if key in g_count:
-                            g_count[key] += 1
-                        else:
-                            g_count[key] = 1
-                        if g.worker == request.user: #a
-                            user_finished_grains.add(key) #a
-                    for k, v in g_count.items():
-                        #min_contributors_per_grain: jhe add on 2017-12-11, guest exceptional
-                        if v >= the_sample.min_contributor_num and request.user.username != 'guest': 
-                            all_grains.remove(k)
-                    if len(all_grains) == 0:
-                        # update sample to completed state
-                        the_sample.completed = True
-                        the_sample.save()
-                        continue #for next sample
-                    # jhe add on 2017-12-11, guest exceptional
-                    if request.user.username == 'guest':
-                        remain_grains = all_grains
-                    else:
-                        remain_grains = all_grains.difference(user_finished_grains) #a
-                    if len(remain_grains) > 0: #a
-                        the_grain, ft_type = random.sample(remain_grains, 1)[0]
-                        grain_uinfo['project'] = the_project
-                        grain_uinfo['sample'] = the_sample
-                        grain_uinfo['grain_index'] = the_grain
-                        grain_uinfo['ft_type'] = ft_type
-                        return grain_uinfo
-            #out of project and has no grain found
-    #end num_loop loop
-    # if still len(projs) > 0, means this user has nothing left, but not all project closed
-    return grain_uinfo
+    # Result objects not produced by guests
+    count_backrefs = Subquery(FissionTrackNumbering.objects.filter(
+        in_sample=OuterRef('sample'),
+        grain=OuterRef('index')
+    ).exclude(
+        worker__username='guest'
+    ).values('id'))
+    # Result objects produced by this user
+    count_backref_user = Subquery(FissionTrackNumbering.objects.filter(
+        worker=request.user,
+        in_sample=OuterRef('sample'),
+        grain=OuterRef('index')
+    ).values('id'))
+    # Grains without results from this user, and with more results needed
+    # Ordered by priority of project then priority of sample
+    # A random one of these top priority samples will be first
+    grain = Grain.objects.annotate(
+        counts=Count(count_backrefs)
+    ).annotate(
+        done=Exists(count_backref_user)
+    ).filter(
+        done=False,
+        sample__in_project__closed=False,
+        sample__completed=False,
+        sample__min_contributor_num__gte=F('counts')
+    ).order_by(
+        '-sample__in_project__priority',
+        '-sample__priority',
+        '?'
+    ).first()
+    if grain == None:
+        return {}
+    return {
+        'project': grain.sample.in_project,
+        'sample': grain.sample,
+        'grain_index': grain.index,
+        'ft_type': 'S' # should be grain.sample.sample_property
+    }
 
 def restore_grain_uinfo(username):
     grain_uinfo = {}
