@@ -376,7 +376,7 @@ from django.templatetags.static import static
 
 from .get_img_list_of_grain  import get_grain_images_list
 from .get_image_size import get_image_size, UnknownImageFormat
-from .grain_uinfo import generate_working_grain_uinfo, restore_grain_uinfo
+from .grain_uinfo import choose_working_grain, restore_grain_uinfo
 from .load_rois import load_rois
 
 @login_required
@@ -388,60 +388,78 @@ def get_image(request, pk):
 @login_required
 def get_grain_images(request):
     res = {}
+    grain = None
     if request.user.is_active:
-        uname = request.user.username
-        grain_uinfo, ftn = restore_grain_uinfo(uname)
-        if len(grain_uinfo) == 0:
-            grain_uinfo = generate_working_grain_uinfo(request)
-        else:
-            res['num_markers']  = grain_uinfo['num_markers']
-            res['marker_latlngs'] = grain_uinfo['marker_latlngs']
-        if len(grain_uinfo) !=0:
-            the_project = grain_uinfo['project']
-            the_sample = grain_uinfo['sample']
-            the_grain = grain_uinfo['grain_index']
-            ft_type = grain_uinfo['ft_type']
-            if the_grain is None:
-                the_grain = -1
-            images_list = get_grain_images_list(the_project.project_name, the_sample.sample_name, \
-                                                the_sample.sample_property, the_grain, ft_type)
-            if (len(images_list) > 0):
-                rois = load_rois(the_project.project_name, the_sample.sample_name, \
-                                                the_sample.sample_property, the_grain, ft_type)
-            else:
-                rois = None
-            if (len(images_list) > 0) and (rois is not None):
-                try:
-                    gs = Grain.objects.filter(index=the_grain,
-                        sample__sample_name=the_sample.sample_name,
-                        sample__in_project__project_name=the_project.project_name)
-                    width = gs[0].image_width
-                    height = gs[0].image_height
-                except UnknownImageFormat:
-                    width, height = 1, 1 
-                res['proj_id'] = the_project.id
-                res['sample_id'] = the_sample.id
-                res['grain_num'] = the_grain
-                res['ft_type'] = ft_type
-                res['image_width'] = width
-                res['image_height'] = height
-                res['images'] = images_list
-                res['rois'] = rois
-                myjson = json.dumps(res, cls=DjangoJSONEncoder)
-                return HttpResponse(myjson, content_type='application/json')
-            else:
-                # report error: cannot find images for grain
-                if ftn is not None:
-                    ftn.delete()
-                error_str = "[Project: %s, Sample: %s, Grain #: %d, FT_type: %s] has no images or has no ROIs\n" \
-                          % (the_project.project_name, the_sample.sample_name, the_grain, ft_type) \
-                          + "Refresh page to load another Grain."
-                myjson = json.dumps({'reply' : 'error: ' + error_str}, cls=DjangoJSONEncoder)
-                return HttpResponse(myjson, content_type='application/json')                
-        else:
-            message = 'Well done! You did all your jobs and take a break.'
-            myjson = json.dumps({'reply' : message}, cls=DjangoJSONEncoder)
-            return HttpResponse(myjson, content_type='application/json')
+        partial_save = FissionTrackNumbering.objects.filter(
+            result=-1,
+            worker=request.user
+        ).first()
+        if partial_save != None:
+            grain = Grain.objects.filter(
+                sample=partial_save.in_sample,
+                index=partial_save.grain
+            ).first()
+    if grain == None:
+        grain = choose_working_grain(request)
+    if grain != None:
+        return HttpResponseRedirect(reverse('get_grain_image', args=[grain.pk]))
+    message = 'Well done! You did all your jobs and take a break.'
+    myjson = json.dumps({'reply' : message}, cls=DjangoJSONEncoder)
+    return HttpResponse(myjson, content_type='application/json')
+
+@login_required
+def get_grain_image(request, pk):
+    grain = Grain.objects.get(pk=pk)
+    save = FissionTrackNumbering.objects.filter(
+        worker=request.user,
+        grain=grain.index,
+        in_sample=grain.sample
+    ).order_by('result').first()
+    the_project = grain.sample.in_project
+    the_sample = grain.sample
+    the_grain = grain.index
+    ft_type = 'S' # should be grain.sample.sample_property
+    images_list = get_grain_images_list(
+        the_project.project_name,
+        the_sample.sample_name,
+        the_sample.sample_property,
+        the_grain,
+        ft_type
+    )
+    if (len(images_list) > 0):
+        rois = load_rois(the_project.project_name, the_sample.sample_name, \
+                                        the_sample.sample_property, the_grain, ft_type)
+    else:
+        rois = None
+    res = {}
+    if (len(images_list) > 0) and (rois is not None):
+        try:
+            gs = Grain.objects.filter(index=the_grain,
+                sample__sample_name=the_sample.sample_name,
+                sample__in_project__project_name=the_project.project_name)
+            width = gs[0].image_width
+            height = gs[0].image_height
+        except UnknownImageFormat:
+            width, height = 1, 1 
+        res['proj_id'] = the_project.id
+        res['sample_id'] = the_sample.id
+        res['grain_num'] = the_grain
+        res['ft_type'] = ft_type
+        res['image_width'] = width
+        res['image_height'] = height
+        res['images'] = images_list
+        res['rois'] = rois
+        myjson = json.dumps(res, cls=DjangoJSONEncoder)
+        return HttpResponse(myjson, content_type='application/json')
+    else:
+        # report error: cannot find images for grain
+        if ftn is not None:
+            ftn.delete()
+        error_str = "[Project: %s, Sample: %s, Grain #: %d, FT_type: %s] has no images or has no ROIs\n" \
+                  % (the_project.project_name, the_sample.sample_name, the_grain, ft_type) \
+                  + "Refresh page to load another Grain."
+        myjson = json.dumps({'reply' : 'error: ' + error_str}, cls=DjangoJSONEncoder)
+        return HttpResponse(myjson, content_type='application/json')                
 
 
 from django.contrib.auth.models import User

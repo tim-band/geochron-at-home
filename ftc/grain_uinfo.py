@@ -18,7 +18,7 @@ def sorted_rand(qeuryset):
     res.reverse()
     return res
 
-def generate_working_grain_uinfo(request):
+def choose_working_grain(request):
     """
     Chooses from the highest priority unclosed projects (breaking ties
     at random), and the highest priority uncompleted sample from that
@@ -40,7 +40,7 @@ def generate_working_grain_uinfo(request):
     # Grains without results from this user, and with more results needed
     # Ordered by priority of project then priority of sample
     # A random one of these top priority samples will be first
-    grain = Grain.objects.annotate(
+    return Grain.objects.annotate(
         counts=Count(count_backrefs)
     ).annotate(
         done=Exists(count_backref_user)
@@ -54,14 +54,6 @@ def generate_working_grain_uinfo(request):
         '-sample__priority',
         '?'
     ).first()
-    if grain == None:
-        return {}
-    return {
-        'project': grain.sample.in_project,
-        'sample': grain.sample,
-        'grain_index': grain.index,
-        'ft_type': 'S' # should be grain.sample.sample_property
-    }
 
 def restore_grain_uinfo(username):
     grain_uinfo = {}
