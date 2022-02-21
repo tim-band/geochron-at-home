@@ -3,12 +3,12 @@ from django.urls import path
 from rest_framework_simplejwt import views as jwt_views
 
 from ftc.views import (home, signmeup, report, getTableData,
-    get_grain_images, updateTFNResult, counting, saveWorkingGrain,
+    count_grain, updateTFNResult, counting, saveWorkingGrain,
     get_image, projects, ProjectCreateView,
     ProjectDetailView, ProjectUpdateView,
     SampleDetailView, SampleUpdateView, SampleCreateView,
     GrainDetailView, GrainCreateView, grain_update,
-    tutorial, saveTutorialResult, get_grain_image)
+    tutorial, saveTutorialResult)
 from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
@@ -30,11 +30,10 @@ urlpatterns = [
     path('projects/', projects, name='projects'),
     path('create_project/', ProjectCreateView.as_view(), name='project_create'),
     path('getTableData/', getTableData, name='getTableData'),
-    path('get_grain_images/', get_grain_images, name='get_grain_images'),
-    path('get_grain_images/<pk>/', get_grain_image, name='get_grain_image'),
     path('updateTFNResult/', updateTFNResult, name='updateTFNResult'),
     path('counting/guest/', counting, name='guest_counting', kwargs={ 'uname': 'guest' }),
     path('counting/', counting, name='counting'),
+    path('count/<pk>/', count_grain, name='count'),
     path('saveWorkingGrain/', saveWorkingGrain, name='saveWorkingGrain'),
     path('image/<pk>/', get_image, name="get_image"),
     path('tutorial/', tutorial, name='tutorial'),

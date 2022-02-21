@@ -105,9 +105,10 @@ font: bold 1.2cm/1.5 'Lucida Console', Monaco, monospace;
 var iconUrl_normal = "{% static 'counting/images/circle.png' %}";
 var iconUrl_selected = "{% static 'counting/images/redCircle.png' %}";
 var atoken = '{{ csrf_token }}';
-var get_grain_images_url = "{% url 'get_grain_images'%}";
+var grain_info = JSON.parse('{{ grain_info|escapejs }}')
 var updateTFNResult_url = "{% url 'updateTFNResult'%}";
 var saveWorkingGrain_url = "{% url 'saveWorkingGrain'%}";
+var getNewGrain_url = "{% url 'counting' %}"
 </script>
 <script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 {% endblock %}

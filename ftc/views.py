@@ -13,11 +13,14 @@ from django.http import (HttpResponse, HttpResponseRedirect,
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.shortcuts import redirect
+
 from ftc.parse_image_name import parse_image_name
 from ftc.get_image_size import get_image_size_from_handle
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
+
 import base64
 import io
+import json
 
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex)
@@ -385,8 +388,7 @@ def get_image(request, pk):
     mime = image.format = 'P' and 'image/png' or 'image/jpeg'
     return HttpResponse(image.data, content_type=mime)
 
-@login_required
-def get_grain_images(request):
+def redirect_to_count(request):
     res = {}
     grain = None
     if request.user.is_active:
@@ -402,13 +404,15 @@ def get_grain_images(request):
     if grain == None:
         grain = choose_working_grain(request)
     if grain != None:
-        return HttpResponseRedirect(reverse('get_grain_image', args=[grain.pk]))
-    message = 'Well done! You did all your jobs and take a break.'
-    myjson = json.dumps({'reply' : message}, cls=DjangoJSONEncoder)
-    return HttpResponse(myjson, content_type='application/json')
+        return HttpResponseRedirect(reverse('count', args=[grain.pk]))
+    return HttpResponseRedirect(reverse('count', args=['done']))
 
-@login_required
-def get_grain_image(request, pk):
+def get_grain_info(request, pk):
+    if pk == 'done':
+        return {
+            'grain_info': 'null',
+            'messages': ['All grains complete, congratulations!']
+        }
     grain = Grain.objects.get(pk=pk)
     save = FissionTrackNumbering.objects.filter(
         worker=request.user,
@@ -426,40 +430,51 @@ def get_grain_image(request, pk):
         the_grain,
         ft_type
     )
-    if (len(images_list) > 0):
-        rois = load_rois(the_project.project_name, the_sample.sample_name, \
-                                        the_sample.sample_property, the_grain, ft_type)
-    else:
-        rois = None
-    res = {}
-    if (len(images_list) > 0) and (rois is not None):
-        try:
-            gs = Grain.objects.filter(index=the_grain,
-                sample__sample_name=the_sample.sample_name,
-                sample__in_project__project_name=the_project.project_name)
-            width = gs[0].image_width
-            height = gs[0].image_height
-        except UnknownImageFormat:
-            width, height = 1, 1 
-        res['proj_id'] = the_project.id
-        res['sample_id'] = the_sample.id
-        res['grain_num'] = the_grain
-        res['ft_type'] = ft_type
-        res['image_width'] = width
-        res['image_height'] = height
-        res['images'] = images_list
-        res['rois'] = rois
-        myjson = json.dumps(res, cls=DjangoJSONEncoder)
-        return HttpResponse(myjson, content_type='application/json')
-    else:
-        # report error: cannot find images for grain
-        if ftn is not None:
-            ftn.delete()
-        error_str = "[Project: %s, Sample: %s, Grain #: %d, FT_type: %s] has no images or has no ROIs\n" \
-                  % (the_project.project_name, the_sample.sample_name, the_grain, ft_type) \
-                  + "Refresh page to load another Grain."
-        myjson = json.dumps({'reply' : 'error: ' + error_str}, cls=DjangoJSONEncoder)
-        return HttpResponse(myjson, content_type='application/json')                
+    rois = None
+    if len(images_list) > 0:
+        rois = load_rois(
+            the_project.project_name,
+            the_sample.sample_name,
+            the_sample.sample_property,
+            the_grain,
+            ft_type
+        )
+    if rois is None:
+        return {
+            'grain_info': 'null',
+            'messages': [
+                "[Project: {0}, Sample: {1}, Grain #: {2}, FT_type: {3}] has no images or has no ROIs\n".format(
+                        the_project.project_name, the_sample.sample_name, the_grain, ft_type
+                ) + "Refresh page to load another Grain."]
+        }
+    try:
+        gs = Grain.objects.filter(index=the_grain,
+            sample__sample_name=the_sample.sample_name,
+            sample__in_project__project_name=the_project.project_name)
+        width = gs[0].image_width
+        height = gs[0].image_height
+    except UnknownImageFormat:
+        width, height = 1, 1
+    info = {
+        'proj_id': the_project.id,
+        'sample_id': the_sample.id,
+        'grain_num': the_grain,
+        'ft_type': ft_type,
+        'image_width': width,
+        'image_height': height,
+        'images': images_list,
+        'rois': rois
+    }
+    if save:
+        latlngs = json.loads(save.latlngs)
+        info['marker_latlngs'] = latlngs
+        info['num_markers'] = len(latlngs)
+    return { 'grain_info': json.dumps(info), 'messages': [] }
+
+
+@login_required
+def count_grain(request, pk):
+    return render(request, 'ftc/counting.html', get_grain_info(request, pk))
 
 
 from django.contrib.auth.models import User
@@ -474,7 +489,7 @@ def tutorialCompleted(request):
 def counting(request, uname=None):
     if request.user.is_authenticated:
         if tutorialCompleted(request):
-            return render(request, 'ftc/counting.html', {})
+            return redirect_to_count(request)
         return render(request, 'ftc/profile.html', {
             'tutorial_completed': False
         })
@@ -513,6 +528,8 @@ def updateTFNResult(request):
             project = Project.objects.get(id=res_dic['proj_id'])
             # Remove any partial save state
             FissionTrackNumbering.objects.filter(
+                in_sample=sample,
+                grain=res_dic['grain_num'],
                 worker=user,
                 result=-1,
             ).delete()
@@ -531,15 +548,18 @@ def saveWorkingGrain(request):
     if request.user.is_active:
         with transaction.atomic():
             user = User.objects.get(username=request.user.username)
-            # Remove any previous partial save state
-            FissionTrackNumbering.objects.filter(
-                worker=user,
-                result=-1,
-            ).delete()
             json_str = request.body.decode(encoding='UTF-8')
             res_json = json.loads(json_str)
             res = res_json['intermedia_res']
             sample = Sample.objects.get(id=res['sample_id'])
+            # Remove any previous partial save state
+            FissionTrackNumbering.objects.filter(
+                in_sample=sample,
+                grain=res['grain_num'],
+                worker=user,
+                result=-1,
+            ).delete()
+            # Save the new state
             ftn = FissionTrackNumbering(
                 in_sample=sample,
                 grain=res['grain_num'],

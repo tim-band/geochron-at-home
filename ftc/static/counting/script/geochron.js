@@ -1,6 +1,10 @@
 /* geochron v0.1 (c) 2014 Jiangping He */
 $(window).load(function() {
 
+    if (!grain_info) {
+        return;
+    }
+
     var ftc_res = {};
     var overlayerImgUrl;
     var sliderNum;
@@ -372,83 +376,57 @@ $(window).load(function() {
         ev.stopPropagation();
     };
 
-    /**************************
-     *  map load image layers *
-     **************************/
     $.ajaxSetup({
         beforeSend: function(xhr, settings) {
             xhr.setRequestHeader('X-CSRFToken', atoken);
         }
     });
 
-    $.ajax({
-        url: get_grain_images_url,
-        type: 'POST',
-        dataType: 'json',
-        //data: JSON.stringify({ client_response: selectedKeys,}),
-        success: function(result) {
-            if ("reply" in result) {
-                alert(result.reply);
-            } else {
-                ftc_res['proj_id'] = result.proj_id;
-                ftc_res['sample_id'] = result.sample_id;
-                ftc_res['grain_num'] = result.grain_num;
-                ftc_res['ft_type'] = result.ft_type;
-                ftc_res['image_width'] = result.image_width;
-                ftc_res['image_height'] = result.image_height;
-                console.log(result.proj_id + ', ' + result.sample_id + ', ' + result.grain_num + ', ' + result.ft_type);
-                var yox = result.image_height / result.image_width;
-                imageBounds[1] = [yox, 1.0];
-                mapView = [yox / 2, 0.5];
-                overlayerImgUrl = result.images;
-                sliderNum = overlayerImgUrl.length;
-                sliders2.updateOptions({
-                    range: {
-                        'min': 0,
-                        'max': sliderNum - 1
-                    }
-                }, true);
-                for (var i = 0; i < sliderNum; i++) {
-                    imageOverlayers[i] = new L.imageOverlay(overlayerImgUrl[i], imageBounds).addTo(map);
-                }
-                imageOverlayers[0].bringToFront();
-                if (('num_markers' in result) && ('marker_latlngs' in result)) {
-                    var latlng;
-                    for (var i = 0; i < result.num_markers; i++) {
-                        latlng = result.marker_latlngs[i];
-                        createMarker(latlng);
-                    }
-                }
-                polygon_arrays = result.rois;
-                for (var i = 0; i < polygon_arrays.length; i++) {
-                    polygon_array = polygon_arrays[i]
-                    var polygon = L.polygon(polygon_array, {
-                        color: 'white',
-                        opacity: 1.0,
-                        fill: false,
-                        clickable: true,
-                        className: 'ftc-rect-select-area'
-                    }).on('click', function(e) {
-                        L.DomEvent.preventDefault(e);
-                        L.DomEvent.stopPropagation(e);
-                    }).addTo(map);
-                }
-                map.setView(mapView, mapZoom);
-            }
-        },
-        error: function(xhr, errmsg, err) {
-            console.log(xhr.status + ": " + xhr.responseText);
-            /* keep this block **** open a new web page for sign in *
-            var doc=document.open("text/html", "replace");
-            doc.write("<html><head><title>Log in | Geochron@home</title></head><body>");
-            doc.write("<div style='width: 50%; margin: 0 auto;'>");
-            doc.write('<h2 id="site-name">Geochron@home</h2>');
-            doc.write(xhr.responseText);
-            doc.write("</div></body></html>");
-            doc.close();
-            */
+    ftc_res['proj_id'] = grain_info.proj_id;
+    ftc_res['sample_id'] = grain_info.sample_id;
+    ftc_res['grain_num'] = grain_info.grain_num;
+    ftc_res['ft_type'] = grain_info.ft_type;
+    ftc_res['image_width'] = grain_info.image_width;
+    ftc_res['image_height'] = grain_info.image_height;
+    console.log(grain_info.proj_id + ', ' + grain_info.sample_id + ', ' + grain_info.grain_num + ', ' + grain_info.ft_type);
+    var yox = grain_info.image_height / grain_info.image_width;
+    imageBounds[1] = [yox, 1.0];
+    mapView = [yox / 2, 0.5];
+    overlayerImgUrl = grain_info.images;
+    sliderNum = overlayerImgUrl.length;
+    sliders2.updateOptions({
+        range: {
+            'min': 0,
+            'max': sliderNum - 1
         }
-    });
+    }, true);
+    for (var i = 0; i < sliderNum; i++) {
+        imageOverlayers[i] = new L.imageOverlay(overlayerImgUrl[i], imageBounds).addTo(map);
+    }
+    imageOverlayers[0].bringToFront();
+    if (('num_markers' in grain_info) && ('marker_latlngs' in grain_info)) {
+        var latlng;
+        for (var i = 0; i < grain_info.num_markers; i++) {
+            latlng = grain_info.marker_latlngs[i];
+            createMarker(latlng);
+        }
+    }
+    polygon_arrays = grain_info.rois;
+    for (var i = 0; i < polygon_arrays.length; i++) {
+        polygon_array = polygon_arrays[i]
+        L.polygon(polygon_array, {
+            color: 'white',
+            opacity: 1.0,
+            fill: false,
+            clickable: true,
+            className: 'ftc-rect-select-area'
+        }).on('click', function(e) {
+            L.DomEvent.preventDefault(e);
+            L.DomEvent.stopPropagation(e);
+        }).addTo(map);
+    }
+    map.setView(mapView, mapZoom);
+
     /* submit result */
     $('#tracknum-submit').click(function() {
         if (confirm("submit the result?") == true) {
@@ -472,7 +450,7 @@ $(window).load(function() {
                 success: function(result) {
                     console.log('submitted: ' + result.reply);
                     ftc_res = {};
-                    window.location.reload(true);
+                    window.location.href = getNewGrain_url;
                 },
                 error: function(xhr, errmsg, err) {
                     console.log(xhr.status + ": " + xhr.responseText);
@@ -484,7 +462,7 @@ $(window).load(function() {
     });
 
     $('#tracknum-save').click(function() {
-        if (confirm("Keep the intermedia result to the server?") == true) {
+        if (confirm("Save the intermedia result to the server?") == true) {
             latlngs = new Array();
             var j = 0;
             for (var i in markers) {
