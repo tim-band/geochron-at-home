@@ -63,7 +63,7 @@ $(window).load(function() {
             tipText: 'undo',
             className_a: 'leaflet-disabled',
             action: function() {
-                /*alert('hello! undo');*/
+                undo();
             }
         },
         'redo': {
@@ -71,7 +71,7 @@ $(window).load(function() {
             tipText: 'redo',
             className_a: 'leaflet-disabled',
             action: function() {
-                /*alert('hello! redo');*/
+                redo();
             }
         },
         'select': {
@@ -86,7 +86,7 @@ $(window).load(function() {
                     map.on('click', drawRectangle);
                 } else {
                     //
-                    for (i = trash_mks_in.length - 1; i >= 0; i--) {
+                    for (var i in trash_mks_in) {
                         indx = trash_mks_in[i]
                         markers[indx].setIcon(normalIcon);
                     }
@@ -105,42 +105,92 @@ $(window).load(function() {
         }
     };
 
+    var undoStack = [];
+    var redoStack = [];
+    function execute(fromStack, toStack) {
+        if (fromStack.length) {
+            var f = fromStack.pop();
+            toStack.push(f());
+        }
+    }
+    function updateStackButton(stack, id) {
+        if (stack.length) {
+            L.DomUtil.removeClass(L.DomUtil.get(id), 'leaflet-disabled');
+        } else {
+            L.DomUtil.addClass(L.DomUtil.get(id), 'leaflet-disabled');
+        }
+    }
+    function updateUndoRedoButtons() {
+        updateStackButton(undoStack, 'ftc-btn-undo');
+        updateStackButton(redoStack, 'ftc-btn-redo');
+    }
+    function redo() {
+        execute(redoStack, undoStack);
+        updateUndoRedoButtons();
+    }
+    function undo() {
+        execute(undoStack, redoStack);
+        updateUndoRedoButtons();
+    }
+    function withUndo(f) {
+        undoStack.push(f);
+        redoStack = [];
+        updateUndoRedoButtons();
+    }
+    function updateTrackCounter() {
+        $('#tracknum').val((1000 + track_num).toString().slice(1));
+    }
+    function addToMap(markersToAdd) {
+        for (var k in markersToAdd) {
+            mk = markersToAdd[k];
+            mk.setIcon(normalIcon);
+            mk.addTo(map);
+            markers[k] = mk;
+            track_num = track_num + 1;
+        }
+        updateTrackCounter();
+        return function() { return removeFromMap(markersToAdd); }
+    }
+    function removeFromMap(markersToRemove) {
+        for (var k in markersToRemove) {
+            map.removeLayer(markersToRemove[k]);
+            delete markers[k];
+            track_num = track_num - 1;
+        }
+        updateTrackCounter();
+        return function() { return addToMap(markersToRemove); }
+    }
+
     var getObjectSize = function(obj) {
-        var len = 0,
-            key;
-        for (key in obj) {
+        var len = 0;
+        for (var key in obj) {
             if (obj.hasOwnProperty(key)) len++;
         }
         return len;
     };
     //==========================
     function createMarker(latlng) {
-        track_num = track_num + 1;
-        $('#tracknum').val((1000 + track_num).toString().slice(1));
         var mk = new L.marker(latlng, {
-                icon: normalIcon,
-                riseOnHover: true,
-                className: 'jhe-fissionTrack-' + track_id
-            })
-            .on('click', function(e) {
-                //console.log("click");
-                //need this to prevent event propagation
-            })
-            .addTo(map);
-        markers[track_id] = mk;
+            icon: normalIcon,
+            riseOnHover: true,
+            className: 'jhe-fissionTrack-' + track_id
+        }).on('click', function(e) {
+            //console.log("click");
+            //need this to prevent event propagation
+        });
+        var mks = {};
+        mks[track_id] = mk;
+        withUndo(addToMap(mks));
         track_id++;
     };
 
     function onMapClick(e) {
         L.DomEvent.preventDefault(e);
         L.DomEvent.stopPropagation(e);
-        //e.originalEvent.ctrlKey
-        var p = e.latlng.toString();
         var pinp = false
         for (var i = 0; i < polygon_arrays.length; i++) {
             pinp = pinp || point_in_polygon([e.latlng.lat, e.latlng.lng],  polygon_arrays[i])
         }
-        //console.log(e.latlng + ': ' + pinp);
         if (pinp) {
             createMarker(e.latlng);
         }
@@ -149,14 +199,12 @@ $(window).load(function() {
     function deleteSelected(e) {
         if (!($.isEmptyObject(e.currentTarget))) {
             if (e.currentTarget.id == "ftc-btn-delete" && trash_mks_in.length > 0) {
-                for (i = trash_mks_in.length - 1; i >= 0; i--) {
+                var mks = {};
+                for (var i in trash_mks_in) {
                     indx = trash_mks_in[i]
-                    map.removeLayer(markers[indx]);
-                    delete markers[indx];
-                    track_num = track_num - 1;
+                    mks[indx] = markers[indx];
                 }
-                $('#tracknum').val((1000 + track_num).toString().slice(1));
-                console.log('after delete, marker #: ' + getObjectSize(markers));
+                withUndo(removeFromMap(mks));
                 trash_mks_in = [];
             }
         }
@@ -182,8 +230,8 @@ $(window).load(function() {
         //map.off('click', 'drawRectangle');
         //map.dragging.enable();
         map._container.style.cursor = 'crosshair';
-        j = 0;
-        for (i in markers) {
+        var j = 0;
+        for (var i in markers) {
             latlon = markers[i].getLatLng();
             if (bounds.contains(latlon)) {
                 trash_mks_in[j] = i;
@@ -231,7 +279,7 @@ $(window).load(function() {
         } else if (numClick == 2) {
             setTwoCorner(e);
         } else if (numClick == 3) {
-            for (i = trash_mks_in.length - 1; i >= 0; i--) {
+            for (var i in trash_mks_in) {
                 indx = trash_mks_in[i]
                 markers[indx].setIcon(normalIcon);
             }
@@ -426,6 +474,7 @@ $(window).load(function() {
         }).addTo(map);
     }
     map.setView(mapView, mapZoom);
+    updateTrackCounter();
 
     /* submit result */
     $('#tracknum-submit').click(function() {
@@ -514,7 +563,5 @@ $(window).load(function() {
             map.setView(mapView, mapZoom);
         }
     });
-
-    // end  
 })
 
