@@ -78,11 +78,11 @@ $(window).load(function() {
             icon: 'fa-pencil-square-o',
             tipText: 'click twice to draw a rectangle and select multiple markers',
             action: function(e) {
-                if (L.DomUtil.get($('#ftc-btn-select')).css('background-color')!='rgb(219, 219, 219)') {
+                if (L.DomUtil.get('ftc-btn-select').css('background-color')!='rgb(219, 219, 219)') {
                     //map.dragging.disable();
                     map.off('click', checkClick);
                     map._container.style.cursor = 'crosshair';
-                    L.DomUtil.get($('#ftc-btn-select')).css('background-color', '#dbdbdb');
+                    L.DomUtil.get('ftc-btn-select').css('background-color', '#dbdbdb');
                     map.on('click', drawRectangle);
                 } else {
                     //
@@ -100,7 +100,8 @@ $(window).load(function() {
             tipText: 'delete selected fission track markers',
             className_a: 'leaflet-disabled',
             action: function(e) {
-                deleteSelected(e);
+                deleteSelected();
+                restoreCounting(e);
             }
         }
     };
@@ -196,19 +197,16 @@ $(window).load(function() {
         }
     };
 
-    function deleteSelected(e) {
-        if (!($.isEmptyObject(e.currentTarget))) {
-            if (e.currentTarget.id == "ftc-btn-delete" && trash_mks_in.length > 0) {
-                var mks = {};
-                for (var i in trash_mks_in) {
-                    indx = trash_mks_in[i]
-                    mks[indx] = markers[indx];
-                }
-                withUndo(removeFromMap(mks));
-                trash_mks_in = [];
+    function deleteSelected() {
+        if (trash_mks_in.length !== 0) {
+            var mks = {};
+            for (var i in trash_mks_in) {
+                indx = trash_mks_in[i]
+                mks[indx] = markers[indx];
             }
+            withUndo(removeFromMap(mks));
+            trash_mks_in = [];
         }
-        restoreCounting(e);
     }
     //
     function setDrawRectangle(e) {
@@ -222,7 +220,7 @@ $(window).load(function() {
         twoCorner = e.latlng;
         rect.setBounds([oneCorner, twoCorner]);
         bounds = L.latLngBounds(oneCorner, twoCorner);
-        //--L.DomUtil.get($('#ftc-btn-select')).css('background-color', '#fff');
+        //--L.DomUtil.get('ftc-btn-select').css('background-color', '#fff');
         //L.DomEvent.preventDefault(e);
         //L.DomEvent.stopPropagation(e);
         //L.DomEvent.disableClickPropagation(e);
@@ -240,7 +238,7 @@ $(window).load(function() {
             }
         }
         if (trash_mks_in.length > 0) {
-            L.DomUtil.get($('#ftc-btn-delete')).removeClass('leaflet-disabled');
+            L.DomUtil.get('ftc-btn-delete').removeClass('leaflet-disabled');
         } else {
             trash_mks_in = [];
             restoreCounting(e);
@@ -264,8 +262,8 @@ $(window).load(function() {
         map.off('click', drawRectangle);
         map.on('click', checkClick);
         numClick = 0;
-        L.DomUtil.get($('#ftc-btn-select')).css('background-color', '#fff');
-        L.DomUtil.get($('#ftc-btn-delete')).addClass('leaflet-disabled');
+        L.DomUtil.get('ftc-btn-select').css('background-color', '#fff');
+        L.DomUtil.get('ftc-btn-delete').addClass('leaflet-disabled');
         rect.setBounds([
             [0., 0.],
             [0., 0.]
@@ -346,8 +344,10 @@ $(window).load(function() {
     });
     map.attributionControl.setPrefix(''); // Don't show the 'Powered by Leaflet' text.
     map.setView(mapView, mapZoom);
-    L.easyButton(buttons, map, 'topright');
-    //L.easyButton(layersSlider, map, 'topleft');
+    buttonControl = L.easyButton(buttons, map, 'topright');
+    buttonControl.getContainer().addEventListener('dblclick', function(e) {
+        e.stopPropagation();
+    });
 
     map.on('click', checkClick)
         .on('dblclick', function(e) {
@@ -436,7 +436,6 @@ $(window).load(function() {
     ftc_res['ft_type'] = grain_info.ft_type;
     ftc_res['image_width'] = grain_info.image_width;
     ftc_res['image_height'] = grain_info.image_height;
-    console.log(grain_info.proj_id + ', ' + grain_info.sample_id + ', ' + grain_info.grain_num + ', ' + grain_info.ft_type);
     var yox = grain_info.image_height / grain_info.image_width;
     imageBounds[1] = [yox, 1.0];
     mapView = [yox / 2, 0.5];
@@ -552,14 +551,10 @@ $(window).load(function() {
 
         }
     });
-    $('#tracknum-restart').click(function() {
+    $('#tracknum-restart').click(function(e) {
         if (confirm("Are you sure that you want to reset the counter for this grain?") == true) {
-            track_num = 0;
-            for (var i in markers) {
-                map.removeLayer(markers[i]);
-            }
-            markers = {};
-            $('#tracknum').val((1000 + track_num).toString().slice(1));
+            trash_mks_in = Object.keys(markers);
+            deleteSelected();
             map.setView(mapView, mapZoom);
         }
     });
