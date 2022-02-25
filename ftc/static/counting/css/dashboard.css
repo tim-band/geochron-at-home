@@ -232,14 +232,18 @@ section {
     border-top: 4px solid #E54B6B;
 }
 /*  font */
-    @font-face {
-        font-family: 'ds-digitalitalic';
-        src: url('../fonts/ds-digii-webfont.eot');
-        src: url('../fonts/ds-digii-webfont.eot?#iefix') format('embedded-opentype'),
-             url('../fonts/ds-digii-webfont.woff') format('woff'),
-             url('../fonts/ds-digii-webfont.ttf') format('truetype'),
-             url('../fonts/ds-digii-webfont.svg#ds-digitalitalic') format('svg');
-        font-weight: normal;
-        font-style: normal;
-    }
+@font-face {
+    font-family: 'ds-digitalitalic';
+    src: url('../fonts/ds-digii-webfont.eot');
+    src: url('../fonts/ds-digii-webfont.eot?#iefix') format('embedded-opentype'),
+         url('../fonts/ds-digii-webfont.woff') format('woff'),
+         url('../fonts/ds-digii-webfont.ttf') format('truetype'),
+         url('../fonts/ds-digii-webfont.svg#ds-digitalitalic') format('svg');
+    font-weight: normal;
+    font-style: normal;
+}
 
+.leaflet-bar a.selecting {
+    background-color: #80dbdb;
+}
+    

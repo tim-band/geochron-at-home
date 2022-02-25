@@ -71,6 +71,11 @@ class BasePage:
         self.driver.find_element_by_css_selector('input[type="submit"]').click()
         return url != self.driver.current_url
 
+    def element_is_disabled(self, elt):
+        if type(elt) is str:
+            elt = self.driver.find_element_by_id(elt)
+        return 'leaflet-disabled' in elt.get_attribute('class').split(' ')
+
 
 class WebMail(BasePage):
     def go(self):
@@ -267,21 +272,28 @@ class CountingPage(BasePage):
         h = lil.size["height"]
         actions = ActionChains(self.driver)
         actions.move_to_element_with_offset(lil, minx * w, miny * h)
-        actions.click().pause(0.1)
+        actions.click().pause(1.05)
         actions.move_to_element_with_offset(lil, maxx * w, maxy * h)
         actions.click().pause(0.1).perform()
         self.driver.find_element_by_id("ftc-btn-delete").click()
         return self
 
-    def dismiss_well_done_message(self):
-        retrying(3, lambda: Alert(self.driver).accept())
-        return self
+    def undo(self):
+        self.driver.find_element_by_id("ftc-btn-undo").click()
+
+    def redo(self):
+        self.driver.find_element_by_id("ftc-btn-redo").click()
+
+    def undo_available(self):
+        return not self.element_is_disabled("ftc-btn-undo")
+
+    def redo_available(self):
+        return not self.element_is_disabled("ftc-btn-redo")
 
     def submit(self):
         self.driver.find_element_by_id("btn-tracknum").click()
         self.driver.find_element_by_id("tracknum-submit").click()
         Alert(self.driver).accept()
-        self.dismiss_well_done_message()
 
     def save(self):
         self.driver.find_element_by_id("btn-tracknum").click()
@@ -327,10 +339,16 @@ class NavBar(BasePage):
         return self
 
     def logout(self):
-        self.get_dropdown().click()
-        self.driver.find_element_by_css_selector(
-            'a[href="/accounts/logout/"]'
-        ).click()
+        class DropsDown:
+            def __init__(self, nav_bar):
+                self.nav = nav_bar
+            def __call__(self, driver):
+                self.nav.get_dropdown().click()
+                logout = driver.find_element_by_css_selector(
+                    'a[href="/accounts/logout/"]'
+                )
+                return logout.is_displayed() and logout
+        WebDriverWait(self.driver, 3).until(DropsDown(self)).click()
         return HomePage(self.driver)
 
     def go_manage_projects(self):
@@ -438,8 +456,7 @@ class GrainPage(BasePage):
         assert len(zoom_outs) == 1
         imgs = self.driver.find_elements_by_css_selector('img.leaflet-image-layer')
         while (600 < imgs[0].rect['width']
-                and 'leaflet-disabled' not in
-                zoom_outs[0].get_attribute('class').split(' ')):
+                and not self.element_is_disabled(zoom_outs[0])):
             zoom_outs[0].click()
         self.driver.find_element_by_id('edit').click()
         return self
@@ -609,8 +626,16 @@ class DjangoTests(TestCase):
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.67).image_displayed_url()), 4)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(-0.33).image_displayed_url()), 3)
         counting.check_count("000")
+        self.assertFalse(counting.undo_available())
+        self.assertFalse(counting.redo_available())
         counting.click_at(0.6, 0.35)
         counting.check_count("001")
+        self.assertTrue(counting.undo_available())
+        self.assertFalse(counting.redo_available())
+        counting.undo()
+        self.assertFalse(counting.undo_available())
+        self.assertTrue(counting.redo_available())
+        counting.redo()
         counting.click_at(0.45, 0.5)
         counting.check_count("002")
         # this one is outside of the boundary
@@ -623,6 +648,25 @@ class DjangoTests(TestCase):
         # delete one
         counting.delete_from(0.51, 0.59, 0.33, 0.41)
         counting.check_count("003")
+        self.assertTrue(counting.undo_available())
+        counting.undo()
+        counting.check_count("004")
+        self.assertTrue(counting.undo_available())
+        self.assertTrue(counting.redo_available())
+        counting.undo()
+        counting.check_count("003")
+        counting.redo()
+        counting.check_count("004")
+        counting.redo()
+        counting.check_count("003")
+        self.assertTrue(counting.undo_available())
+        self.assertFalse(counting.redo_available())
+        counting.undo()
+        counting.check_count("004")
+        counting.click_at(0.54, 0.35)
+        counting.check_count("005")
+        self.assertFalse(counting.redo_available())
+        self.assertTrue(counting.undo_available())
 
         # save intermediate result and logout
         counting.save()
@@ -643,7 +687,7 @@ class DjangoTests(TestCase):
         # login as test user, we should still see the saved result
         profile = SignInPage(self.driver).go().sign_in(test_user)
         counting = profile.go_start_counting().check()
-        counting.check_count("003")
+        counting.check_count("005")
 
         # submit the result
         counting.submit()
@@ -654,7 +698,7 @@ class DjangoTests(TestCase):
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
-        self.assertEqual(report.result("1"), "3")
+        self.assertEqual(report.result("1"), "5")
 
     def tearDown(self):
         self.driver.close()

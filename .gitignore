@@ -7,3 +7,4 @@ production.env
 geckodriver.log
 /*.config
 /db/
+__pycache__

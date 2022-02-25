@@ -78,14 +78,14 @@ $(window).load(function() {
             icon: 'fa-pencil-square-o',
             tipText: 'click twice to draw a rectangle and select multiple markers',
             action: function(e) {
-                if (L.DomUtil.get('ftc-btn-select').css('background-color')!='rgb(219, 219, 219)') {
-                    //map.dragging.disable();
-                    map.off('click', checkClick);
+                if (!hasClass('ftc-btn-select', 'selecting')) {
+                    addClass('ftc-btn-select', 'selecting');
+                    map.off('click', onMapClick);
+                    console.log('click off');
                     map._container.style.cursor = 'crosshair';
-                    L.DomUtil.get('ftc-btn-select').css('background-color', '#dbdbdb');
                     map.on('click', drawRectangle);
                 } else {
-                    //
+                    removeClass('ftc-btn-select', 'selecting');
                     for (var i in trash_mks_in) {
                         indx = trash_mks_in[i]
                         markers[indx].setIcon(normalIcon);
@@ -116,9 +116,9 @@ $(window).load(function() {
     }
     function updateStackButton(stack, id) {
         if (stack.length) {
-            L.DomUtil.removeClass(L.DomUtil.get(id), 'leaflet-disabled');
+            removeClass(id, 'leaflet-disabled');
         } else {
-            L.DomUtil.addClass(L.DomUtil.get(id), 'leaflet-disabled');
+            addClass(id, 'leaflet-disabled');
         }
     }
     function updateUndoRedoButtons() {
@@ -138,6 +138,17 @@ $(window).load(function() {
         redoStack = [];
         updateUndoRedoButtons();
     }
+
+    function addClass(id, cls) {
+        L.DomUtil.addClass(L.DomUtil.get(id), cls);
+    }
+    function removeClass(id, cls) {
+        L.DomUtil.removeClass(L.DomUtil.get(id), cls);
+    }
+    function hasClass(id, cls) {
+        L.DomUtil.hasClass(L.DomUtil.get(id), cls);
+    }
+
     function updateTrackCounter() {
         $('#tracknum').val((1000 + track_num).toString().slice(1));
     }
@@ -209,6 +220,14 @@ $(window).load(function() {
         }
     }
     //
+    function stopSelecting() {
+        removeClass('ftc-btn-select', 'selecting');
+        rect.setBounds([
+            [0., 0.],
+            [0., 0.]
+        ]);
+    }
+
     function setDrawRectangle(e) {
         //L.DomEvent.preventDefault(e);
         //L.DomEvent.stopPropagation(e);
@@ -238,14 +257,13 @@ $(window).load(function() {
             }
         }
         if (trash_mks_in.length > 0) {
-            L.DomUtil.get('ftc-btn-delete').removeClass('leaflet-disabled');
+            removeClass('ftc-btn-delete', 'leaflet-disabled');
         } else {
             trash_mks_in = [];
             restoreCounting(e);
             console.log('no delete acton. marker #: ' + getObjectSize(markers));
         }
     }
-
 
     function setOneCorner(e) {
         //L.DomEvent.preventDefault(e);
@@ -260,14 +278,11 @@ $(window).load(function() {
         L.DomEvent.preventDefault(e);
         L.DomEvent.stopPropagation(e);
         map.off('click', drawRectangle);
-        map.on('click', checkClick);
+        map.on('click', onMapClick);
+        console.log('click on');
         numClick = 0;
-        L.DomUtil.get('ftc-btn-select').css('background-color', '#fff');
-        L.DomUtil.get('ftc-btn-delete').addClass('leaflet-disabled');
-        rect.setBounds([
-            [0., 0.],
-            [0., 0.]
-        ]);
+        stopSelecting();
+        addClass('ftc-btn-delete', 'leaflet-disabled');
     }
 
     function drawRectangle(e) {
@@ -289,13 +304,16 @@ $(window).load(function() {
     }
 
     function checkClick(e) {
+        console.log("checkcCick");
         var that = this;
         setTimeout(function() {
             var double_btn = parseInt($(that).data('jhe_double'), 10);
+            console.log("timed out", double_btn);
             if (double_btn > 0) {
                 $(that).data('jhe_double', double_btn - 1);
                 return false;
             } else {
+                console.log("normal click");
                 onMapClick(e);
             }
         }, 300);
@@ -349,7 +367,7 @@ $(window).load(function() {
         e.stopPropagation();
     });
 
-    map.on('click', checkClick)
+    map.on('click', onMapClick)
         .on('dblclick', function(e) {
             $(this).data('jhe_double', 2);
         });
