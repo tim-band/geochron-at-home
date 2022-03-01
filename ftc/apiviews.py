@@ -125,7 +125,10 @@ class SampleInfoView(RetrieveUpdateDeleteView):
 class GrainSerializer(serializers.ModelSerializer):
     class Meta:
         model = Grain
-        fields = ['id', 'sample', 'index', 'image_width', 'image_height']
+        fields = [
+            'id', 'sample', 'index', 'image_width', 'image_height',
+            'scale_x', 'scale_y', 'stage_x', 'stage_y'
+        ]
 
     index = serializers.IntegerField(required=False, read_only=False)
     sample = serializers.PrimaryKeyRelatedField(required=False, read_only=True)
@@ -148,7 +151,11 @@ class GrainSerializer(serializers.ModelSerializer):
             index = index,
             sample = sample,
             image_width=rois['image_width'],
-            image_height=rois['image_height']
+            image_height=rois['image_height'],
+            scale_x=rois.get('scale_x'),
+            scale_y=rois.get('scale_y'),
+            stage_x=rois.get('stage_x'),
+            stage_y=rois.get('stage_y'),
         )
         save_rois_regions(rois, grain)
 
@@ -201,7 +208,9 @@ def download_rois(request, pk):
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
-        fields = ['id', 'grain', 'format', 'ft_type', 'index']
+        fields = [
+            'id', 'grain', 'format', 'ft_type', 'index', 'light_path', 'focus'
+        ]
         extra_kwargs = {
             'name': { 'write_only': True }
         }

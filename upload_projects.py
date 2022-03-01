@@ -28,8 +28,16 @@ def creategrain(src, sample, grain_nth):
     with open(p, mode='r') as j:
         print(p)
         rois = json.load(j)
-    g = Grain(sample=sample, index=grain_nth,
-        image_width=rois['image_width'], image_height=rois['image_height'])
+    g = Grain(
+        sample=sample,
+        index=grain_nth,
+        image_width=rois['image_width'],
+        image_height=rois['image_height'],
+        scale_x=rois.get('scale_x'),
+        scale_y=rois.get('scale_y'),
+        stage_x=rois.get('stage_x'),
+        stage_y=rois.get('stage_y'),
+    )
     g.save()
     save_rois_regions(rois, g)
     return g

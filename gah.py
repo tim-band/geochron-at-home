@@ -5,10 +5,12 @@ from getpass import getpass
 from html.parser import HTMLParser
 import json
 import os.path
+import re
 import sys
 from urllib.error import HTTPError
 from urllib.parse import urlencode, quote
 from urllib.request import Request, urlopen
+import xml.etree.ElementTree as ET
 
 
 def get_values(d, ks):
@@ -158,7 +160,7 @@ def api_upload_verb(verb, config, *args, **kwargs):
             data += (
                 b'--' + boundary + b'\r\nContent-Disposition: form-data;'
                 + b' name="' + k.encode('ascii')
-                + b'"\r\n\r\n' + v.encode('ascii') + b'\r\n'
+                + b'"\r\n\r\n' + str(v).encode('ascii') + b'\r\n'
             )
     data += b'--' + boundary + b'--'
     req = Request(url, data=data, method=verb)
@@ -354,9 +356,15 @@ def grain_info(opts, config):
     with api_get(config, 'grain', opts.id) as response:
         body = response.read()
         v = json.loads(body)
-        print('grain ID: {0}\nsample ID: {1}\nindex: {2}\nimage size: {3} x {4}\n'.format(
+        print(
+            ( 'grain ID: {0}\nsample ID: {1}\nindex: {2}\n'
+            + 'image size: {3} x {4}\n'
+            + 'scale: {5} x {6}\nstage position: {7} x {8}\n'
+        ).format(
             v.get('id'), v.get('sample'), v.get('index'),
-            v.get('image_width'), v.get('image_height')
+            v.get('image_width'), v.get('image_height'),
+            v.get('scale_x'), v.get('scale_y'),
+            v.get('stage_x'), v.get('stage_y'),
         ))
 
 
@@ -416,8 +424,13 @@ def image_list(opts, config):
 
 @token_refresh
 def image_upload(opts, config):
+    try:
+        extras = parse_metadata_image(opts.image + '_metadata.xml')
+    except OSError:
+        extras = {}
     with api_upload(
-        config, 'grain', opts.grain, 'image', data=open(opts.image, 'rb')
+        config, 'grain', opts.grain, 'image',
+        data=open(opts.image, 'rb'), **extras
     ) as response:
         body = response.read()
         result = json.loads(body)
@@ -425,7 +438,7 @@ def image_upload(opts, config):
 
 
 def images_upload(opts, config):
-    images = opts.image
+    images = sorted(opts.image)
     last_error = None
     for attempt in [1,2,3]:
         for_retry = []
@@ -437,6 +450,10 @@ def images_upload(opts, config):
                 last_error = e
                 if 500 <= e.code:
                     for_retry.append(i)
+                elif 400 <= e.code:
+                    print('image {0} failed with error {1}'.format(
+                        i, e.code
+                    ))
         if len(for_retry) == 0:
             return
         images = for_retry
@@ -473,6 +490,10 @@ def grain_upload(opts, config):
 
 @token_refresh
 def image_update(opts, config):
+    try:
+        extras = parse_metadata_image(opts.image + '_metadata.xml')
+    except OSError:
+        extras = {}
     with api_upload_verb(
         'PATCH',
         config,
@@ -480,6 +501,7 @@ def image_update(opts, config):
         opts.id,
         data=open(opts.image, 'rb'),
         grain=opts.grain,
+        **extras
     ) as response:
         print(response.read())
 
@@ -489,8 +511,12 @@ def image_info(opts, config):
     with api_get(config, 'image', opts.id) as response:
         body = response.read()
         v = json.loads(body)
-        print('image ID: {0}\ngrain ID: {1}\nindex: {2}\nfission track type: {3}\n'.format(
-            v.get('id'), v.get('grain'), v.get('index'), v.get('ft_type')
+        print((
+            'image ID: {0}\ngrain ID: {1}\nindex: {2}\n'
+            + 'fission track type: {3}\nlight path: {4}\nfocus: {5}\n'
+        ).format(
+            v.get('id'), v.get('grain'), v.get('index'), v.get('ft_type'),
+            v.get('light_path'), v.get('focus'),
         ))
 
 
@@ -588,6 +614,101 @@ def add_count_subparser(subparsers):
     list_counts.add_argument('--sample', help='only report the sample with this name')
     list_counts.add_argument('--grain', help='only report the grain with this index')
 
+
+def parse_metadata_file(metadata, floats={}, texts={}):
+    root = ET.parse(metadata).getroot()
+    out = {}
+    for k,v in floats.items():
+        out[k] = float(root.find(v).text)
+    for k,v in texts.items():
+        out[k] = root.find(v).text
+    return out
+
+
+def parse_metadata_grain(metadata):
+    xpaths_float = {
+        'image_width': "Information/Image/SizeX",
+        'image_height': "Information/Image/SizeY",
+        'scale_x': "Scaling/Items/Distance[@Id='X']/Value",
+        'scale_y': "Scaling/Items/Distance[@Id='Y']/Value",
+        'stage_x': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisX']/Position",
+        'stage_y': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisY']/Position",
+    }
+    return parse_metadata_file(metadata, xpaths_float)
+
+
+def rlTlSwitchTranslate(lp):
+    if lp == 'RLTLSwitch.RL':
+        return 'R'
+    if lp == 'RLTLSwitch.TL':
+        return 'T'
+    return None
+
+
+def parse_metadata_image(metadata):
+    xpath_text = {
+        'light_path': "HardwareSetting/ParameterCollection[@Id='MTBRLTLSwitch']/PositionName"
+    }
+    xpaths_float = {
+        'focus': "HardwareSetting/ParameterCollection[@Id='MTBFocus']/Position"
+    }
+    out = parse_metadata_file(metadata, xpaths_float, xpath_text)
+    out['light_path'] = rlTlSwitchTranslate(out['light_path'])
+    return out
+
+
+def generate_rois_file(dir, metadata):
+    vs = parse_metadata_grain(metadata)
+    w = vs['image_width']
+    h = vs['image_height']
+    fname = os.path.join(dir, 'rois.json')
+    x1 = int(w * 0.1)
+    x2 = int(w * 0.9)
+    y1 = int(h * 0.1)
+    y2 = int(h * 0.9)
+    vs['regions'] = [{
+        'vertices': [[x1, y1], [x1, y2], [x2, y2], [x2, y1]],
+        'shift': [0,0]
+    }]
+    with open(fname, 'w') as h:
+        json.dump(vs, h)
+    return fname
+
+
+def generate_roiss(opts, config):
+    # Find all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files
+    meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
+    metadata_by_dir = {}
+    for root, dirs, files in os.walk(opts.path):
+        metas = [
+            os.path.join(root, f)
+            for f in files
+            if meta_re.fullmatch(f)
+        ]
+        if metas and (opts.overwrite or 'rois.json' not in files):
+            metadata_by_dir[root] = metas[0]
+    for d,m in metadata_by_dir.items():
+        r = generate_rois_file(d, m)
+        print('wrote {0}'.format(r))
+
+
+def add_genrois_subparser(subparsers):
+    parser = subparsers.add_parser(
+        'genrois',
+        help='generate rois.json files from *_metadata.xml files'
+    )
+    parser.add_argument(
+        '--overwrite',
+        action='store_true',
+        help='overwrite any existing rois.json files'
+    )
+    parser.add_argument(
+        'path',
+        help='path to directories containing *_metadata.xml files'
+    )
+    parser.set_defaults(func=generate_roiss)
+
+
 class ExceptionExtractor(HTMLParser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -625,6 +746,7 @@ add_sample_subparser(subparsers)
 add_grain_subparser(subparsers)
 add_image_subparser(subparsers)
 add_count_subparser(subparsers)
+add_genrois_subparser(subparsers)
 
 options = parser.parse_args()
 

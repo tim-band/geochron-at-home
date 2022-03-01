@@ -6,16 +6,18 @@ from django_prometheus.models import ExportModelOperationsMixin
 
 class Project(models.Model):
     alphanumeric = RegexValidator(r'^[0-9a-zA-Z_-]+$', 'Only alphanumeric, "-" and "_" are allowed.')
-    project_name = models.CharField(max_length=36, validators=[alphanumeric])
+    project_name = models.CharField(
+        max_length=36,
+        validators=[alphanumeric],
+        unique=True,
+    )
     creator = models.ForeignKey(User, on_delete=models.CASCADE)
     create_date = models.DateTimeField(auto_now_add=True)
     project_description = models.CharField(max_length=200)
     priority = models.IntegerField(default='0')
     closed = models.BooleanField(default=False)
-    #project path
 
     class Meta:
-        unique_together = ('project_name', 'creator',)
         get_latest_by = "create_date"
 
     def __unicode__(self):
@@ -70,6 +72,13 @@ class Grain(models.Model):
     index = models.IntegerField()
     image_width = models.IntegerField()
     image_height = models.IntegerField()
+    scale_x = models.FloatField(null=True)
+    scale_y = models.FloatField(null=True)
+    stage_x = models.FloatField(null=True)
+    stage_y = models.FloatField(null=True)
+
+    class Meta:
+        unique_together = ('sample', 'index',)
 
     def get_owner(self):
         return self.sample.get_owner()
@@ -103,11 +112,17 @@ class Image(ExportModelOperationsMixin('image'), models.Model):
         ('S', 'Spontaneous Fission Tracks'),
         ('I', 'Induced Fission Tracks'),
     )
+    LIGHT_PATH = (
+        ('T', 'Transmitted Light'),
+        ('R', 'Reflected Light'),
+    )
     grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
     format = models.CharField(max_length=1, choices=IMAGE_FORMAT)
     ft_type = models.CharField(max_length=1, choices=FT_TYPE)
     index = models.IntegerField()
     data = models.BinaryField()
+    light_path = models.CharField(max_length=1, choices=LIGHT_PATH, null=True)
+    focus = models.FloatField(null=True)
 
     def get_owner(self):
         return self.grain.get_owner()
@@ -129,9 +144,6 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     result = models.IntegerField() #-1 means this is a partial save state
     create_date = models.DateTimeField(auto_now_add=True)
     latlngs = models.TextField(default='')
-
-    class Meta:
-        unique_together = ('in_sample', 'grain', 'ft_type', 'worker', 'create_date')
 
     def project_name(self):
         return self.in_sample.in_project

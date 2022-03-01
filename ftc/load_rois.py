@@ -59,5 +59,9 @@ def get_rois(grain):
     return {
         "image_width": grain.image_width,
         "image_height": grain.image_height,
+        "scale_x": grain.scale_x,
+        "scale_y": grain.scale_y,
+        "stage_x": grain.stage_x,
+        "stage_y": grain.stage_y,
         "regions": rjs
     }
