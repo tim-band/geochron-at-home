@@ -384,6 +384,76 @@ $(window).load(function() {
         return false;
     });
 
+    var UScale = L.Control.extend({
+        options: {
+            position: 'bottomleft',
+            maxWidth: 100,
+            imageWidthMeters: 1e-4,
+        },
+
+        onAdd: function (map) {
+            map.on('move', this._update, this);
+            map.whenReady(this._update, this);
+
+            this.scale = document.createElement('div');
+            this.scale.className = 'ftc-uscale-line-10';
+            var container = document.createElement('div');
+            container.className = 'ftc-uscale';
+            container.appendChild(this.scale);  
+            return container;
+        },
+
+        onRemove: function (map) {
+            map.off('move', this._update, this);
+        },
+
+        _update: function () {
+            if (!this.scale) {
+                return;
+            }
+            var map = this._map;
+            var y = map.getSize().y / 2;
+            var maxLng =
+                map.containerPointToLatLng([this.options.maxWidth, y]).lng -
+                map.containerPointToLatLng([0, y]).lng;
+            var maxMeters = this.options.imageWidthMeters * maxLng;
+            this._updateMetric(maxMeters);
+        },
+
+        _updateMetric: function (maxMeters) {
+            var unit = ' nm';
+            var m = maxMeters / 1e-9;
+            if (1000.0 <= m) {
+                unit = ' \xB5m';
+                m = maxMeters / 1e-6;
+                if (1000.0 <= m) {
+                    unit = ' mm';
+                    m = maxMeters / 1e-3;
+                }
+            }
+            var z = 1;
+            while (10.0 <= m) {
+                z *= 10;
+                m /= 10.0;
+            }
+            var ratio = 1/m;
+            var num = z;
+            if (5.0 <= m) {
+                num = 5 * z;
+                ratio = 5/m;
+                this.scale.className = 'ftc-uscale-line-5';
+            } else if (2.0 <= m) {
+                num = 2 * z;
+                ratio = 2/m;
+                this.scale.className = 'ftc-uscale-line-2';
+            } else {
+                this.scale.className = 'ftc-uscale-line-10';
+            }
+            this.scale.style.width = Math.round(this.options.maxWidth * ratio) + 'px';
+            this.scale.innerHTML = num + unit;
+        },
+    });
+
     /**************************
      *   slider and tooltip   *
      **************************/
@@ -404,6 +474,13 @@ $(window).load(function() {
     });
 
     map.addControl(new MyControl());
+    if ('scale_x' in grain_info && grain_info.scale_x) {
+        map.addControl(new UScale({
+            position: 'bottomright',
+            maxWidth: 300,
+            imageWidthMeters: grain_info.scale_x * grain_info.image_width
+        }));
+    }
 
     var slider2elt = document.getElementById('slider2');
     var sliders2 = noUiSlider.create(slider2elt, {

@@ -462,6 +462,7 @@ def get_grain_info(request, pk):
         'ft_type': ft_type,
         'image_width': width,
         'image_height': height,
+        'scale_x': grain.scale_x,
         'images': images_list,
         'rois': rois
     }
