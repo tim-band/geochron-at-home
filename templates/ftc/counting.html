@@ -101,23 +101,6 @@ font-family: "ds-digitalitalic";
     );
 }
 
-/*
-.leaflet-container {
-font: 0.8cm "Helvetica Neue", Arial, Helvetica, sans-serif;
-}
-
-.leaflet-bar a, .leaflet-bar a:hover {
-background-color: #fff;
-border-bottom: 1px solid #ccc;
-width: 1.5cm;
-height: 1.5cm;
-line-height: 1.55cm;
-}
-
-.leaflet-control-zoom-in, .leaflet-control-zoom-out {
-font: bold 1.2cm/1.5 'Lucida Console', Monaco, monospace;
-}
-*/
 </style>
 <script src="{% static 'Leaflet-1.7.1/leaflet.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
@@ -147,22 +130,6 @@ var getNewGrain_url = "{% url 'counting' %}"
             {% endblock %}
 
 {% block content %}
-    <!--    <div id="tracknum" style="cursor: pointer;">000</div> -->
-<!--
-<div id="dropdown-tracknum" class="nav navbar-nav navbar-right">
-<li class="dropdown">
-    <a class="dropdown-toggle" style="padding:0px;width:120px;background-color:#fff;text-align:center;" data-toggle="dropdown" href="#">
-       <input id="tracknum" class="form-control" style="padding:0px;width:95px;height:46px;float:left" type="text" value="000" readonly>
-       <div style="background-color:#eee;border: 1px solid #CCC;padding:0px;width:25px;height:46px;float:left;text-align:center;"><span class="caret"></span></div>
-    </a>
-    <ul class="dropdown-menu" style="background-color:#fff" role="menu">
-      <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>&nbsp;save current status</a></li>
-      <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>&nbsp;submit result</a></li>
-      <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>&nbsp;restart counting</a></li>
-    </ul>
-</li>
-</div>
--->
 <div id="dropdown-tracknum" class="input-group">
 <div class="btn-group">
   <input id="tracknum" class="form-control" type="text" value="000" readonly>
@@ -192,11 +159,7 @@ var getNewGrain_url = "{% url 'counting' %}"
     {% endif %}
 
            <div id="map" style="cursor: crosshair; position: absolute; top: 50px; bottom: 0; width: 100%; "></div>
-<!--           <div id="slider2" style="position: absolute; top: 140px; left: 14px; height: 120px;"></div> -->
 
 {% endblock %}
 
 {% block footer %}{% endblock %}
-
-</body>
-</html>

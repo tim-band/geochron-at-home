@@ -6,14 +6,7 @@ $(window).load(function() {
     }
 
     var ftc_res = {};
-    var overlayerImgUrl;
-    var sliderNum;
-    var imageBounds = [
-        [0.0, 0.0],
-        [1., 1.]
-    ];
 
-    var imageOverlayers = new Array();
     var mapView = [0.5, 0.5];
     var mapZoom = 11;
     var numClick = 0;
@@ -21,7 +14,6 @@ $(window).load(function() {
     var track_id = 0;
     var track_num = 0;
     var markers = {};
-    var polygon_arrays = new Array();
     var trash_mks_in = new Array();
     var myIcon = L.Icon.extend({
         options: {
@@ -152,6 +144,7 @@ $(window).load(function() {
     function updateTrackCounter() {
         $('#tracknum').val((1000 + track_num).toString().slice(1));
     }
+
     function addToMap(markersToAdd) {
         for (var k in markersToAdd) {
             mk = markersToAdd[k];
@@ -163,6 +156,7 @@ $(window).load(function() {
         updateTrackCounter();
         return function() { return removeFromMap(markersToAdd); }
     }
+
     function removeFromMap(markersToRemove) {
         for (var k in markersToRemove) {
             map.removeLayer(markersToRemove[k]);
@@ -173,21 +167,12 @@ $(window).load(function() {
         return function() { return addToMap(markersToRemove); }
     }
 
-    var getObjectSize = function(obj) {
-        var len = 0;
-        for (var key in obj) {
-            if (obj.hasOwnProperty(key)) len++;
-        }
-        return len;
-    };
-    //==========================
     function createMarker(latlng) {
         var mk = new L.marker(latlng, {
             icon: normalIcon,
             riseOnHover: true,
             className: 'jhe-fissionTrack-' + track_id
         }).on('click', function(e) {
-            //console.log("click");
             //need this to prevent event propagation
         });
         var mks = {};
@@ -199,11 +184,7 @@ $(window).load(function() {
     function onMapClick(e) {
         L.DomEvent.preventDefault(e);
         L.DomEvent.stopPropagation(e);
-        var pinp = false
-        for (var i = 0; i < polygon_arrays.length; i++) {
-            pinp = pinp || point_in_polygon([e.latlng.lat, e.latlng.lng],  polygon_arrays[i])
-        }
-        if (pinp) {
+        if (zStack.pointInRois(e.latlng.lat, e.latlng.lng)) {
             createMarker(e.latlng);
         }
     };
@@ -219,7 +200,7 @@ $(window).load(function() {
             trash_mks_in = [];
         }
     }
-    //
+
     function stopSelecting() {
         removeClass('ftc-btn-select', 'selecting');
         rect.setBounds([
@@ -261,7 +242,6 @@ $(window).load(function() {
         } else {
             trash_mks_in = [];
             restoreCounting(e);
-            console.log('no delete acton. marker #: ' + getObjectSize(markers));
         }
     }
 
@@ -303,54 +283,82 @@ $(window).load(function() {
         }
     }
 
-    function checkClick(e) {
-        console.log("checkcCick");
-        var that = this;
-        setTimeout(function() {
-            var double_btn = parseInt($(that).data('jhe_double'), 10);
-            console.log("timed out", double_btn);
-            if (double_btn > 0) {
-                $(that).data('jhe_double', double_btn - 1);
-                return false;
-            } else {
-                console.log("normal click");
-                onMapClick(e);
+    function makeZStack(map, images, imageCount, yOverX, rois) {
+        var bounds = [
+            [0.0, 0.0],
+            [yOverX, 1.0]
+        ];
+        var imageOverlayers = new Array();
+        for (var i = 0; i < imageCount; i++) {
+            imageOverlayers[i] = new L.imageOverlay(
+                images[i], bounds
+            ).addTo(map);
+        }
+        var currentLayer = 0;
+        var polygon_arrays = rois;
+        for (var i = 0; i < polygon_arrays.length; i++) {
+            L.polygon(polygon_arrays[i], {
+                color: 'white',
+                opacity: 1.0,
+                fill: false,
+                clickable: true,
+                className: 'ftc-rect-select-area'
+            }).on('click', function(e) {
+                L.DomEvent.preventDefault(e);
+                L.DomEvent.stopPropagation(e);
+            }).addTo(map);
+        }
+        function point_in_polygon(x, y, vs) {
+            // ray-casting algorithm based on
+            // http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html
+            var inside = false;
+            for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+                var xi = vs[i][0],
+                    yi = vs[i][1];
+                var xj = vs[j][0],
+                    yj = vs[j][1];
+                var intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
             }
-        }, 300);
+            return inside;
+        };
+        function point_in_any_polygon(x, y, vss) {
+            for (var i =0; i !== vss.length; ++i) {
+                if (point_in_polygon(x, y, vss[i])) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        function refresh() {
+            imageOverlayers[currentLayer].bringToFront();
+        }
+        refresh();
+        return {
+            set: function(position) {
+                currentLayer = position;
+                refresh();
+            },
+            position: function() {
+                return currentLayer;
+            },
+            decrement: function() {
+                currentLayer = 0 < currentLayer? currentLayer - 1 : 0;
+                refresh();
+            },
+            increment: function() {
+                var c = currentLayer + 1;
+                currentLayer = c < imageCount? c : imageCount - 1;
+                refresh();
+            },
+            pointInRois: function(x, y) {
+                return point_in_any_polygon(x, y, polygon_arrays);
+            }
+        };
     }
 
-    function point_in_polygon(point, vs) {
-        // ray-casting algorithm based on
-        // http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html
-        var x = point[0],
-            y = point[1];
-        var inside = false;
-        for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-            var xi = vs[i][0],
-                yi = vs[i][1];
-            var xj = vs[j][0],
-                yj = vs[j][1];
-            var intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-            if (intersect) inside = !inside;
-        }
-        return inside;
-    };
+    var zStack = null;
 
-    function slider_bringToFront(position) {
-        imageOverlayers[position].bringToFront();
-        var topImg = imageOverlayers[position]._image;
-        var chldr = topImg.parentElement.children;
-        var i = null;
-        for (i = (chldr.length) - 1; i >= 0; i--) {
-            /* reslt = chldr.item(i).getElementsByClassName('ftc-rect-select-area'); */
-            if (chldr.item(i).tagName.toLowerCase() == "svg") {
-                break;
-            }
-        }
-        if (i !== null) {
-            $(chldr.item(i)).insertAfter($(topImg));
-        }
-    };
     map = L.map('map', {
         center: mapView,
         zoom: mapZoom,
@@ -376,11 +384,12 @@ $(window).load(function() {
      *   wheel change layer   *
      **************************/
     $('#map').mousewheel(function(e, delta) {
-        var position = sliders2.get();
-        position = position - delta;
-        position = (position > (sliderNum - 1)) ? (sliderNum - 1) : ((position < 0) ? 0 : position);
-        sliders2.set(position);
-        slider_bringToFront(position);
+        if (delta < 0) {
+            zStack.dec();
+        } else {
+            zStack.inc();
+        }
+        sliders2.set(zStack.position());
         return false;
     });
 
@@ -457,23 +466,23 @@ $(window).load(function() {
     /**************************
      *   slider and tooltip   *
      **************************/
-    var MyControl = L.Control.extend({
+    var FocusControl = L.Control.extend({
         options: {
             position: 'topleft'
         },
 
         onAdd: function(map) {
             // create the control container with a particular class name
-            var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control slider2-container');
+            var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control focus-slider-container');
             container.setAttribute('style', 'margin-left: 14px;margin-top: 27px;');
-            this.slider_div = L.DomUtil.create('div', 'leaflet-bar-slider2', container);
-            this.slider_div.id = 'slider2';
+            this.slider_div = L.DomUtil.create('div', 'leaflet-bar-focus-slider', container);
+            this.slider_div.id = 'focus-slider';
             this.slider_div.setAttribute('style', 'height:120px');
             return container;
         }
     });
+    map.addControl(new FocusControl());
 
-    map.addControl(new MyControl());
     if ('scale_x' in grain_info && grain_info.scale_x) {
         map.addControl(new UScale({
             position: 'bottomright',
@@ -482,8 +491,8 @@ $(window).load(function() {
         }));
     }
 
-    var slider2elt = document.getElementById('slider2');
-    var sliders2 = noUiSlider.create(slider2elt, {
+    var focusSliderElt = document.getElementById('focus-slider');
+    var sliders2 = noUiSlider.create(focusSliderElt, {
         start: 0,
         orientation: 'vertical',
         range: {
@@ -504,16 +513,16 @@ $(window).load(function() {
     });
 
     sliders2.on('slide', function(ev) {
-        slider_bringToFront(sliders2.get());
+        zStack.set(sliders2.get());
     });
 
-    slider2elt.onpointerdown = function(ev) {
+    focusSliderElt.onpointerdown = function(ev) {
         // Prevents the sample image from being dragged around
         // by movements that begin on the slider.
         ev.stopPropagation();
     };
 
-    slider2elt.onclick = function(ev) {
+    focusSliderElt.onclick = function(ev) {
         // Prevents points from being added
         // by movements that begin on the slider.
         ev.stopPropagation();
@@ -532,40 +541,21 @@ $(window).load(function() {
     ftc_res['image_width'] = grain_info.image_width;
     ftc_res['image_height'] = grain_info.image_height;
     var yox = grain_info.image_height / grain_info.image_width;
-    imageBounds[1] = [yox, 1.0];
     mapView = [yox / 2, 0.5];
-    overlayerImgUrl = grain_info.images;
-    sliderNum = overlayerImgUrl.length;
+    var sliderNum = grain_info.images.length;
     sliders2.updateOptions({
         range: {
             'min': 0,
             'max': sliderNum - 1
         }
     }, true);
-    for (var i = 0; i < sliderNum; i++) {
-        imageOverlayers[i] = new L.imageOverlay(overlayerImgUrl[i], imageBounds).addTo(map);
-    }
-    imageOverlayers[0].bringToFront();
+    zStack = makeZStack(map, grain_info.images, sliderNum, yox, grain_info.rois);
     if (('num_markers' in grain_info) && ('marker_latlngs' in grain_info)) {
         var latlng;
         for (var i = 0; i < grain_info.num_markers; i++) {
             latlng = grain_info.marker_latlngs[i];
             createMarker(latlng);
         }
-    }
-    polygon_arrays = grain_info.rois;
-    for (var i = 0; i < polygon_arrays.length; i++) {
-        polygon_array = polygon_arrays[i]
-        L.polygon(polygon_array, {
-            color: 'white',
-            opacity: 1.0,
-            fill: false,
-            clickable: true,
-            className: 'ftc-rect-select-area'
-        }).on('click', function(e) {
-            L.DomEvent.preventDefault(e);
-            L.DomEvent.stopPropagation(e);
-        }).addTo(map);
     }
     map.setView(mapView, mapZoom);
     updateTrackCounter();

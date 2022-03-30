@@ -124,10 +124,10 @@ function makeMap(image_height, image_width, image_urls, region_points) {
 
         function onAdd(map) {
             // create the control container with a particular class name
-            var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control slider2-container');
-            container.id = 'slider2-container';
-            slider_div = L.DomUtil.create('div', 'leaflet-bar-slider2', container);
-            slider_div.id = 'slider2';
+            var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control focus-slider-container');
+            container.id = 'focus-slider-container';
+            slider_div = L.DomUtil.create('div', 'leaflet-bar-focus-slider', container);
+            slider_div.id = 'focus-slider';
             slider = noUiSlider.create(slider_div, {
                 start: currentFront,
                 orientation: 'vertical',

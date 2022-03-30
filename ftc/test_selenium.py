@@ -302,7 +302,7 @@ class CountingPage(BasePage):
         return self
 
     def drag_layer_handle(self, offset):
-        track = self.driver.find_element_by_id("slider2")
+        track = self.driver.find_element_by_id("focus-slider")
         dy = offset * track.size['height']
         handle = self.driver.find_element_by_class_name("noUi-touch-area")
         actions = ActionChains(self.driver)
