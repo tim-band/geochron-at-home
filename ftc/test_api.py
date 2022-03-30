@@ -310,7 +310,14 @@ class ApiGrainCreate(ApiTestMixin, TestCase):
         rr = self.client.get('/ftc/api/grain/{0}/rois/'.format(j['id']), **self.headers)
         with open(rois_path) as rfh:
             rois_expected = rfh.read()
-        self.assertJSONEqual(rois_expected, rr.content.decode(rr.charset))
+        expected = json.loads(rois_expected)
+        content = json.loads(rr.content.decode(rr.charset))
+        self.assertEqual(expected['image_width'], content['image_width'])
+        self.assertEqual(expected['image_height'], content['image_height'])
+        self.assertEqual(len(expected['regions']), len(content['regions']))
+        for i in range(len(expected['regions'])):
+            self.assertEqual(expected['regions'][i]['shift'], content['regions'][i]['shift'])
+            self.assertEqual(expected['regions'][i]['vertices'], content['regions'][i]['vertices'])
 
     def test_superuser_can_create_grain_in_others_sample(self):
         r = self.upload_rois(1, 'test/crystals/john/p1/s1/Grain01/rois.json', self.super_headers)
