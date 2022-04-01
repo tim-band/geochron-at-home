@@ -9,12 +9,9 @@ $(window).load(function() {
 
     var mapView = [0.5, 0.5];
     var mapZoom = 11;
-    var numClick = 0;
-    var oneCorner, twoCorner;
     var track_id = 0;
     var track_num = 0;
     var markers = {};
-    var trash_mks_in = new Array();
     var myIcon = L.Icon.extend({
         options: {
             //iconUrl: "{% static 'counting/images/circle.png' %}",
@@ -27,21 +24,110 @@ $(window).load(function() {
     var normalIcon = new myIcon({
         iconUrl: iconUrl_normal
     });
-    var selectedIcon = new myIcon({
-        iconUrl: iconUrl_selected
-    });
-    var rect = L.rectangle([
-        [0., 0.],
-        [0., 0.]
-    ], {
-        className: "ftc-rect-select-area",
-        color: "#ff0000",
-        fillOpacity: 0,
-        stroke: true,
-        weight: 2,
-        fill: false,
-        clickable: true
-    });
+    function makeDeleter(map) {
+        var rect = L.rectangle([
+            [0., 0.],
+            [0., 0.]
+        ], {
+            className: "ftc-rect-select-area",
+            color: "#ff0000",
+            fillOpacity: 0,
+            stroke: true,
+            weight: 2,
+            fill: false,
+            clickable: true
+        });
+        var selectedIcon = new myIcon({
+            iconUrl: iconUrl_selected
+        });
+        var trash_mks_in = new Array();
+        var oneCorner, twoCorner;
+        var numClick = 0;
+        function deleteSelected() {
+            if (trash_mks_in.length !== 0) {
+                var mks = {};
+                for (var i in trash_mks_in) {
+                    indx = trash_mks_in[i]
+                    mks[indx] = markers[indx];
+                }
+                undo.withUndo(removeFromMap(mks));
+                trash_mks_in = [];
+            }
+        }
+        function stopSelecting() {
+            removeClass('ftc-btn-select', 'selecting');
+            rect.setBounds([
+                [0., 0.],
+                [0., 0.]
+            ]);
+        }
+        function setDrawRectangle(e) {
+            twoCorner = e.latlng;
+            rect.setBounds([oneCorner, twoCorner]);
+        }
+        function setTwoCorner(e) {
+            twoCorner = e.latlng;
+            rect.setBounds([oneCorner, twoCorner]);
+            bounds = L.latLngBounds(oneCorner, twoCorner);
+            map.off('mousemove', setDrawRectangle);
+            map._container.style.cursor = 'crosshair';
+            var j = 0;
+            for (var i in markers) {
+                latlon = markers[i].getLatLng();
+                if (bounds.contains(latlon)) {
+                    trash_mks_in[j] = i;
+                    markers[i].setIcon(selectedIcon);
+                    j++;
+                }
+            }
+            if (trash_mks_in.length > 0) {
+                removeClass('ftc-btn-delete', 'leaflet-disabled');
+            } else {
+                trash_mks_in = [];
+                restoreCounting(e);
+            }
+        }
+        function setOneCorner(e) {
+            //L.DomEvent.preventDefault(e);
+            //L.DomEvent.stopPropagation(e);
+            oneCorner = e.latlng;
+            rect.setBounds([oneCorner, oneCorner]);
+            rect.addTo(map).bringToFront();
+            map.on('mousemove', setDrawRectangle);
+        }
+        function drawRectangle(e) {
+            numClick++;
+            if (numClick == 1) {
+                setOneCorner(e);
+            } else if (numClick == 2) {
+                setTwoCorner(e);
+            } else if (numClick == 3) {
+                for (var i in trash_mks_in) {
+                    indx = trash_mks_in[i]
+                    markers[indx].setIcon(normalIcon);
+                }
+                trash_mks_in = [];
+                restoreCounting(e);
+            } else {
+                alert('click event should not listened any more');
+            }
+        }
+        function restoreCounting(e) {
+            L.DomEvent.preventDefault(e);
+            L.DomEvent.stopPropagation(e);
+            map.off('click', drawRectangle);
+            map.on('click', onMapClick);
+            numClick = 0;
+            stopSelecting();
+            addClass('ftc-btn-delete', 'leaflet-disabled');
+        }
+        return {
+            deleteSelected: deleteSelected,
+            restoreCounting: restoreCounting,
+            drawRectangle: drawRectangle
+        }
+    }
+    var deleter = null;
     var buttons = {
         'homeView': {
             icon: 'fa-arrows-alt',
@@ -55,7 +141,7 @@ $(window).load(function() {
             tipText: 'undo',
             className_a: 'leaflet-disabled',
             action: function() {
-                undo();
+                undo.undo();
             }
         },
         'redo': {
@@ -63,7 +149,7 @@ $(window).load(function() {
             tipText: 'redo',
             className_a: 'leaflet-disabled',
             action: function() {
-                redo();
+                undo.redo();
             }
         },
         'select': {
@@ -73,9 +159,8 @@ $(window).load(function() {
                 if (!hasClass('ftc-btn-select', 'selecting')) {
                     addClass('ftc-btn-select', 'selecting');
                     map.off('click', onMapClick);
-                    console.log('click off');
                     map._container.style.cursor = 'crosshair';
-                    map.on('click', drawRectangle);
+                    map.on('click', deleter.drawRectangle);
                 } else {
                     removeClass('ftc-btn-select', 'selecting');
                     for (var i in trash_mks_in) {
@@ -83,7 +168,7 @@ $(window).load(function() {
                         markers[indx].setIcon(normalIcon);
                     }
                     trash_mks_in = [];
-                    restoreCounting(e);
+                    deleter.restoreCounting(e);
                 }
             }
         },
@@ -92,44 +177,49 @@ $(window).load(function() {
             tipText: 'delete selected fission track markers',
             className_a: 'leaflet-disabled',
             action: function(e) {
-                deleteSelected();
-                restoreCounting(e);
+                deleter.deleteSelected();
+                deleter.restoreCounting(e);
             }
         }
     };
 
-    var undoStack = [];
-    var redoStack = [];
-    function execute(fromStack, toStack) {
-        if (fromStack.length) {
-            var f = fromStack.pop();
-            toStack.push(f());
+    function makeUndoStack() {
+        var undoStack = [];
+        var redoStack = [];
+        function execute(fromStack, toStack) {
+            if (fromStack.length) {
+                var f = fromStack.pop();
+                toStack.push(f());
+            }
         }
-    }
-    function updateStackButton(stack, id) {
-        if (stack.length) {
-            removeClass(id, 'leaflet-disabled');
-        } else {
-            addClass(id, 'leaflet-disabled');
+        function updateStackButton(stack, id) {
+            if (stack.length) {
+                removeClass(id, 'leaflet-disabled');
+            } else {
+                addClass(id, 'leaflet-disabled');
+            }
         }
+        function updateUndoRedoButtons() {
+            updateStackButton(undoStack, 'ftc-btn-undo');
+            updateStackButton(redoStack, 'ftc-btn-redo');
+        }
+        return {
+            redo: function() {
+                execute(redoStack, undoStack);
+                updateUndoRedoButtons();
+            },
+            undo: function() {
+                execute(undoStack, redoStack);
+                updateUndoRedoButtons();
+            },
+            withUndo: function(f) {
+                undoStack.push(f);
+                redoStack = [];
+                updateUndoRedoButtons();
+            }
+        };
     }
-    function updateUndoRedoButtons() {
-        updateStackButton(undoStack, 'ftc-btn-undo');
-        updateStackButton(redoStack, 'ftc-btn-redo');
-    }
-    function redo() {
-        execute(redoStack, undoStack);
-        updateUndoRedoButtons();
-    }
-    function undo() {
-        execute(undoStack, redoStack);
-        updateUndoRedoButtons();
-    }
-    function withUndo(f) {
-        undoStack.push(f);
-        redoStack = [];
-        updateUndoRedoButtons();
-    }
+    var undo = makeUndoStack();
 
     function addClass(id, cls) {
         L.DomUtil.addClass(L.DomUtil.get(id), cls);
@@ -177,7 +267,7 @@ $(window).load(function() {
         });
         var mks = {};
         mks[track_id] = mk;
-        withUndo(addToMap(mks));
+        undo.withUndo(addToMap(mks));
         track_id++;
     };
 
@@ -188,100 +278,6 @@ $(window).load(function() {
             createMarker(e.latlng);
         }
     };
-
-    function deleteSelected() {
-        if (trash_mks_in.length !== 0) {
-            var mks = {};
-            for (var i in trash_mks_in) {
-                indx = trash_mks_in[i]
-                mks[indx] = markers[indx];
-            }
-            withUndo(removeFromMap(mks));
-            trash_mks_in = [];
-        }
-    }
-
-    function stopSelecting() {
-        removeClass('ftc-btn-select', 'selecting');
-        rect.setBounds([
-            [0., 0.],
-            [0., 0.]
-        ]);
-    }
-
-    function setDrawRectangle(e) {
-        //L.DomEvent.preventDefault(e);
-        //L.DomEvent.stopPropagation(e);
-        twoCorner = e.latlng;
-        rect.setBounds([oneCorner, twoCorner]);
-    }
-
-    function setTwoCorner(e) {
-        twoCorner = e.latlng;
-        rect.setBounds([oneCorner, twoCorner]);
-        bounds = L.latLngBounds(oneCorner, twoCorner);
-        //--L.DomUtil.get('ftc-btn-select').css('background-color', '#fff');
-        //L.DomEvent.preventDefault(e);
-        //L.DomEvent.stopPropagation(e);
-        //L.DomEvent.disableClickPropagation(e);
-        map.off('mousemove', setDrawRectangle);
-        //map.off('click', 'drawRectangle');
-        //map.dragging.enable();
-        map._container.style.cursor = 'crosshair';
-        var j = 0;
-        for (var i in markers) {
-            latlon = markers[i].getLatLng();
-            if (bounds.contains(latlon)) {
-                trash_mks_in[j] = i;
-                markers[i].setIcon(selectedIcon);
-                j++;
-            }
-        }
-        if (trash_mks_in.length > 0) {
-            removeClass('ftc-btn-delete', 'leaflet-disabled');
-        } else {
-            trash_mks_in = [];
-            restoreCounting(e);
-        }
-    }
-
-    function setOneCorner(e) {
-        //L.DomEvent.preventDefault(e);
-        //L.DomEvent.stopPropagation(e);
-        oneCorner = e.latlng;
-        rect.setBounds([oneCorner, oneCorner]);
-        rect.addTo(map).bringToFront();
-        map.on('mousemove', setDrawRectangle);
-    }
-
-    function restoreCounting(e) {
-        L.DomEvent.preventDefault(e);
-        L.DomEvent.stopPropagation(e);
-        map.off('click', drawRectangle);
-        map.on('click', onMapClick);
-        console.log('click on');
-        numClick = 0;
-        stopSelecting();
-        addClass('ftc-btn-delete', 'leaflet-disabled');
-    }
-
-    function drawRectangle(e) {
-        numClick++;
-        if (numClick == 1) {
-            setOneCorner(e);
-        } else if (numClick == 2) {
-            setTwoCorner(e);
-        } else if (numClick == 3) {
-            for (var i in trash_mks_in) {
-                indx = trash_mks_in[i]
-                markers[indx].setIcon(normalIcon);
-            }
-            trash_mks_in = [];
-            restoreCounting(e);
-        } else {
-            alert('click event should not listened any more');
-        }
-    }
 
     function makeZStack(map, images, imageCount, yOverX, rois) {
         var bounds = [
@@ -359,14 +355,13 @@ $(window).load(function() {
 
     var zStack = null;
 
-    map = L.map('map', {
+    var map = L.map('map', {
         center: mapView,
         zoom: mapZoom,
         minZoom: mapZoom - 2,
         maxZoom: mapZoom + 3,
         scrollWheelZoom: false
         //doubleClickZoom: false
-        /* zoomControl: false */
     });
     map.attributionControl.setPrefix(''); // Don't show the 'Powered by Leaflet' text.
     map.setView(mapView, mapZoom);
@@ -374,6 +369,8 @@ $(window).load(function() {
     buttonControl.getContainer().addEventListener('dblclick', function(e) {
         e.stopPropagation();
     });
+
+    deleter = makeDeleter(map);
 
     map.on('click', onMapClick)
         .on('dblclick', function(e) {
@@ -639,7 +636,10 @@ $(window).load(function() {
     $('#tracknum-restart').click(function(e) {
         if (confirm("Are you sure that you want to reset the counter for this grain?") == true) {
             trash_mks_in = Object.keys(markers);
-            deleteSelected();
+            if (Object.keys(markers).length !== 0) {
+                undo.withUndo(removeFromMap(markers));
+                trash_mks_in = [];
+            }
             map.setView(mapView, mapZoom);
         }
     });

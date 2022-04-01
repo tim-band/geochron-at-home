@@ -8,6 +8,9 @@ from ftc.models import (
 import json
 
 
+testGrain1 = 'test/crystals/john/p1/s1/Grain01/stack-01.jpg'
+
+
 def log_in_headers(client, username, password):
     r = client.post('/ftc/api/get-token', {
         'username': username,
@@ -363,7 +366,10 @@ class ApiGrainUpdate(ApiTestMixin, TestCase):
 
     def test_superuser_can_change_grain_ownership(self):
         r = self.client.patch('/ftc/api/grain/2/', {
-            'sample': 1
+            'sample': 1,
+            # there is already an index 1 in sample 1, so we must
+            # change the index too
+            'index': 2
         }, content_type='application/json', **self.super_headers)
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content)
@@ -384,7 +390,7 @@ class ApiImageCreate(ApiTestMixin, TestCase):
     def test_image_create(self):
         r1 = self.upload_image(
             2,
-            'test/crystals/john/p1/s1/Grain01/stack-01.jpg',
+            testGrain1,
             self.headers,
         )
         self.assertEqual(r1.status_code, 201)
@@ -401,7 +407,7 @@ class ApiImageCreate(ApiTestMixin, TestCase):
     def test_cannot_create_image_for_other(self):
         r = self.upload_image(
             1,
-            'test/crystals/john/p1/s1/Grain01/stack-01.jpg',
+            testGrain1,
             self.headers,
         )
         self.assertEqual(r.status_code, 403)
@@ -409,7 +415,7 @@ class ApiImageCreate(ApiTestMixin, TestCase):
     def test_superuser_can_create_image_for_other(self):
         r1 = self.upload_image(
             1,
-            'test/crystals/john/p1/s1/Grain01/stack-01.jpg',
+            testGrain1,
             self.super_headers,
         )
         self.assertEqual(r1.status_code, 201)
