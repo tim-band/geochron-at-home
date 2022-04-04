@@ -9,9 +9,6 @@ $(window).load(function() {
 
     var mapView = [0.5, 0.5];
     var mapZoom = 11;
-    var track_id = 0;
-    var track_num = 0;
-    var markers = {};
     var myIcon = L.Icon.extend({
         options: {
             //iconUrl: "{% static 'counting/images/circle.png' %}",
@@ -24,7 +21,7 @@ $(window).load(function() {
     var normalIcon = new myIcon({
         iconUrl: iconUrl_normal
     });
-    function makeDeleter(map) {
+    function makeDeleter(map, markers) {
         var rect = L.rectangle([
             [0., 0.],
             [0., 0.]
@@ -40,14 +37,21 @@ $(window).load(function() {
         var selectedIcon = new myIcon({
             iconUrl: iconUrl_selected
         });
-        var trash_mks_in = new Array();
+        var trash_mks_in = [];
         var oneCorner, twoCorner;
         var numClick = 0;
+        function resetMarkers() {
+            for (var i in trash_mks_in) {
+                var indx = trash_mks_in[i]
+                markers[indx].setIcon(normalIcon);
+            }
+            trash_mks_in = [];
+        }
         function deleteSelected() {
             if (trash_mks_in.length !== 0) {
                 var mks = {};
                 for (var i in trash_mks_in) {
-                    indx = trash_mks_in[i]
+                    var indx = trash_mks_in[i]
                     mks[indx] = markers[indx];
                 }
                 undo.withUndo(removeFromMap(mks));
@@ -60,6 +64,7 @@ $(window).load(function() {
                 [0., 0.],
                 [0., 0.]
             ]);
+            resetMarkers();
         }
         function setDrawRectangle(e) {
             twoCorner = e.latlng;
@@ -102,11 +107,6 @@ $(window).load(function() {
             } else if (numClick == 2) {
                 setTwoCorner(e);
             } else if (numClick == 3) {
-                for (var i in trash_mks_in) {
-                    indx = trash_mks_in[i]
-                    markers[indx].setIcon(normalIcon);
-                }
-                trash_mks_in = [];
                 restoreCounting(e);
             } else {
                 alert('click event should not listened any more');
@@ -127,7 +127,80 @@ $(window).load(function() {
             drawRectangle: drawRectangle
         }
     }
+    function makeMarkers(map) {
+        var track_id = 0;
+        var track_num = 0;
+        var markers = {};
+        return {
+            makeDeleter: function() {
+                return makeDeleter(map, markers);
+            },
+            // Returns a new track marker with a new track ID,
+            // as an object with a single key (the new track ID)
+            // with the value as this new marker. This return
+            // value can be passed into addToMap as is.
+            make: function(latlng) {
+                var mk = new L.marker(latlng, {
+                    icon: normalIcon,
+                    riseOnHover: true,
+                    className: 'jhe-fissionTrack-' + track_id
+                }).on('click', function(e) {
+                    //need this to prevent event propagation
+                });
+                var mks = {};
+                mks[track_id] = mk;
+                track_id++;
+                return mks;
+            },
+            addToMap: function(markersToAdd) {
+                for (var k in markersToAdd) {
+                    mk = markersToAdd[k];
+                    mk.setIcon(normalIcon);
+                    mk.addTo(map);
+                    markers[k] = mk;
+                    track_num = track_num + 1;
+                }
+            },
+            removeFromMap: function(markersToRemove) {
+                for (var k in markersToRemove) {
+                    map.removeLayer(markersToRemove[k]);
+                    delete markers[k];
+                    track_num = track_num - 1;
+                }
+            },
+            removeAllFromMap: function() {
+                var mks = {};
+                for (var k in markers) {
+                    mks[k] = markers[k];
+                }
+                removeFromMap(mks);
+                return mks;
+            },
+            getLatLngs: function() {
+                var latlngs = new Array();
+                var j = 0;
+                for (var i in markers) {
+                    latlng = markers[i].getLatLng();
+                    latlngs[j] = [latlng.lat, latlng.lng];
+                    j++;
+                }
+                return latlngs;
+            },
+            trackCount: function() {
+                return track_num;
+            },
+            empty: function() {
+                for (var i in markers) {
+                    return false;
+                }
+                return true;
+            }
+        };
+    }
+    var markers = null;
     var deleter = null;
+    var markers = makeMarkers(map);
+    var deleter = markers.makeDeleter();
     var buttons = {
         'homeView': {
             icon: 'fa-arrows-alt',
@@ -163,11 +236,6 @@ $(window).load(function() {
                     map.on('click', deleter.drawRectangle);
                 } else {
                     removeClass('ftc-btn-select', 'selecting');
-                    for (var i in trash_mks_in) {
-                        indx = trash_mks_in[i]
-                        markers[indx].setIcon(normalIcon);
-                    }
-                    trash_mks_in = [];
                     deleter.restoreCounting(e);
                 }
             }
@@ -232,43 +300,30 @@ $(window).load(function() {
     }
 
     function updateTrackCounter() {
-        $('#tracknum').val((1000 + track_num).toString().slice(1));
+        $('#tracknum').val((1000 + markers.trackCount()).toString().slice(1));
     }
 
     function addToMap(markersToAdd) {
-        for (var k in markersToAdd) {
-            mk = markersToAdd[k];
-            mk.setIcon(normalIcon);
-            mk.addTo(map);
-            markers[k] = mk;
-            track_num = track_num + 1;
-        }
+        markers.addToMap(markersToAdd);
         updateTrackCounter();
         return function() { return removeFromMap(markersToAdd); }
     }
 
     function removeFromMap(markersToRemove) {
-        for (var k in markersToRemove) {
-            map.removeLayer(markersToRemove[k]);
-            delete markers[k];
-            track_num = track_num - 1;
-        }
+        markers.removeFromMap(markersToRemove);
         updateTrackCounter();
         return function() { return addToMap(markersToRemove); }
     }
 
+    function removeAllFromMap() {
+        var deleted = markers.removeAllFromMap();
+        updateTrackCounter();
+        return function() { return addToMap(deleted); }
+    }
+
     function createMarker(latlng) {
-        var mk = new L.marker(latlng, {
-            icon: normalIcon,
-            riseOnHover: true,
-            className: 'jhe-fissionTrack-' + track_id
-        }).on('click', function(e) {
-            //need this to prevent event propagation
-        });
-        var mks = {};
-        mks[track_id] = mk;
+        var mks = markers.make(latlng);
         undo.withUndo(addToMap(mks));
-        track_id++;
     };
 
     function onMapClick(e) {
@@ -369,8 +424,6 @@ $(window).load(function() {
     buttonControl.getContainer().addEventListener('dblclick', function(e) {
         e.stopPropagation();
     });
-
-    deleter = makeDeleter(map);
 
     map.on('click', onMapClick)
         .on('dblclick', function(e) {
@@ -547,6 +600,8 @@ $(window).load(function() {
         }
     }, true);
     zStack = makeZStack(map, grain_info.images, sliderNum, yox, grain_info.rois);
+    markers = makeMarkers(map);
+    deleter = markers.makeDeleter();
     if (('num_markers' in grain_info) && ('marker_latlngs' in grain_info)) {
         var latlng;
         for (var i = 0; i < grain_info.num_markers; i++) {
@@ -560,14 +615,8 @@ $(window).load(function() {
     /* submit result */
     $('#tracknum-submit').click(function() {
         if (confirm("submit the result?") == true) {
-            ftc_res['track_num'] = track_num;
-            latlngs = new Array();
-            var j = 0;
-            for (var i in markers) {
-                latlng = markers[i].getLatLng();
-                latlngs[j] = [latlng.lat, latlng.lng];
-                j++;
-            }
+            ftc_res['track_num'] = markers.trackCount();
+            var latlngs = markers.getLatLngs();
             ftc_res['marker_latlngs'] = latlngs
             str = JSON.stringify({
                 'counting_res': ftc_res
@@ -593,13 +642,7 @@ $(window).load(function() {
 
     $('#tracknum-save').click(function() {
         if (confirm("Save the intermedia result to the server?") == true) {
-            latlngs = new Array();
-            var j = 0;
-            for (var i in markers) {
-                latlng = markers[i].getLatLng();
-                latlngs[j] = [latlng.lat, latlng.lng];
-                j++;
-            }
+            var latlngs = markers.getLatLngs();
             // use ftc_res info
             res = {
                 'proj_id': ftc_res['proj_id'],
@@ -608,15 +651,12 @@ $(window).load(function() {
                 'ft_type': ftc_res['ft_type'],
                 'image_width': ftc_res['image_width'],
                 'image_height': ftc_res['image_height'],
-                'num_markers': j,
+                'num_markers': latlngs.length,
                 'marker_latlngs': latlngs
             };
             str = JSON.stringify({
                 'intermedia_res': res
             });
-            console.log('total markers: ' + j);
-            console.log(latlngs);
-            console.log(str);
             $.ajax({
                 url: saveWorkingGrain_url,
                 type: 'POST',
@@ -635,10 +675,8 @@ $(window).load(function() {
     });
     $('#tracknum-restart').click(function(e) {
         if (confirm("Are you sure that you want to reset the counter for this grain?") == true) {
-            trash_mks_in = Object.keys(markers);
-            if (Object.keys(markers).length !== 0) {
-                undo.withUndo(removeFromMap(markers));
-                trash_mks_in = [];
+            if (!markers.empty()) {
+                undo.withUndo(removeAllFromMap());
             }
             map.setView(mapView, mapZoom);
         }

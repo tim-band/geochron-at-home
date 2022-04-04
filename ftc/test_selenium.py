@@ -250,7 +250,7 @@ class CountingPage(BasePage):
 
     def check_count(self, count):
         retrying(
-            6,
+            7,
             lambda: self.assert_count(count),
             0.3
         )
