@@ -95,7 +95,7 @@ $ docker-compose exec django ./site_init.sh
 If any static files have changed you might have to:
 
 ```sh
-(gechron-at-home) $ STATIC_ROOT='static' python manage.py collectstatic
+(gechron-at-home) $ python manage.py collectstatic
 ```
 
 Then, in any case you must:

@@ -21,7 +21,7 @@ from datetime import timedelta
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DJANGO_DEBUG') in ['1', 'true', 'True', 'TRUE']
+DEBUG = os.getenv('DJANGO_DEBUG') not in ['0', 'false', 'False', 'FALSE', 'no', 'No', 'NO']
 
 TEMPLATE_DEBUG = DEBUG
 
@@ -171,13 +171,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = os.getenv('STATIC_URL') or 'static/'
-STATIC_ROOT = os.getenv('STATIC_ROOT') or ''
+STATIC_ROOT = os.getenv('STATIC_ROOT') or 'static'
 STATICFILES_DIRS = [
   os.path.join(BASE_DIR, 'vendor'),
 ]
-if STATIC_ROOT == '':
-    STATICFILES_DIRS.append(os.path.join(BASE_DIR, 'static'))
-elif not os.path.isabs(STATIC_ROOT):
+if not os.path.isabs(STATIC_ROOT):
     STATIC_ROOT = os.path.join(BASE_DIR, STATIC_ROOT)
 
 #

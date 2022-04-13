@@ -32,6 +32,7 @@ services:
       - STATIC_ROOT=/code/static
       - DB_HOST=db
       - PROMETHEUS_METRICS_EXPORT_PORT_RANGE=8001-8019
+      - DJANGO_DEBUG=0
     ports:
       - "3851-3869:8001-8019"
     volumes:
