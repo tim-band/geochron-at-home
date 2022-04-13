@@ -5,9 +5,6 @@ $(window).load(function() {
         return;
     }
 
-    var ftc_res = {};
-
-    var mapView = [0.5, 0.5];
     var mapZoom = 11;
     var myIcon = L.Icon.extend({
         options: {
@@ -206,7 +203,8 @@ $(window).load(function() {
             icon: 'fa-arrows-alt',
             tipText: 'fit images to window',
             action: function() {
-                map.setView(mapView, mapZoom);
+                var yox = grain_info.image_height / grain_info.image_width;
+                map.setView([yox / 2, 0.5], mapZoom);
             }
         },
         'undo': {
@@ -411,7 +409,7 @@ $(window).load(function() {
     var zStack = null;
 
     var map = L.map('map', {
-        center: mapView,
+        center: [grain_info.image_height / grain_info.image_width / 2, 0.5],
         zoom: mapZoom,
         minZoom: mapZoom - 2,
         maxZoom: mapZoom + 3,
@@ -419,7 +417,6 @@ $(window).load(function() {
         //doubleClickZoom: false
     });
     map.attributionControl.setPrefix(''); // Don't show the 'Powered by Leaflet' text.
-    map.setView(mapView, mapZoom);
     buttonControl = L.easyButton(buttons, map, 'topright');
     buttonControl.getContainer().addEventListener('dblclick', function(e) {
         e.stopPropagation();
@@ -584,14 +581,6 @@ $(window).load(function() {
         }
     });
 
-    ftc_res['proj_id'] = grain_info.proj_id;
-    ftc_res['sample_id'] = grain_info.sample_id;
-    ftc_res['grain_num'] = grain_info.grain_num;
-    ftc_res['ft_type'] = grain_info.ft_type;
-    ftc_res['image_width'] = grain_info.image_width;
-    ftc_res['image_height'] = grain_info.image_height;
-    var yox = grain_info.image_height / grain_info.image_width;
-    mapView = [yox / 2, 0.5];
     var sliderNum = grain_info.images.length;
     sliders2.updateOptions({
         range: {
@@ -599,6 +588,7 @@ $(window).load(function() {
             'max': sliderNum - 1
         }
     }, true);
+    var yox = grain_info.image_height / grain_info.image_width;
     zStack = makeZStack(map, grain_info.images, sliderNum, yox, grain_info.rois);
     markers = makeMarkers(map);
     deleter = markers.makeDeleter();
@@ -609,17 +599,24 @@ $(window).load(function() {
             createMarker(latlng);
         }
     }
-    map.setView(mapView, mapZoom);
+    map.setView([yox / 2, 0.5], mapZoom);
     updateTrackCounter();
 
     /* submit result */
     $('#tracknum-submit').click(function() {
         if (confirm("submit the result?") == true) {
-            ftc_res['track_num'] = markers.trackCount();
             var latlngs = markers.getLatLngs();
-            ftc_res['marker_latlngs'] = latlngs
             str = JSON.stringify({
-                'counting_res': ftc_res
+                'counting_res': {
+                    'proj_id': grain_info.proj_id,
+                    'sample_id': grain_info.sample_id,
+                    'grain_num': grain_info.grain_num,
+                    'ft_type': grain_info.ft_type,
+                    'image_width': grain_info.image_width,
+                    'image_height': grain_info.image_height,
+                    'marker_latlngs': latlng,
+                    'track_num': markers.trackCount()
+                }
             });
             $.ajax({
                 url: updateTFNResult_url,
@@ -628,7 +625,6 @@ $(window).load(function() {
                 data: str,
                 success: function(result) {
                     console.log('submitted: ' + result.reply);
-                    ftc_res = {};
                     window.location.href = getNewGrain_url;
                 },
                 error: function(xhr, errmsg, err) {
@@ -643,19 +639,17 @@ $(window).load(function() {
     $('#tracknum-save').click(function() {
         if (confirm("Save the intermedia result to the server?") == true) {
             var latlngs = markers.getLatLngs();
-            // use ftc_res info
-            res = {
-                'proj_id': ftc_res['proj_id'],
-                'sample_id': ftc_res['sample_id'],
-                'grain_num': ftc_res['grain_num'],
-                'ft_type': ftc_res['ft_type'],
-                'image_width': ftc_res['image_width'],
-                'image_height': ftc_res['image_height'],
-                'num_markers': latlngs.length,
-                'marker_latlngs': latlngs
-            };
             str = JSON.stringify({
-                'intermedia_res': res
+                'intermedia_res': {
+                    'proj_id': grain_info.proj_id,
+                    'sample_id': grain_info.sample_id,
+                    'grain_num': grain_info.grain_num,
+                    'ft_type': grain_info.ft_type,
+                    'image_width': grain_info.image_width,
+                    'image_height': grain_info.image_height,
+                    'num_markers': latlngs.length,
+                    'marker_latlngs': latlngs
+                }
             });
             $.ajax({
                 url: saveWorkingGrain_url,
@@ -678,7 +672,8 @@ $(window).load(function() {
             if (!markers.empty()) {
                 undo.withUndo(removeAllFromMap());
             }
-            map.setView(mapView, mapZoom);
+            var yox = grain_info.image_height / grain_info.image_width;
+            map.setView([yox / 2, 0.5], mapZoom);
         }
     });
 })
