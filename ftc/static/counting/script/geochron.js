@@ -1,10 +1,6 @@
 /* geochron v0.1 (c) 2014 Jiangping He */
-function grain_view(grain_info) {
-
-    if (!grain_info) {
-        return;
-    }
-
+function grain_view(options) {
+    var grain_info = options.grain_info;
     var mapZoom = 11;
     var myIcon = L.Icon.extend({
         options: {
@@ -16,7 +12,7 @@ function grain_view(grain_info) {
         }
     });
     var normalIcon = new myIcon({
-        iconUrl: iconUrl_normal
+        iconUrl: options.iconUrl_normal
     });
     function makeDeleter(map, markers) {
         var rect = L.rectangle([
@@ -32,7 +28,7 @@ function grain_view(grain_info) {
             clickable: true
         });
         var selectedIcon = new myIcon({
-            iconUrl: iconUrl_selected
+            iconUrl: options.iconUrl_selected
         });
         var trash_mks_in = [];
         var oneCorner, twoCorner;
@@ -413,8 +409,8 @@ function grain_view(grain_info) {
         zoom: mapZoom,
         minZoom: mapZoom - 2,
         maxZoom: mapZoom + 3,
-        scrollWheelZoom: false
-        //doubleClickZoom: false
+        scrollWheelZoom: false,
+        doubleClickZoom: false
     });
     map.attributionControl.setPrefix(''); // Don't show the 'Powered by Leaflet' text.
     buttonControl = L.easyButton(buttons, map, 'topright');
@@ -422,14 +418,8 @@ function grain_view(grain_info) {
         e.stopPropagation();
     });
 
-    map.on('click', onMapClick)
-        .on('dblclick', function(e) {
-            $(this).data('jhe_double', 2);
-        });
+    map.on('click', onMapClick);
 
-    /**************************
-     *   wheel change layer   *
-     **************************/
     $('#map').mousewheel(function(e, delta) {
         if (delta < 0) {
             zStack.decrement();
@@ -575,12 +565,6 @@ function grain_view(grain_info) {
         ev.stopPropagation();
     };
 
-    $.ajaxSetup({
-        beforeSend: function(xhr, settings) {
-            xhr.setRequestHeader('X-CSRFToken', atoken);
-        }
-    });
-
     var sliderNum = grain_info.images.length;
     sliders2.updateOptions({
         range: {
@@ -605,8 +589,18 @@ function grain_view(grain_info) {
     /* submit result */
     $('#tracknum-submit').click(function() {
         if (confirm("submit the result?") == true) {
-            var latlngs = markers.getLatLngs();
-            str = JSON.stringify({
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', options.updateTFNResult_url);
+            xhr.onload = function() {
+                console.log('submitted: ' + xhr.responseText);
+                window.location.href = options.getNewGrain_url;
+            };
+            xhr.onerror = function() {
+                console.log(xhr.status + ": " + xhr.responseText);
+            };
+            xhr.setRequestHeader('X-CSRFToken', options.atoken);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(JSON.stringify({
                 'counting_res': {
                     'proj_id': grain_info.proj_id,
                     'sample_id': grain_info.sample_id,
@@ -614,23 +608,10 @@ function grain_view(grain_info) {
                     'ft_type': grain_info.ft_type,
                     'image_width': grain_info.image_width,
                     'image_height': grain_info.image_height,
-                    'marker_latlngs': latlng,
+                    'marker_latlngs': markers.getLatLngs(),
                     'track_num': markers.trackCount()
                 }
-            });
-            $.ajax({
-                url: updateTFNResult_url,
-                type: 'POST',
-                dataType: 'json',
-                data: str,
-                success: function(result) {
-                    console.log('submitted: ' + result.reply);
-                    window.location.href = getNewGrain_url;
-                },
-                error: function(xhr, errmsg, err) {
-                    console.log(xhr.status + ": " + xhr.responseText);
-                }
-            });
+            }));
         } else {
             console.log("You pressed Cancel!");
         }
@@ -639,7 +620,18 @@ function grain_view(grain_info) {
     $('#tracknum-save').click(function() {
         if (confirm("Save the intermedia result to the server?") == true) {
             var latlngs = markers.getLatLngs();
-            str = JSON.stringify({
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', options.saveWorkingGrain_url);
+            xhr.onload = function() {
+                console.log('submitted: ' + xhr.responseText);
+            };
+            xhr.onerror = function() {
+                console.log(xhr.status + ": " + xhr.responseText);
+                alert('Failed to save your intermedia result, Please try again.');
+            };
+            xhr.setRequestHeader('X-CSRFToken', options.atoken);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.send(JSON.stringify({
                 'intermedia_res': {
                     'proj_id': grain_info.proj_id,
                     'sample_id': grain_info.sample_id,
@@ -650,21 +642,7 @@ function grain_view(grain_info) {
                     'num_markers': latlngs.length,
                     'marker_latlngs': latlngs
                 }
-            });
-            $.ajax({
-                url: saveWorkingGrain_url,
-                type: 'POST',
-                dataType: 'json',
-                data: str,
-                success: function(result) {
-                    console.log('submitted: ' + result.reply);
-                },
-                error: function(xhr, errmsg, err) {
-                    console.log(xhr.status + ": " + xhr.responseText);
-                    alert('Failed to save your intermedia result, Please try again.');
-                }
-            });
-
+            }));
         }
     });
     $('#tracknum-restart').click(function(e) {

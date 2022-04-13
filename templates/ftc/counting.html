@@ -108,15 +108,16 @@ font-family: "ds-digitalitalic";
 <script type='text/javascript' src="{% static 'noUiSlider-14.6.3/nouislider.min.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 <script type='text/javascript'>
-var iconUrl_normal = "{% static 'counting/images/circle.png' %}";
-var iconUrl_selected = "{% static 'counting/images/redCircle.png' %}";
-var atoken = '{{ csrf_token }}';
-var updateTFNResult_url = "{% url 'updateTFNResult'%}";
-var saveWorkingGrain_url = "{% url 'saveWorkingGrain'%}";
-var getNewGrain_url = "{% url 'counting' %}"
 function setup() {
-    var grain_info = JSON.parse('{{ grain_info|escapejs }}');
-    grain_view(grain_info);
+    grain_view({
+        grain_info: JSON.parse('{{ grain_info|escapejs }}'),
+        atoken: '{{ csrf_token }}',
+        iconUrl_normal: "{% static 'counting/images/circle.png' %}",
+        iconUrl_selected: "{% static 'counting/images/redCircle.png' %}",
+        updateTFNResult_url: "{% url 'updateTFNResult'%}",
+        saveWorkingGrain_url: "{% url 'saveWorkingGrain'%}",
+        getNewGrain_url: "{% url 'counting' %}"
+    });
 }
 </script>
 {% endblock %}

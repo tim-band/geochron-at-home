@@ -13,6 +13,7 @@ djangorestframework-simplejwt = "*"
 jwcrypto = "*"
 django-prometheus = "*"
 rsa = "*"
+tzdata = ">=2022.1"  # required for Alpine linux (used in the Dockerfile)
 
 [dev-packages]
 rsa = "*"
