@@ -1,5 +1,5 @@
 /* geochron v0.1 (c) 2014 Jiangping He */
-$(window).load(function() {
+function grain_view(grain_info) {
 
     if (!grain_info) {
         return;
@@ -432,9 +432,9 @@ $(window).load(function() {
      **************************/
     $('#map').mousewheel(function(e, delta) {
         if (delta < 0) {
-            zStack.dec();
+            zStack.decrement();
         } else {
-            zStack.inc();
+            zStack.increment();
         }
         sliders2.set(zStack.position());
         return false;
@@ -676,5 +676,4 @@ $(window).load(function() {
             map.setView([yox / 2, 0.5], mapZoom);
         }
     });
-})
-
+}

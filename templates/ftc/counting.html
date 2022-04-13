@@ -106,28 +106,33 @@ font-family: "ds-digitalitalic";
 <script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/jquery.mousewheel.js' %}"></script>
 <script type='text/javascript' src="{% static 'noUiSlider-14.6.3/nouislider.min.js' %}"></script>
+<script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 <script type='text/javascript'>
 var iconUrl_normal = "{% static 'counting/images/circle.png' %}";
 var iconUrl_selected = "{% static 'counting/images/redCircle.png' %}";
 var atoken = '{{ csrf_token }}';
-var grain_info = JSON.parse('{{ grain_info|escapejs }}')
 var updateTFNResult_url = "{% url 'updateTFNResult'%}";
 var saveWorkingGrain_url = "{% url 'saveWorkingGrain'%}";
 var getNewGrain_url = "{% url 'counting' %}"
+function setup() {
+    var grain_info = JSON.parse('{{ grain_info|escapejs }}');
+    grain_view(grain_info);
+}
 </script>
-<script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 {% endblock %}
 
-            {% block left_nav_li %}{% endblock %}
+{% block left_nav_li %}{% endblock %}
 
-            {% block right_nav_li %}{% endblock %}
+{% block right_nav_li %}{% endblock %}
 
-            {% block right_nav_functon_li %}
-                {% if user.is_staff %}
-                    <li class="divider"></li>
-                    <li><a href="{%url 'report'%}"><i class="fa fa-cubes"></i>&nbsp;Manage your projects</a></li>
-                {% endif %}
-            {% endblock %}
+{% block right_nav_functon_li %}
+    {% if user.is_staff %}
+        <li class="divider"></li>
+        <li><a href="{%url 'report'%}"><i class="fa fa-cubes"></i>&nbsp;Manage your projects</a></li>
+    {% endif %}
+{% endblock %}
+
+{% block body_attributes %}onload='setup()'{% endblock %}
 
 {% block content %}
 <div id="dropdown-tracknum" class="input-group">
