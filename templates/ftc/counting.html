@@ -109,15 +109,20 @@ font-family: "ds-digitalitalic";
 <script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 <script type='text/javascript'>
 function setup() {
-    grain_view({
+    var map = grain_view({
         grain_info: JSON.parse('{{ grain_info|escapejs }}'),
         atoken: '{{ csrf_token }}',
         iconUrl_normal: "{% static 'counting/images/circle.png' %}",
-        iconUrl_selected: "{% static 'counting/images/redCircle.png' %}",
-        updateTFNResult_url: "{% url 'updateTFNResult'%}",
-        saveWorkingGrain_url: "{% url 'saveWorkingGrain'%}",
-        getNewGrain_url: "{% url 'counting' %}"
+        iconUrl_selected: "{% static 'counting/images/redCircle.png' %}"
     });
+    map.setTrackCounterElement(document.getElementById('tracknum'));
+    document.getElementById('tracknum-submit').onclick = function() {
+        map.submitTrackCount("{% url 'updateTFNResult'%}", "{% url 'counting' %}");
+    };
+    document.getElementById('tracknum-save').onclick = function() {
+        map.saveTrackCount("{% url 'saveWorkingGrain'%}");
+    };
+    document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
 }
 </script>
 {% endblock %}

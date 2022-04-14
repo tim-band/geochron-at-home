@@ -1,4 +1,27 @@
 /* geochron v0.1 (c) 2014 Jiangping He */
+/**
+ * Creates a pannable, focussable viewer of a grain z-stack.
+ * @param {*} options Options:
+ * grain_info.image_height The height in pixels of the image
+ * grain_info.image_width The width in pixels of the image
+ * grain_info.scale_x Meters per pixel, if known
+ * grain_info.images Array of URLs to the z-stack images
+ * grain_info.marker_latlngs Array of marker positions
+ * grain_info.rois Array of regions of interest, each of which is an array
+ *   of vertex positions [x,y] in pixels
+ * iconUrl_normal Url of marker image
+ * iconUrl_selected Url of selected marker image
+ * atoken CSRF token
+ * @returns {*} An object giving functions to add functionality to the viewer
+ * setTrackCounterCallback: Sets a function that takes the current number of
+ *   markers and sets this in some track counter element
+ * setTrackCounterElement: as setTrackCounterCallback, but takes an input
+ *   element that should have its counter set as a three digit number
+ * submitTrackCount: Takes two URLs, submitUrl and newGrainUrl, POSTs the
+ *  current marker set to submitUrl and redirects to newGrainUrl
+ * saveTrackCount: Takes a URL and POSTs the current marker set to it
+ * restartTrackCount: Delete all the markers and reset the track counter
+ */
 function grain_view(options) {
     var grain_info = options.grain_info;
     var mapZoom = 11;
@@ -293,9 +316,7 @@ function grain_view(options) {
         L.DomUtil.hasClass(L.DomUtil.get(id), cls);
     }
 
-    function updateTrackCounter() {
-        $('#tracknum').val((1000 + markers.trackCount()).toString().slice(1));
-    }
+    var updateTrackCounter = function() {};
 
     function addToMap(markersToAdd) {
         markers.addToMap(markersToAdd);
@@ -420,8 +441,8 @@ function grain_view(options) {
 
     map.on('click', onMapClick);
 
-    $('#map').mousewheel(function(e, delta) {
-        if (delta < 0) {
+    L.DomEvent.on(map.getContainer(), 'wheel', function(e) {
+        if (e.deltaY < 0) {
             zStack.decrement();
         } else {
             zStack.increment();
@@ -576,82 +597,95 @@ function grain_view(options) {
     zStack = makeZStack(map, grain_info.images, sliderNum, yox, grain_info.rois);
     markers = makeMarkers(map);
     deleter = markers.makeDeleter();
-    if (('num_markers' in grain_info) && ('marker_latlngs' in grain_info)) {
+    if ('marker_latlngs' in grain_info) {
         var latlng;
-        for (var i = 0; i < grain_info.num_markers; i++) {
+        for (var i = 0; i < grain_info.marker_latlngs.length; i++) {
             latlng = grain_info.marker_latlngs[i];
             createMarker(latlng);
         }
     }
     map.setView([yox / 2, 0.5], mapZoom);
-    updateTrackCounter();
 
-    /* submit result */
-    $('#tracknum-submit').click(function() {
-        if (confirm("submit the result?") == true) {
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', options.updateTFNResult_url);
-            xhr.onload = function() {
-                console.log('submitted: ' + xhr.responseText);
-                window.location.href = options.getNewGrain_url;
-            };
-            xhr.onerror = function() {
-                console.log(xhr.status + ": " + xhr.responseText);
-            };
-            xhr.setRequestHeader('X-CSRFToken', options.atoken);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.send(JSON.stringify({
-                'counting_res': {
-                    'proj_id': grain_info.proj_id,
-                    'sample_id': grain_info.sample_id,
-                    'grain_num': grain_info.grain_num,
-                    'ft_type': grain_info.ft_type,
-                    'image_width': grain_info.image_width,
-                    'image_height': grain_info.image_height,
-                    'marker_latlngs': markers.getLatLngs(),
-                    'track_num': markers.trackCount()
-                }
-            }));
-        } else {
-            console.log("You pressed Cancel!");
-        }
-    });
+    function setTrackCounterCallback(cb) {
+        updateTrackCounter = function() {
+            cb(markers.trackCount());
+        };
+        updateTrackCounter();
+    };
 
-    $('#tracknum-save').click(function() {
-        if (confirm("Save the intermedia result to the server?") == true) {
-            var latlngs = markers.getLatLngs();
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', options.saveWorkingGrain_url);
-            xhr.onload = function() {
-                console.log('submitted: ' + xhr.responseText);
-            };
-            xhr.onerror = function() {
-                console.log(xhr.status + ": " + xhr.responseText);
-                alert('Failed to save your intermedia result, Please try again.');
-            };
-            xhr.setRequestHeader('X-CSRFToken', options.atoken);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.send(JSON.stringify({
-                'intermedia_res': {
-                    'proj_id': grain_info.proj_id,
-                    'sample_id': grain_info.sample_id,
-                    'grain_num': grain_info.grain_num,
-                    'ft_type': grain_info.ft_type,
-                    'image_width': grain_info.image_width,
-                    'image_height': grain_info.image_height,
-                    'num_markers': latlngs.length,
-                    'marker_latlngs': latlngs
-                }
-            }));
-        }
-    });
-    $('#tracknum-restart').click(function(e) {
-        if (confirm("Are you sure that you want to reset the counter for this grain?") == true) {
-            if (!markers.empty()) {
-                undo.withUndo(removeAllFromMap());
+    return {
+        setTrackCounterCallback: setTrackCounterCallback,
+        setTrackCounterElement: function(element) {
+            setTrackCounterCallback(function(count) {
+                var v = (1000 + count).toString().slice(1);
+                element.setRangeText(v, 0, 3, 'end');
+            });
+        },
+        submitTrackCount: function(upateUrl, newGrainUrl) {
+            if (confirm("submit the result?") == true) {
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', upateUrl);
+                xhr.onload = function() {
+                    console.log('submitted: ' + xhr.responseText);
+                    window.location.href = newGrainUrl;
+                };
+                xhr.onerror = function() {
+                    console.log(xhr.status + ": " + xhr.responseText);
+                };
+                xhr.setRequestHeader('X-CSRFToken', options.atoken);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.send(JSON.stringify({
+                    'counting_res': {
+                        'proj_id': grain_info.proj_id,
+                        'sample_id': grain_info.sample_id,
+                        'grain_num': grain_info.grain_num,
+                        'ft_type': grain_info.ft_type,
+                        'image_width': grain_info.image_width,
+                        'image_height': grain_info.image_height,
+                        'marker_latlngs': markers.getLatLngs(),
+                        'track_num': markers.trackCount()
+                    }
+                }));
+            } else {
+                console.log("You pressed Cancel!");
             }
-            var yox = grain_info.image_height / grain_info.image_width;
-            map.setView([yox / 2, 0.5], mapZoom);
+        },
+        saveTrackCount: function(saveUrl) {
+            if (confirm("Save the intermediate result to the server?") == true) {
+                var latlngs = markers.getLatLngs();
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', saveUrl);
+                xhr.onload = function() {
+                    console.log('submitted: ' + xhr.responseText);
+                };
+                xhr.onerror = function() {
+                    console.log(xhr.status + ": " + xhr.responseText);
+                    alert('Failed to save your intermediate result, Please try again.');
+                };
+                xhr.setRequestHeader('X-CSRFToken', options.atoken);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.send(JSON.stringify({
+                    'intermedia_res': {
+                        'proj_id': grain_info.proj_id,
+                        'sample_id': grain_info.sample_id,
+                        'grain_num': grain_info.grain_num,
+                        'ft_type': grain_info.ft_type,
+                        'image_width': grain_info.image_width,
+                        'image_height': grain_info.image_height,
+                        'num_markers': latlngs.length,
+                        'marker_latlngs': latlngs
+                    }
+                }));
+            }
+        },
+        restartTrackCount: function() {
+            if (confirm("Are you sure that you want to reset the counter for this grain?") == true) {
+                if (!markers.empty()) {
+                    undo.withUndo(removeAllFromMap());
+                }
+                var yox = grain_info.image_height / grain_info.image_width;
+                map.setView([yox / 2, 0.5], mapZoom);
+            }
         }
-    });
+    }
 }
