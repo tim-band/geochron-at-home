@@ -123,6 +123,7 @@ function setup() {
         map.saveTrackCount("{% url 'saveWorkingGrain'%}");
     };
     document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
+    map.enableEditing();
 }
 </script>
 {% endblock %}

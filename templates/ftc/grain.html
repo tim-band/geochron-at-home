@@ -91,17 +91,13 @@ button:disabled {
 <script type='text/javascript' src="{% static 'noUiSlider-14.6.3/nouislider.min.js' %}"></script>
 <script>var static_ring_svg_url="{% static 'home/ring.svg' %}";</script>
 <script type='text/javascript' src="{% static 'projects/script/grain.js' %}"></script>
+<script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 <script>
 var crystal_control;
 function makeGrainMap() {
     var image_height = {{ object.image_height }};
     var image_width = {{ object.image_width }};
-    var image_urls = [
-        //{% for i in object.get_images %}
-        "{% url 'get_image' i.pk %}",
-        //{% endfor %}
-    ];
-    var region_points = [
+    var rois = [
         //{% for region in object.region_set.all %}
         [
             //{% for v in region.vertex_set.all|order_by:"id" %}
@@ -109,8 +105,28 @@ function makeGrainMap() {
             //{% endfor %}
         ],
         //{% endfor %}
-    ];
-    return makeMap(image_height, image_width, image_urls, region_points);
+    ]
+    var view = grain_view({
+        grain_info: {
+            image_width: image_width,
+            image_height: image_height,
+            // scale_x
+            images: [
+                //{% for i in object.get_images %}
+                "{% url 'get_image' i.pk %}",
+                //{% endfor %}
+            ],
+            rois: rois
+        },
+        atoken: '{{ csrf_token }}'
+    });
+    return {
+        map: view.map,
+        region_layer: view.roisLayer,
+        marker_layer: L.layerGroup().addTo(view.map),
+        mid_marker_layer: L.layerGroup().addTo(view.map),
+        region_points: rois,
+    };
 }
 window.addEventListener('load', function() {
     crystal_control = makeGrainMap();
@@ -127,6 +143,7 @@ window.addEventListener('load', function() {
         in sample <strong>{{ object.sample.sample_name }}</strong>,
         in project <strong>{{ object.sample.in_project.project_name }}</strong>
     </span>
+    <!--got to figure out how to fix this-->
     <button id="edit" onclick="beginEdit(crystal_control)">Edit</button>
     <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
 </div>

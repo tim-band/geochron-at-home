@@ -20,7 +20,10 @@
  * submitTrackCount: Takes two URLs, submitUrl and newGrainUrl, POSTs the
  *  current marker set to submitUrl and redirects to newGrainUrl
  * saveTrackCount: Takes a URL and POSTs the current marker set to it
- * restartTrackCount: Delete all the markers and reset the track counter
+ * restartTrackCount: Deletes all the markers and reset the track counter
+ * enableEditing: Creates the editing buttons and allows clicking to add markers
+ * map: The Leaflet map
+ * roisLayer: The Leaflet layer containing the region polygons
  */
 function grain_view(options) {
     var grain_info = options.grain_info;
@@ -213,6 +216,7 @@ function grain_view(options) {
             }
         };
     }
+    var isEditable = false;
     var markers = null;
     var deleter = null;
     var markers = makeMarkers(map);
@@ -301,19 +305,27 @@ function grain_view(options) {
                 undoStack.push(f);
                 redoStack = [];
                 updateUndoRedoButtons();
-            }
+            },
+            updateButtons: updateUndoRedoButtons
         };
     }
     var undo = makeUndoStack();
 
     function addClass(id, cls) {
-        L.DomUtil.addClass(L.DomUtil.get(id), cls);
+        var e = L.DomUtil.get(id);
+        if (e) {
+            L.DomUtil.addClass(e, cls);
+        }
     }
     function removeClass(id, cls) {
-        L.DomUtil.removeClass(L.DomUtil.get(id), cls);
+        var e = L.DomUtil.get(id);
+        if (e) {
+            L.DomUtil.removeClass(e, cls);
+        }
     }
     function hasClass(id, cls) {
-        L.DomUtil.hasClass(L.DomUtil.get(id), cls);
+        var e = L.DomUtil.get(id);
+        return e && L.DomUtil.hasClass(e, cls);
     }
 
     var updateTrackCounter = function() {};
@@ -344,7 +356,7 @@ function grain_view(options) {
     function onMapClick(e) {
         L.DomEvent.preventDefault(e);
         L.DomEvent.stopPropagation(e);
-        if (zStack.pointInRois(e.latlng.lat, e.latlng.lng)) {
+        if (isEditable && zStack.pointInRois(e.latlng.lat, e.latlng.lng)) {
             createMarker(e.latlng);
         }
     };
@@ -361,19 +373,16 @@ function grain_view(options) {
             ).addTo(map);
         }
         var currentLayer = 0;
-        var polygon_arrays = rois;
-        for (var i = 0; i < polygon_arrays.length; i++) {
-            L.polygon(polygon_arrays[i], {
-                color: 'white',
-                opacity: 1.0,
-                fill: false,
-                clickable: true,
-                className: 'ftc-rect-select-area'
-            }).on('click', function(e) {
-                L.DomEvent.preventDefault(e);
-                L.DomEvent.stopPropagation(e);
-            }).addTo(map);
-        }
+        var rois_layer = L.polygon(rois, {
+            color: 'white',
+            opacity: 1.0,
+            fill: false,
+            clickable: true,
+            className: 'ftc-rect-select-area'
+        }).on('click', function(e) {
+            L.DomEvent.preventDefault(e);
+            L.DomEvent.stopPropagation(e);
+        }).addTo(map);
         function point_in_polygon(x, y, vs) {
             // ray-casting algorithm based on
             // http://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html
@@ -418,8 +427,9 @@ function grain_view(options) {
                 refresh();
             },
             pointInRois: function(x, y) {
-                return point_in_any_polygon(x, y, polygon_arrays);
-            }
+                return point_in_any_polygon(x, y, rois);
+            },
+            rois_layer: rois_layer
         };
     }
 
@@ -434,11 +444,6 @@ function grain_view(options) {
         doubleClickZoom: false
     });
     map.attributionControl.setPrefix(''); // Don't show the 'Powered by Leaflet' text.
-    buttonControl = L.easyButton(buttons, map, 'topright');
-    buttonControl.getContainer().addEventListener('dblclick', function(e) {
-        e.stopPropagation();
-    });
-
     map.on('click', onMapClick);
 
     L.DomEvent.on(map.getContainer(), 'wheel', function(e) {
@@ -686,6 +691,16 @@ function grain_view(options) {
                 var yox = grain_info.image_height / grain_info.image_width;
                 map.setView([yox / 2, 0.5], mapZoom);
             }
-        }
+        },
+        enableEditing: function() {
+            isEditable = true;
+            buttonControl = L.easyButton(buttons, map, 'topright');
+            buttonControl.getContainer().addEventListener('dblclick', function(e) {
+                e.stopPropagation();
+            });
+            undo.updateButtons();
+        },
+        map: map,
+        roisLayer: zStack.rois_layer
     }
 }
