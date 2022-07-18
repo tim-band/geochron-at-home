@@ -21,9 +21,26 @@ should not be typed yourself! The prompts I have used are as follows:
 ### Configure your Geochron@home instance
 
 Copy the file `env` to `.env`, and edit the new copy as appropriate. In
-particular replace `<GEOCHRON_PASSWORD>` with the password you set
-after `\password geochron` above. These settings will be set as environment
-variables when you enter your pipenv shell (see next section).
+particular replace `<GEOCHRON_PASSWORD>` with an arbitrary password
+(this does not need to be a secure password on a local development
+installation).
+
+There are also the details for two initially-provisioned users in this
+file: `admin` and `john`. You should change these users' details if
+you are installing in production (or if you want to for some other
+reason). The variables you need to change are called:
+
+```
+SITE_ADMIN_NAME
+SITE_ADMIN_PASSWORD
+SITE_ADMIN_EMAIL
+PROJ_ADMIN_NAME
+PROJ_ADMIN_PASSWORD
+PROJ_ADMIN_EMAIL
+```
+
+These settings will be set as environment variables when
+you enter your pipenv shell (see next section).
 
 ### Setting up a Python environment
 
@@ -77,6 +94,8 @@ Password for user geochron:
 geochron=>
 ```
 
+And you can exit postgres with `\q`.
+
 #### Resetting the database in docker-compose
 
 Normally a "production" server running inside docker-compose will
@@ -92,13 +111,7 @@ $ docker-compose exec django ./site_init.sh
 
 ### Starting Geochron@Home
 
-If any static files have changed you might have to:
-
-```sh
-(gechron-at-home) $ python manage.py collectstatic
-```
-
-Then, in any case you must:
+Run the server with:
 
 ```sh
 (geochron-at-home) $ python manage.py runserver
@@ -155,6 +168,15 @@ Run 2 workers with:
 (geochron-at-home) $ gunicorn -b 127.0.0.1:3841 --workers=2 geochron.wsgi
 ```
 
+Whenever any static files (anything in the `ftc/static` directory) have changed
+you will need to run:
+
+```sh
+(gechron-at-home) $ python manage.py collectstatic
+```
+
+so that these changes are reflected when running behind nginx.
+
 ## Running in production with docker-compose
 
 Firstly copy the file `production_env` to `production.env` and edit the copy
@@ -198,6 +220,13 @@ $ docker logs -f geochron-at-home_django_1
 (with the `-f` to show log messages as they arrive, or without
 to show just the messages currently logged)
 
+As with running without Docker, whenever any static files (anything
+in the `ftc/static` directory) have changed you will need to run:
+
+```sh
+(gechron-at-home) $ python manage.py collectstatic
+```
+
 ### nginx stanza
 
 To proxy to this docker swarm with nginx (using the path
@@ -218,6 +247,13 @@ location /geochron@home/ {
         }
 }
 ```
+
+### Using Geochron@Home
+
+Two users will have been set up, you can sign in as either  one. If
+you did not change them from the defaults, they will be
+`admin` with password `yOuRsEcReT_01` and `john` with password
+`yOuRsEcReT_02`.
 
 ### Backup and restore
 
