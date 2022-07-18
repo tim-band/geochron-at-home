@@ -19,4 +19,4 @@ tzdata = ">=2022.1"  # required for Alpine linux (used in the Dockerfile)
 rsa = "*"
 
 [requires]
-python_version = "3.8"
+python_version = "3.9"
