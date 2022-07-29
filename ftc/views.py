@@ -12,6 +12,7 @@ from django.http import (HttpResponse, HttpResponseRedirect,
     HttpResponseForbidden, HttpResponseNotFound)
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import redirect
 
 from ftc.parse_image_name import parse_image_name
@@ -340,9 +341,6 @@ def grain_update(request, pk):
 
     return redirect('grain', pk=pk)
 
-
-import json
-from django.core.serializers.json import DjangoJSONEncoder
 
 @login_required
 def getTableData(request):
