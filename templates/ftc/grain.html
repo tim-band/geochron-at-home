@@ -17,10 +17,14 @@
 }
 
 #edit, #save {
-    display: inline;
     float: right;
     margin-left: 5px;
     margin-right: 5px;;
+}
+
+#count {
+    padding: 1px 10px;
+    border: black solid 1px;
 }
 
 button {
@@ -110,7 +114,6 @@ function makeGrainMap() {
         grain_info: {
             image_width: image_width,
             image_height: image_height,
-            // scale_x
             images: [
                 //{% for i in object.get_images %}
                 "{% url 'get_image' i.pk %}",
@@ -143,7 +146,7 @@ window.addEventListener('load', function() {
         in sample <a href="{% url 'sample' object.sample.pk %}">{{ object.sample.sample_name }}</a>,
         in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
     </span>
-    <!--got to figure out how to fix this-->
+    <a id="count" href="{% url 'count_my' object.pk %}">Count</a>
     <button id="edit" onclick="beginEdit(crystal_control)">Edit</button>
     <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
 </div>

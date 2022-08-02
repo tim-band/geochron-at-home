@@ -8,7 +8,7 @@ from ftc.views import (home, signmeup, report, getTableData,
     ProjectDetailView, ProjectUpdateView,
     SampleDetailView, SampleUpdateView, SampleCreateView,
     GrainDetailView, GrainCreateView, grain_update,
-    tutorial, saveTutorialResult)
+    tutorial, saveTutorialResult, CountMyGrainView)
 from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
@@ -34,6 +34,7 @@ urlpatterns = [
     path('counting/guest/', counting, name='guest_counting', kwargs={ 'uname': 'guest' }),
     path('counting/', counting, name='counting'),
     path('count/<pk>/', count_grain, name='count'),
+    path('count_my/<pk>/', CountMyGrainView.as_view(), name='count_my'),
     path('saveWorkingGrain/', saveWorkingGrain, name='saveWorkingGrain'),
     path('image/<pk>/', get_image, name="get_image"),
     path('tutorial/', tutorial, name='tutorial'),

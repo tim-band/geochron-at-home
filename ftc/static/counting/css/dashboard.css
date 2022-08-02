@@ -246,4 +246,23 @@ section {
 .leaflet-bar a.selecting {
     background-color: #80dbdb;
 }
-    
+
+.details td {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.grain_table th {
+    padding-left: 5px;
+    padding-right: 5px;
+    background-color: #8fbc8f;
+}
+
+.grain_table td {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.grain_table tr:nth-child(even) {
+    background-color: #ffebcd;
+}

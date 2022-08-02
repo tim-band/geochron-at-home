@@ -22,6 +22,7 @@ from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 import base64
 import io
 import json
+import sys
 
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex)
@@ -405,7 +406,7 @@ def redirect_to_count(request):
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def get_grain_info(request, pk):
+def get_grain_info(request, pk, submit_url):
     if pk == 'done':
         return {
             'grain_info': 'null',
@@ -468,13 +469,52 @@ def get_grain_info(request, pk):
         latlngs = json.loads(save.latlngs)
         info['marker_latlngs'] = latlngs
         info['num_markers'] = len(latlngs)
-    return { 'grain_info': json.dumps(info), 'messages': [] }
+    return {
+        'grain_info': json.dumps(info),
+        'messages': [],
+        'submit_url': submit_url
+    }
 
 
 @login_required
 def count_grain(request, pk):
-    return render(request, 'ftc/counting.html', get_grain_info(request, pk))
+    return render(
+        request,
+        'ftc/counting.html',
+        get_grain_info(request, pk, reverse('counting'))
+    )
 
+
+def next_grain_page(user, current_id):
+    current_grain = Grain.objects.get(id=current_id)
+    sample = current_grain.sample
+    project = sample.in_project
+    index = current_grain.index
+    next_grain = Grain.objects.filter(
+        sample__in_project__creator=user,
+        sample__in_project=project,
+        sample=sample,
+        index__gt=index,
+    ).order_by(
+        'index'
+    ).first()
+    if next_grain == None:
+        return reverse('sample', args=[sample.id])
+    return reverse('count_my', args=[next_grain.id])
+
+
+class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
+    model = Grain
+    template_name = "ftc/counting.html"
+    def get_context_data(self, **kwargs):
+        pk = self.kwargs['pk']
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(get_grain_info(
+            self.request,
+            pk,
+            submit_url=next_grain_page(self.request.user, pk)
+        ))
+        return ctx
 
 from django.contrib.auth.models import User
 def tutorialCompleted(request):
@@ -505,6 +545,7 @@ def counting(request, uname=None):
 
 
 @login_required
+@transaction.atomic
 def updateTFNResult(request):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     sep = '~'
@@ -515,6 +556,12 @@ def updateTFNResult(request):
             res_dic = json_obj['counting_res']
             sample = Sample.objects.get(id=res_dic['sample_id'])
             latlng_json_str = json.dumps(res_dic['marker_latlngs'])
+            # Remove any previous or partial save state
+            FissionTrackNumbering.objects.filter(
+                in_sample=sample,
+                grain=res_dic['grain_num'],
+                worker=request.user,
+            ).delete()
             fts = FissionTrackNumbering(in_sample=sample, 
                                         grain=res_dic['grain_num'], 
                                         ft_type=res_dic['ft_type'], 
@@ -523,15 +570,7 @@ def updateTFNResult(request):
                                         latlngs=latlng_json_str,
             )
             fts.save()
-            user = User.objects.get(username=request.user.username)
             project = Project.objects.get(id=res_dic['proj_id'])
-            # Remove any partial save state
-            FissionTrackNumbering.objects.filter(
-                in_sample=sample,
-                grain=res_dic['grain_num'],
-                worker=user,
-                result=-1,
-            ).delete()
         except (KeyError, Project.DoesNotExist):
             return HttpResponseNotFound("you have no project currrently.")
         else:
@@ -540,9 +579,8 @@ def updateTFNResult(request):
     else:
         return HttpResponseForbidden("Sorry, You have to active your account first.")
 
-import sys
-import fnmatch
 @login_required
+@transaction.atomic
 def saveWorkingGrain(request):
     if request.user.is_active:
         with transaction.atomic():
@@ -551,12 +589,11 @@ def saveWorkingGrain(request):
             res_json = json.loads(json_str)
             res = res_json['intermedia_res']
             sample = Sample.objects.get(id=res['sample_id'])
-            # Remove any previous partial save state
+            # Remove any previous or partial save state
             FissionTrackNumbering.objects.filter(
                 in_sample=sample,
                 grain=res['grain_num'],
                 worker=user,
-                result=-1,
             ).delete()
             # Save the new state
             ftn = FissionTrackNumbering(

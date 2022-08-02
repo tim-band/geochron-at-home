@@ -117,7 +117,8 @@ function setup() {
     });
     map.setTrackCounterElement(document.getElementById('tracknum'));
     document.getElementById('tracknum-submit').onclick = function() {
-        map.submitTrackCount("{% url 'updateTFNResult'%}", "{% url 'counting' %}");
+        var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
+        map.submitTrackCount("{% url 'updateTFNResult'%}", submit_url);
     };
     document.getElementById('tracknum-save').onclick = function() {
         map.saveTrackCount("{% url 'saveWorkingGrain'%}");

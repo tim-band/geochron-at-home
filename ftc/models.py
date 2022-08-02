@@ -90,6 +90,22 @@ class Grain(models.Model):
     def get_images(self):
         return self.image_set.order_by('index')
 
+    def count_results(self):
+        return FissionTrackNumbering.objects.filter(
+            in_sample=self.sample,
+            grain=self.index
+        ).count()
+
+    def owners_result(self):
+        ftn = FissionTrackNumbering.objects.filter(
+            in_sample=self.sample,
+            grain=self.index,
+            worker=self.get_owner()
+        ).first()
+        if ftn == None:
+            return None
+        return ftn.result
+
 #
 class Region(models.Model):
     grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
