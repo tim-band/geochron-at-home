@@ -136,7 +136,7 @@ function setup() {
 {% block right_nav_functon_li %}
     {% if user.is_staff %}
         <li class="divider"></li>
-        <li><a href="{%url 'report'%}"><i class="fa fa-cubes"></i>&nbsp;Manage your projects</a></li>
+        <li><a href="{%url 'report'%}"><i class="fa fa-cubes"></i>Manage your projects</a></li>
     {% endif %}
 {% endblock %}
 
@@ -150,9 +150,11 @@ function setup() {
     <span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
   </button>
   <ul class="dropdown-menu">
-      {% if user.username != "guest"  %}
-      <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>&nbsp;save intermediate result</a></li>
-      {% endif %}
+    {% if user.username != "guest"  %}
+    <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>save intermediate result</a></li>
+    {% endif %}
+    <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>submit result</a></li>
+    <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>restart counting</a></li>
     {% if cancel_url %}
     <li><a id="tracknum-cancel" href="{{cancel_url}}"><i class="fa fa-eject"></i>cancel counting</a></li>
     {% endif %}

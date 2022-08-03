@@ -58,14 +58,14 @@
                 <i class="fa fa-user fa-lg"></i>&nbsp; {{ user.username | default:"User"}} &nbsp;<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
                 {% if user.is_authenticated %}
-                    <li><a href="{% url 'profile'%}"><i class="fa fa-cogs"></i> &nbsp;Site dashboard</a></li>
+                    <li><a href="{% url 'profile'%}"><i class="fa fa-cogs"></i>Site dashboard</a></li>
                     <li class="divider"></li>
-                    <li><a href="{% url 'logout' %}"><i class="fa fa-sign-out"></i> &nbsp;Logout</a></li>
+                    <li><a href="{% url 'logout' %}"><i class="fa fa-sign-out"></i>Logout</a></li>
                     {% if user.username != "guest"  %}
-                    <li><a href="{% url 'account_change_password'%}"><i class="fa fa-key"></i> &nbsp;Change password</a></li>
+                    <li><a href="{% url 'account_change_password'%}"><i class="fa fa-key"></i>Change password</a></li>
                     {% endif %}
                 {% else %}
-                    <li><a href="{% url 'account_login'%}"><i class="fa fa-sign-in"></i> &nbsp;Sign in</a></li>
+                    <li><a href="{% url 'account_login'%}"><i class="fa fa-sign-in"></i>Sign in</a></li>
                 {% endif %}
                 <!-- <li class="dropdown-header">admin your projects</li>  -->
                 {% block right_nav_functon_li %}{% endblock %}

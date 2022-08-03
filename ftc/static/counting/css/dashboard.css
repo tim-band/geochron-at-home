@@ -198,6 +198,11 @@ section {
 }
 
 /* ------------ */
+
+.dropdown-menu .fa {
+    padding-right: 5px;
+}
+
 /*
 #dropdown-tracknum, #tracknum {
 	font-family: 'ds-digitalitalic';

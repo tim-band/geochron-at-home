@@ -80,12 +80,12 @@ footer {
 {% block right_nav_functon_li %}
     {% if user.is_authenticated %}
         <li class="divider"></li>
-        <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i> &nbsp;Fission track counting</a></li>
+        <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i>Fission track counting</a></li>
         {% if user.is_staff %}
-        <li><a href="{% url 'report'%}"><i class="fa fa-cubes"></i> &nbsp;Manage your projects</a></li>
+        <li><a href="{% url 'report'%}"><i class="fa fa-cubes"></i>Manage your projects</a></li>
         {% endif %}
         {% if user.is_staff or user.is_superuser %}
-        <li><a id='projects-link' href="{% url 'projects'%}"><i class="fa fa-flash"></i> &nbsp;Edit your projects</a></li>
+        <li><a id='projects-link' href="{% url 'projects'%}"><i class="fa fa-flash"></i>Edit your projects</a></li>
         {% endif %}
     {% endif %}
 {% endblock %}

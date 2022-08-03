@@ -626,10 +626,10 @@ function grain_view(options) {
                 element.setRangeText(v, 0, 3, 'end');
             });
         },
-        submitTrackCount: function(upateUrl, newGrainUrl) {
+        submitTrackCount: function(updateUrl, newGrainUrl) {
             if (confirm("submit the result?") == true) {
                 var xhr = new XMLHttpRequest();
-                xhr.open('POST', upateUrl);
+                xhr.open('POST', updateUrl);
                 xhr.onload = function() {
                     console.log('submitted: ' + xhr.responseText);
                     window.location.href = newGrainUrl;
