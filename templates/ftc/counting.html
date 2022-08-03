@@ -153,8 +153,15 @@ function setup() {
       {% if user.username != "guest"  %}
       <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>&nbsp;save intermediate result</a></li>
       {% endif %}
-    <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>&nbsp;submit result</a></li>
-    <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>&nbsp;restart counting</a></li>
+    {% if cancel_url %}
+    <li><a id="tracknum-cancel" href="{{cancel_url}}"><i class="fa fa-eject"></i>cancel counting</a></li>
+    {% endif %}
+    {% if prev_url %}
+    <li><a id="tracknum-previous" href="{{prev_url}}"><i class="fa fa-angle-left"></i>previous grain</a></li>
+    {% endif %}
+    {% if next_url %}
+    <li><a id="tracknum-next" href="{{next_url}}"><i class="fa fa-angle-right"></i>next grain</a></li>
+    {% endif %}
   </ul>
 </div>
 </div>

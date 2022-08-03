@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q, Subquery
 from django.db.models.aggregates import Max
 from django.forms import (ModelForm, CharField, Textarea, FileField,
     ClearableFileInput, ValidationError)
@@ -406,7 +406,7 @@ def redirect_to_count(request):
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def get_grain_info(request, pk, submit_url):
+def get_grain_info(request, pk, **kwargs):
     if pk == 'done':
         return {
             'grain_info': 'null',
@@ -472,7 +472,7 @@ def get_grain_info(request, pk, submit_url):
     return {
         'grain_info': json.dumps(info),
         'messages': [],
-        'submit_url': submit_url
+        **kwargs
     }
 
 
@@ -481,26 +481,55 @@ def count_grain(request, pk):
     return render(
         request,
         'ftc/counting.html',
-        get_grain_info(request, pk, reverse('counting'))
+        get_grain_info(request, pk, submit_url=reverse('counting'))
     )
 
 
-def next_grain_page(user, current_id):
+def count_my_grain_extra_links(user, current_id):
     current_grain = Grain.objects.get(id=current_id)
     sample = current_grain.sample
     project = sample.in_project
     index = current_grain.index
-    next_grain = Grain.objects.filter(
+    done_query = Subquery(FissionTrackNumbering.objects.filter(
+        worker=user,
+        in_sample=sample,
+        grain=OuterRef('index'),
+        result__gte=0
+    ))
+    next_grain = Grain.objects.annotate(
+        done=Exists(done_query)
+    ).filter(
         sample__in_project__creator=user,
         sample__in_project=project,
         sample=sample,
         index__gt=index,
+        done=False
     ).order_by(
         'index'
     ).first()
-    if next_grain == None:
-        return reverse('sample', args=[sample.id])
-    return reverse('count_my', args=[next_grain.id])
+    prev_grain = Grain.objects.annotate(
+        done=Exists(done_query)
+    ).filter(
+        sample__in_project__creator=user,
+        sample__in_project=project,
+        sample=sample,
+        index__lt=index,
+        done=False
+    ).order_by(
+        '-index'
+    ).first()
+    back = reverse('grain', args=[current_id])
+    r = {
+        'submit_url': back,
+        'cancel_url': back
+    }
+    if next_grain != None:
+        url = reverse('count_my', args=[next_grain.id])
+        r['next_url'] = url
+        r['submit_url'] = url
+    if prev_grain != None:
+        r['prev_url'] = reverse('count_my', args=[prev_grain.id])
+    return r
 
 
 class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
@@ -512,7 +541,7 @@ class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
         ctx.update(get_grain_info(
             self.request,
             pk,
-            submit_url=next_grain_page(self.request.user, pk)
+            **count_my_grain_extra_links(self.request.user, pk)
         ))
         return ctx
 
