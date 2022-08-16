@@ -52,14 +52,14 @@ class BasePage:
 
     def fill_form(self, fields):
         for k,v in fields.items():
-            elt = self.driver.find_element_by_css_selector('*[name="{0}"]'.format(k))
+            elt = self.driver.find_element(By.CSS_SELECTOR,  '*[name="{0}"]'.format(k))
             if type(v) is bool:
                 if v != elt.is_selected():
                     elt.click()
             else:
                 if elt.tag_name.lower() == 'select':
                     elt.click()
-                    opt = elt.find_element_by_css_selector('option[value="{0}"]'.format(v))
+                    opt = elt.find_element(By.CSS_SELECTOR,  'option[value="{0}"]'.format(v))
                     assert opt
                     opt.click()
                 else:
@@ -68,12 +68,12 @@ class BasePage:
 
     def submit(self):
         url = self.driver.current_url
-        self.driver.find_element_by_css_selector('input[type="submit"]').click()
+        self.driver.find_element(By.CSS_SELECTOR,  'input[type="submit"]').click()
         return url != self.driver.current_url
 
     def element_is_disabled(self, elt):
         if type(elt) is str:
-            elt = self.driver.find_element_by_id(elt)
+            elt = self.driver.find_element(By.ID, elt)
         return 'leaflet-disabled' in elt.get_attribute('class').split(' ')
 
 
@@ -83,7 +83,7 @@ class WebMail(BasePage):
         return self
 
     def click_first_body_link(self):
-        self.driver.find_element_by_css_selector("td.body-text p a").click()
+        self.driver.find_element(By.CSS_SELECTOR,  "td.body-text p a").click()
 
 
 class HomePage(BasePage):
@@ -92,7 +92,7 @@ class HomePage(BasePage):
         return self
 
     def join(self):
-        self.driver.find_element_by_css_selector("a.btn-success").click()
+        self.driver.find_element(By.CSS_SELECTOR,  "a.btn-success").click()
         return JoinPage(self.driver)
 
     def become_guest(self):
@@ -115,30 +115,30 @@ class JoinPage(BasePage):
         return self
 
     def fill_in(self, user):
-        self.driver.find_element_by_id("id_username").send_keys(user.identity)
-        self.driver.find_element_by_id("id_email").send_keys(user.email)
-        self.driver.find_element_by_id("id_password1").send_keys(user.password)
-        self.driver.find_element_by_id("id_password2").send_keys(user.password)
-        self.driver.find_element_by_class_name("btn-primary").click()
+        self.driver.find_element(By.ID, "id_username").send_keys(user.identity)
+        self.driver.find_element(By.ID, "id_email").send_keys(user.email)
+        self.driver.find_element(By.ID, "id_password1").send_keys(user.password)
+        self.driver.find_element(By.ID, "id_password2").send_keys(user.password)
+        self.driver.find_element(By.CLASS_NAME, "btn-primary").click()
         return VerifyPage(self.driver)
 
 
 class VerifyPage(BasePage):
     def check(self, user):
         assert "Verify" in self.driver.title
-        info = self.driver.find_element_by_css_selector("div.alert-info")
+        info = self.driver.find_element(By.CSS_SELECTOR,  "div.alert-info")
         assert user.email in info.text
         return self
 
 
 class ConfirmPage(BasePage):
     def check(self, user):
-        assert user.identity in self.driver.find_element_by_css_selector("p.lead span.lead").text
-        assert user.email in self.driver.find_element_by_css_selector("p.lead > a").text
+        assert user.identity in self.driver.find_element(By.CSS_SELECTOR,  "p.lead span.lead").text
+        assert user.email in self.driver.find_element(By.CSS_SELECTOR,  "p.lead > a").text
         return self
 
     def confirm(self):
-        self.driver.find_element_by_css_selector("button.btn-success").click()
+        self.driver.find_element(By.CSS_SELECTOR,  "button.btn-success").click()
         return SignInPage(self.driver)
 
 
@@ -148,28 +148,28 @@ class SignInPage(BasePage):
         return self
 
     def sign_in(self, user):
-        self.driver.find_element_by_css_selector('input[name="login"]').send_keys(user.identity)
-        self.driver.find_element_by_css_selector('input[name="password"]').send_keys(user.password)
-        self.driver.find_element_by_class_name("btn-primary").click()
+        self.driver.find_element(By.CSS_SELECTOR,  'input[name="login"]').send_keys(user.identity)
+        self.driver.find_element(By.CSS_SELECTOR,  'input[name="password"]').send_keys(user.password)
+        self.driver.find_element(By.CLASS_NAME, "btn-primary").click()
         return ProfilePage(self.driver)
 
 
 class TutorialPage(BasePage):
     def check_text_contains(self, text):
-        tut_text = self.driver.find_element_by_id('results').text
+        tut_text = self.driver.find_element(By.ID, 'results').text
         assert text in tut_text
         return self
 
     def go_next(self):
-        self.driver.find_element_by_id('next').click()
+        self.driver.find_element(By.ID, 'next').click()
         return self
 
     def go_previous(self):
-        self.driver.find_element_by_id('previous').click()
+        self.driver.find_element(By.ID, 'previous').click()
         return self
 
     def get_finish_link(self):
-        return self.driver.find_element_by_id('finish')
+        return self.driver.find_element(By.ID, 'finish')
 
     def go_finish(self):
         self.get_finish_link().click()
@@ -197,14 +197,14 @@ class TutorialPage(BasePage):
 
 class ProfilePage(BasePage):
     def login_name(self):
-        return self.driver.find_element_by_class_name('fa-user').text
+        return self.driver.find_element(By.CLASS_NAME, 'fa-user').text
 
     def go(self):
         self.driver.get("http://localhost:18080/accounts/profile")
         return self
 
     def get_counting_link(self):
-        return self.driver.find_element_by_id('start-counting-link')
+        return self.driver.find_element(By.ID, 'start-counting-link')
 
     def go_start_counting(self):
         self.get_counting_link().click()
@@ -212,7 +212,7 @@ class ProfilePage(BasePage):
 
     def check_can_count(self):
         link = self.get_counting_link()
-        danger = self.driver.find_elements_by_class_name('text-danger')
+        danger = self.driver.find_elements(By.CLASS_NAME, 'text-danger')
         assert link.get_attribute('disabled') != 'true'
         assert link.get_attribute('href')
         assert not any(['must finish the tutorial' in e.text for e in danger])
@@ -220,20 +220,20 @@ class ProfilePage(BasePage):
 
     def check_cannot_count(self):
         link = self.get_counting_link()
-        danger = self.driver.find_elements_by_class_name('text-danger')
+        danger = self.driver.find_elements(By.CLASS_NAME, 'text-danger')
         assert link.get_attribute('disabled') == 'true'
         assert link.get_attribute('href') == None
         assert any(['must finish the tutorial' in e.text for e in danger])
         return self
 
     def go_tutorial(self):
-        self.driver.find_element_by_id('tutorial-link').click()
+        self.driver.find_element(By.ID, 'tutorial-link').click()
         return TutorialPage(self.driver)
 
 
 class CountingPage(BasePage):
     def check(self):
-        self.driver.find_element_by_id("btn-tracknum")
+        self.driver.find_element(By.ID, "btn-tracknum")
         return self
 
     def go(self):
@@ -256,33 +256,33 @@ class CountingPage(BasePage):
         )
 
     def click_at(self, x, y):
-        mp = self.driver.find_element_by_id("map")
-        lil = mp.find_element_by_css_selector('img.leaflet-image-layer')
+        mp = self.driver.find_element(By.ID, "map")
+        lil = mp.find_element(By.CSS_SELECTOR,  'img.leaflet-image-layer')
         actions = ActionChains(self.driver)
         actions.move_to_element_with_offset(lil,
-            x * lil.size["width"], y * lil.size["height"])
+            (x - 0.5) * lil.rect["width"], (y - 0.5) * lil.size["height"])
         actions.click().pause(1.0).perform()
         return self
 
     def delete_from(self, minx, maxx, miny, maxy):
-        self.driver.find_element_by_id("ftc-btn-select").click()
-        mp = self.driver.find_element_by_id("map")
-        lil = mp.find_element_by_css_selector('img.leaflet-image-layer')
+        self.driver.find_element(By.ID, "ftc-btn-select").click()
+        mp = self.driver.find_element(By.ID, "map")
+        lil = mp.find_element(By.CSS_SELECTOR,  'img.leaflet-image-layer')
         w = lil.size["width"]
         h = lil.size["height"]
         actions = ActionChains(self.driver)
-        actions.move_to_element_with_offset(lil, minx * w, miny * h)
+        actions.move_to_element_with_offset(lil, (minx - 0.5) * w, (miny - 0.5) * h)
         actions.click().pause(1.05)
-        actions.move_to_element_with_offset(lil, maxx * w, maxy * h)
+        actions.move_to_element_with_offset(lil, (maxx - 0.5) * w, (maxy - 0.5) * h)
         actions.click().pause(0.1).perform()
-        self.driver.find_element_by_id("ftc-btn-delete").click()
+        self.driver.find_element(By.ID, "ftc-btn-delete").click()
         return self
 
     def undo(self):
-        self.driver.find_element_by_id("ftc-btn-undo").click()
+        self.driver.find_element(By.ID, "ftc-btn-undo").click()
 
     def redo(self):
-        self.driver.find_element_by_id("ftc-btn-redo").click()
+        self.driver.find_element(By.ID, "ftc-btn-redo").click()
 
     def undo_available(self):
         return not self.element_is_disabled("ftc-btn-undo")
@@ -291,20 +291,20 @@ class CountingPage(BasePage):
         return not self.element_is_disabled("ftc-btn-redo")
 
     def submit(self):
-        self.driver.find_element_by_id("btn-tracknum").click()
-        self.driver.find_element_by_id("tracknum-submit").click()
+        self.driver.find_element(By.ID, "btn-tracknum").click()
+        self.driver.find_element(By.ID, "tracknum-submit").click()
         Alert(self.driver).accept()
 
     def save(self):
-        self.driver.find_element_by_id("btn-tracknum").click()
-        self.driver.find_element_by_id("tracknum-save").click()
+        self.driver.find_element(By.ID, "btn-tracknum").click()
+        self.driver.find_element(By.ID, "tracknum-save").click()
         Alert(self.driver).accept()
         return self
 
     def drag_layer_handle(self, offset):
-        track = self.driver.find_element_by_id("focus-slider")
+        track = self.driver.find_element(By.ID, "focus-slider")
         dy = offset * track.size['height']
-        handle = self.driver.find_element_by_class_name("noUi-touch-area")
+        handle = self.driver.find_element(By.CLASS_NAME, "noUi-touch-area")
         actions = ActionChains(self.driver)
         actions.drag_and_drop_by_offset(handle, 0, dy).pause(1.0).perform()
         return self
@@ -330,7 +330,7 @@ class CountingPage(BasePage):
 
 class NavBar(BasePage):
     def get_dropdown(self):
-        return self.driver.find_element_by_css_selector(
+        return self.driver.find_element(By.CSS_SELECTOR,
             ".navbar-fixed-top .navbar-right a.dropdown-toggle"
         )
 
@@ -344,7 +344,7 @@ class NavBar(BasePage):
                 self.nav = nav_bar
             def __call__(self, driver):
                 self.nav.get_dropdown().click()
-                logout = driver.find_element_by_css_selector(
+                logout = driver.find_element(By.CSS_SELECTOR,
                     'a[href="/accounts/logout/"]'
                 )
                 return logout.is_displayed() and logout
@@ -353,20 +353,20 @@ class NavBar(BasePage):
 
     def go_manage_projects(self):
         self.get_dropdown().click()
-        self.driver.find_element_by_css_selector(
+        self.driver.find_element(By.CSS_SELECTOR,
             'a[href="/ftc/report/"]'
         ).click()
         return ReportPage(self.driver)
 
     def go_edit_projects(self):
         self.get_dropdown().click()
-        self.driver.find_element_by_id('projects-link').click()
+        self.driver.find_element(By.ID, 'projects-link').click()
         return ProjectsPage(self.driver)
 
 
 class ReportPage(BasePage):
     def toggle_tree_node(self, name):
-        self.driver.find_element_by_xpath(
+        self.driver.find_element(By.XPATH,
             "//span[@class='fancytree-title' and text()='"
             + name
             + "']//preceding-sibling::span[@class='fancytree-expander']"
@@ -374,7 +374,7 @@ class ReportPage(BasePage):
         return self
 
     def select_tree_node(self, name):
-        self.driver.find_element_by_xpath(
+        self.driver.find_element(By.XPATH,
             "//span[@class='fancytree-title' and text()='"
             + name
             + "']//preceding-sibling::span[@class='fancytree-checkbox']"
@@ -400,7 +400,7 @@ class ReportPage(BasePage):
 
 class ProjectsPage(BasePage):
     def create_project(self):
-        self.driver.find_element_by_id('create-project').click()
+        self.driver.find_element(By.ID, 'create-project').click()
         return ProjectCreatePage(self.driver)
 
 
@@ -418,7 +418,7 @@ class ProjectCreatePage(BasePage):
 
 class ProjectPage(BasePage):
     def create_sample(self):
-        self.driver.find_element_by_id('create-sample').click()
+        self.driver.find_element(By.ID, 'create-sample').click()
         return SampleCreatePage(self.driver)
 
 
@@ -437,13 +437,13 @@ class SampleCreatePage(BasePage):
 
 class SamplePage(BasePage):
     def create_grain(self):
-        self.driver.find_element_by_id('create-grain').click()
+        self.driver.find_element(By.ID, 'create-grain').click()
         return GrainCreatePage(self.driver)
 
 
 class GrainCreatePage(BasePage):
     def create(self, paths):
-        browse = self.driver.find_element_by_id('id_images')
+        browse = self.driver.find_element(By.ID, 'id_images')
         for p in paths:
             browse.send_keys(p)
         assert self.submit()
@@ -452,17 +452,17 @@ class GrainCreatePage(BasePage):
 
 class GrainPage(BasePage):
     def edit(self):
-        zoom_outs = self.driver.find_elements_by_class_name('leaflet-control-zoom-out')
+        zoom_outs = self.driver.find_elements(By.CLASS_NAME, 'leaflet-control-zoom-out')
         assert len(zoom_outs) == 1
-        imgs = self.driver.find_elements_by_css_selector('img.leaflet-image-layer')
+        imgs = self.driver.find_elements(By.CSS_SELECTOR, 'img.leaflet-image-layer')
         while (600 < imgs[0].rect['width']
                 and not self.element_is_disabled(zoom_outs[0])):
             zoom_outs[0].click()
-        self.driver.find_element_by_id('edit').click()
+        self.driver.find_element(By.ID, 'edit').click()
         return self
 
     def save(self):
-        self.driver.find_element_by_id('save').click()
+        self.driver.find_element(By.ID, 'save').click()
         return self
 
     def do_drag(self, dragee, dest_x, dest_y):
@@ -478,9 +478,9 @@ class GrainPage(BasePage):
         ActionChains(self.driver).release().perform()
 
     def drag_marker(self, marker_index, to_x, to_y):
-        imgs = self.driver.find_elements_by_css_selector('img.leaflet-image-layer')
+        imgs = self.driver.find_elements(By.CSS_SELECTOR, 'img.leaflet-image-layer')
         rect = imgs[0].rect
-        markers = self.driver.find_elements_by_css_selector(
+        markers = self.driver.find_elements(By.CSS_SELECTOR,
             'img.leaflet-marker-icon')
         marker = markers[marker_index]
         self.do_drag(

@@ -1,4 +1,4 @@
-FROM rust:1.45.1-alpine3.12
+FROM rust:1.63.0-alpine3.16
 
 WORKDIR /code
 RUN apk add python3-dev py3-pip postgresql-dev libffi-dev build-base postgresql-client

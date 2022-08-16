@@ -16,7 +16,8 @@ rsa = "*"
 tzdata = ">=2022.1"  # required for Alpine linux (used in the Dockerfile)
 
 [dev-packages]
-rsa = "*"
+rsa = "4.9"
+selenium = ">=4.4.0"
 
 [requires]
 python_version = "3.9"
