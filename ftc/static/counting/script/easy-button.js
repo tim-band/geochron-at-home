@@ -31,7 +31,7 @@ L.Control.EasyButtons = L.Control.extend({
 			this.link.title = val.tipText;
                         this.link.id = 'ftc-btn-' + name;
 
-                        className = 'fa ' + val.icon;
+                        className = 'fa ' + val.icon; // TODO update class since bootstrap removed?
                         if (val.className_i) { className = className + ' ' + val.className_i; }
 			L.DomUtil.create('i', className, this.link);
 

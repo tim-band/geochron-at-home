@@ -8,19 +8,42 @@
 <link rel="stylesheet" href="{% static 'Leaflet-1.7.1/leaflet.css' %}" />
 <link rel="stylesheet" href="{% static 'noUiSlider-14.6.3/nouislider.min.css' %}" />
 <style>
+body {
+    padding-top: 0;
+}
+
+#navigation-header {
+    position: relative;
+}
+
 #heading-row {
-    width: 100%;
+    display: flex;
+    align-items: center;
+    padding-left: 10px;
+    padding-right: 10px;
 }
 
 #heading {
     width: 100%;
 }
 
-#edit, #save {
-    display: inline;
-    float: right;
+#control-row {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+#edit, #save, #configure {
     margin-left: 5px;
-    margin-right: 5px;;
+    margin-right: 5px;
+}
+
+.control-divider {
+    width: 2px;
+    height: 1em;
+    margin-left: 5px;
+    margin-right: 5px;
+    background: #ccc;
 }
 
 button {
@@ -40,10 +63,17 @@ button:disabled {
 }
 
 #map {
-    position: absolute;
-    top: 80px;
-    bottom: 0;
+    position: fixed;
     width: 100%;
+    height: 100%;
+}
+
+.image-crystal {
+}
+
+.image-mica {
+    opacity: 0.4;
+    filter: contrast(10);
 }
 
 .noUi-base {
@@ -105,17 +135,24 @@ function makeGrainMap() {
             //{% endfor %}
         ],
         //{% endfor %}
-    ]
+    ];
     var view = grain_view({
         grain_info: {
             image_width: image_width,
             image_height: image_height,
+            shift_x: {{ object.shift_x }},
+            shift_y: {{ object.shift_y }},
             // scale_x
-            images: [
-                //{% for i in object.get_images %}
+            images_crystal: [
+                //{% for i in object.get_images_crystal %}
                 "{% url 'get_image' i.pk %}",
                 //{% endfor %}
             ],
+            images_mica: {
+                //{% for i in object.get_images_mica %}
+                [{{ i.index }} + 1]: "{% url 'get_image' i.pk %}",
+                //{% endfor %}
+            },
             rois: rois
         },
         atoken: '{{ csrf_token }}'
@@ -130,6 +167,7 @@ function makeGrainMap() {
 }
 window.addEventListener('load', function() {
     crystal_control = makeGrainMap();
+    document.getElementById("map").focus();
 });
 </script>
 
@@ -143,9 +181,13 @@ window.addEventListener('load', function() {
         in sample <strong>{{ object.sample.sample_name }}</strong>,
         in project <strong>{{ object.sample.in_project.project_name }}</strong>
     </span>
-    <!--got to figure out how to fix this-->
-    <button id="edit" onclick="beginEdit(crystal_control)">Edit</button>
-    <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
+    <span id="control-row">
+        <button id="configure">Configure View</button>
+        <span class="control-divider"></span>
+        <!--got to figure out how to fix this-->
+        <button id="edit" onclick="beginEdit(crystal_control)">Edit</button>
+        <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
+    </span>
 </div>
 
 <div id="map"></div>

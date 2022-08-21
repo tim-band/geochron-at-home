@@ -253,7 +253,7 @@ class GrainForm(ModelForm):
         self.instance.image_width = max_w
         self.instance.image_height = max_h
         self.instance.sample = self.sample
-        region = Region(grain=self.instance, shift_x=0, shift_y=0)
+        region = Region(grain=self.instance)
         x_margin = int(max_w / 20)
         y_margin = int(max_h / 20)
         v0 = Vertex(region=region, x=x_margin, y=y_margin)
@@ -330,7 +330,7 @@ def grain_update(request, pk):
     with transaction.atomic():
         Region.objects.filter(grain=grain).delete()
         for _, vertices in sorted(regions.items()):
-            region = Region(grain=grain, shift_x=0, shift_y=0)
+            region = Region(grain=grain)
             region.save()
             for _, v in sorted(vertices.items()):
                 x = float(v['x']) * w

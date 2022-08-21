@@ -10,6 +10,7 @@ $(document).ready(function () {
   });
 });
 </script>
+
 <style>
 /*
  * Style tweaks
@@ -38,8 +39,8 @@ footer {
   .row-offcanvas {
     position: relative;
     -webkit-transition: all .25s ease-out;
-         -o-transition: all .25s ease-out;
-            transition: all .25s ease-out;
+    -o-transition: all .25s ease-out;
+    transition: all .25s ease-out;
   }
 
   .row-offcanvas-right {
@@ -74,104 +75,97 @@ footer {
     width: 50%; /* 6 columns */
   }
 }
-</style>
-{% endblock %}
 
-{% block right_nav_functon_li %}
-    {% if user.is_authenticated %}
-        <li class="divider"></li>
-        <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i> &nbsp;Fission track counting</a></li>
-        {% if user.is_staff %}
-        <li><a href="{% url 'report'%}"><i class="fa fa-cubes"></i> &nbsp;Manage your projects</a></li>
-        {% endif %}
-        {% if user.is_staff or user.is_superuser %}
-        <li><a id='projects-link' href="{% url 'projects'%}"><i class="fa fa-flash"></i> &nbsp;Edit your projects</a></li>
-        {% endif %}
-    {% endif %}
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 800px;
+}
+
+.container > * {
+  background: linear-gradient(to bottom, #eee 0, #ddd 100%);
+  border-radius: 4px;
+  padding: 10px;
+  margin-block: 10px;
+  margin-inline: 20px;
+  flex-grow: 1;
+}
+</style>
 {% endblock %}
 
 {% block content %}
 
-    {% if messages %}
-      {% for message in messages %}
-      <div class="alert alert-{{message.tags}} alert-dismissible" role="alert">
-        <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-        <strong>{{ message.tags }}</strong> {{ message }}
-      </div>
-      {% endfor %}
-    {% endif %}
-<!-- ========== -->
-<div class="container" style="margin-top:20px">
+{% for message in messages %}
+<div class="alert alert-{{message.tags}} alert-dismissible" role="alert">
+  <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+  <strong>{{ message.tags }}</strong> {{ message }}
+</div>
+{% endfor %}
 
-      <div class="row row-offcanvas row-offcanvas-right">
+<div style="margin-top:20px">
 
-        <div class="col-xs-12 col-sm-9">
-          <p class="pull-right visible-xs">
-            <button type="button" class="btn btn-primary btn-xs" data-toggle="offcanvas">Toggle nav</button>
-          </p>
-          <div class="jumbotron">
-            <!-- <h1>Hello, world!</h1> -->
-            <h2>Welcome, {{user.username}}!</h2>
-            {% if not tutorial_completed %}
-            <p class="text-danger"><small>You must finish the tutorial before counting.</small></p>
-            {% endif %}
-          </div>
-          <div class="row">
-            <div class="col-6 col-sm-6 col-lg-4">
-              <h2>How to</h2>
-              <!--<p>A tutorial on how to count tracks.</p>-->
-              <p><a id="tutorial-link" class="btn btn-default" href="{%url 'tutorial' %}" role="button">Tutorial &raquo;</a></p>
-            </div><!--/span-->
-            <div class="col-6 col-sm-6 col-lg-4">
-              <h2>Start counting</h2>
-              <!--<p>Counting the tracks</p>-->
-              <p><a id="start-counting-link" class="btn btn-default" role="button"
-                {% if tutorial_completed %} href="{% url 'counting' %}"{% else %}disabled{% endif %}
-                >Go &raquo;</a></p>
-            </div><!--/span-->
-            <div class="col-6 col-sm-6 col-lg-4">
-              <h2>Site statistics</h2>
-              <!--<p>View your site statistics.</p>-->
-              <p><a id="site-statistics-link" class="btn btn-default" href="#" role="button">View details &raquo;</a></p>
-            </div><!--/span-->
-            {% if user.is_staff %}
-            <div class="col-6 col-sm-6 col-lg-4">
-              <h2>Set up a project</h2>
-              <p>Learn how to set up a proper project. Preparing the folder structure and use the proper naming rules for file and directories.</p>
-              <p><a class="btn btn-default" href="#" role="button">View details &raquo;</a></p>
-            </div>
-            <div class="col-6 col-sm-6 col-lg-4">
-              <h2>Get the results</h2>
-              <p>Download your project results. Download the results for offline analysis.</p>
-              <p><a class="btn btn-default" href="{% url 'report'%}" role="button">View details &raquo;</a></p>
-            </div>
-            <div class="col-6 col-sm-6 col-lg-4">
-                <h2>Manage projects</h2>
-                <p>Add, remove and update your projects; upload crystal stacks.</p>
-                <p><a class="btn btn-default" href="{% url 'projects'%}" role="button">View details &raquo;</a></p>
-              </div>
-              {% endif%}
-          </div><!--/row-->
-        </div><!--/span-->
+<div class="row row-offcanvas row-offcanvas-right">
+  <div class="col-xs-12 col-sm-9">
+    <p class="pull-right visible-xs">
+      <button type="button" class="btn-xs" data-toggle="offcanvas">Toggle nav</button>
+    </p>
+    <div class="jumbotron">
+      <span>Welcome, <b>{{user.username}}</b>!</span>
+      {% if not tutorial_completed %}
+      <p class="text-danger"><small>You must finish the tutorial before counting.</small></p>
+      {% endif %}
+    </div>
+    <div class="container">
+      <span>
+        <h2>Learn Geochron@home</h2>
+        <p><a id="tutorial-link" href="{%url 'tutorial' %}" role="button">Tutorial &raquo;</a></p>
+      </span>
+      <span>
+        <h2>Start counting</h2>
+        <p><a id="start-counting-link" role="button"
+          {% if tutorial_completed %} href="{% url 'counting' %}" {% else %} disabled="" {% endif %}>
+          Go &raquo;
+        </a></p>
+      </span>
+      <span>
+        <h2>View site statistics</h2>
+        <p><a id="site-statistics-link" href="#" role="button">View details &raquo;</a></p>
+      </span>
+      {% if user.is_staff %}
+      <span>
+        <h2>Set up a project</h2>
+        <p>Learn how to start a project, preparing the folder structure and following the naming guidelines for files and directories.</p>
+        <p><a href="#" role="button">View details &raquo;</a></p>
+      </span>
+      <span>
+        <h2>Get results</h2>
+        <p>Download project results for offline analysis.</p>
+        <p><a href="{% url 'report'%}" role="button">View details &raquo;</a></p>
+      </span>
+      <span>
+        <h2>Manage projects</h2>
+        <p>Create, remove, and update projects. Upload crystal stacks.</p>
+        <p><a href="{% url 'projects'%}" role="button">View details &raquo;</a></p>
+      </span>
+      {% endif%}
+    </div>
+  </div>
 
-        <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
-          <div class="list-group">
-            <a href="{% url 'account_logout'%}" class="list-group-item active">Logout</a>
-            {% if user.username != "guest" %}
-            <a href="{% url 'account_change_password'%}" class="list-group-item">Change password</a>
-            {% endif %}
-          </div>
-        </div><!--/span-->
-      </div><!--/row-->
+  <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
+    <div class="list-group">
+      <a href="{% url 'account_logout'%}" class="list-group-item active">Logout</a>
+      {% if user.username != "guest" %}
+      <a href="{% url 'account_change_password'%}" class="list-group-item">Change password</a>
+      {% endif %}
+    </div>
+  </div>
+</div>
 
-      <hr>
+<footer>
+  <p>&copy; Jiangping He 2014 - 2021</p>
+</footer>
 
-      <footer>
-        <p>&copy; Jiangping He 2014 - 2021</p>
-      </footer>
-
-    </div><!--/.container-->
-<!-- ========== -->
+</div>
 
 {% endblock %}
 

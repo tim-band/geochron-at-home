@@ -133,10 +133,7 @@ function setup() {
 {% block right_nav_li %}{% endblock %}
 
 {% block right_nav_functon_li %}
-    {% if user.is_staff %}
-        <li class="divider"></li>
-        <li><a href="{%url 'report'%}"><i class="fa fa-cubes"></i>&nbsp;Manage your projects</a></li>
-    {% endif %}
+    
 {% endblock %}
 
 {% block body_attributes %}onload='setup()'{% endblock %}
@@ -145,7 +142,7 @@ function setup() {
 <div id="dropdown-tracknum" class="input-group">
 <div class="btn-group">
   <input id="tracknum" class="form-control" type="text" value="000" readonly>
-  <button id="btn-tracknum" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+  <button id="btn-tracknum" type="button" class="dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
     <span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
   </button>
   <ul class="dropdown-menu">

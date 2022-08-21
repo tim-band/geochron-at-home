@@ -76,6 +76,8 @@ class Grain(models.Model):
     scale_y = models.FloatField(null=True)
     stage_x = models.FloatField(null=True)
     stage_y = models.FloatField(null=True)
+    shift_x = models.IntegerField(default=0)
+    shift_y = models.IntegerField(default=0)
 
     class Meta:
         unique_together = ('sample', 'index',)
@@ -87,14 +89,15 @@ class Grain(models.Model):
     def filter_owned_by(cls, qs, user):
         return qs.filter(sample__in_project__creator=user)
 
-    def get_images(self):
-        return self.image_set.order_by('index')
+    def get_images_crystal(self):
+        return self.image_set.filter(ft_type='S').order_by('index')
+    
+    def get_images_mica(self):
+        return self.image_set.filter(ft_type='I').order_by('index')
 
 #
 class Region(models.Model):
     grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
-    shift_x = models.IntegerField()
-    shift_y = models.IntegerField()
 
 #
 class Vertex(models.Model):
@@ -123,6 +126,9 @@ class Image(ExportModelOperationsMixin('image'), models.Model):
     data = models.BinaryField()
     light_path = models.CharField(max_length=1, choices=LIGHT_PATH, null=True)
     focus = models.FloatField(null=True)
+
+    class Meta:
+        unique_together = ('grain', 'index', 'ft_type')
 
     def get_owner(self):
         return self.grain.get_owner()
