@@ -4,7 +4,7 @@
 production.env
 /user_upload/
 .vscode
-geckodriver.log
 /*.config
 /db/
 __pycache__
+/*.log

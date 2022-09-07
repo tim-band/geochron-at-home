@@ -595,7 +595,7 @@ function grain_view(options) {
     sliders2.updateOptions({
         range: {
             'min': 0,
-            'max': sliderNum - 1
+            'max': Math.max(1, sliderNum - 1)
         }
     }, true);
     var yox = grain_info.image_height / grain_info.image_width;

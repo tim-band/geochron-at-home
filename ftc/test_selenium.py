@@ -563,7 +563,7 @@ class DjangoTests(TestCase):
         self.driver = webdriver.Firefox()
 
     def test_onboard(self):
-        # Upload Crystal images
+        # Upload Z-Stack images
         test_user = User("tester", "tester@test.com", "MyPaSsW0rd")
         project_user = User("john", "john@test.com", "john")
         HomePage(self.driver).go()

@@ -22,9 +22,17 @@
     margin-right: 5px;;
 }
 
-#count {
+.button {
     padding: 1px 10px;
     border: black solid 1px;
+}
+
+table.metadata {
+    padding: 1px 10px;
+}
+
+table.metadata td:nth-child(odd) {
+    background-color: #ccc;
 }
 
 button {
@@ -45,7 +53,7 @@ button:disabled {
 
 #map {
     position: absolute;
-    top: 80px;
+    top:132px;
     bottom: 0;
     width: 100%;
 }
@@ -146,11 +154,19 @@ window.addEventListener('load', function() {
         in sample <a href="{% url 'sample' object.sample.pk %}">{{ object.sample.sample_name }}</a>,
         in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
     </span>
-    <a id="count" href="{% url 'count_my' object.pk %}">Count</a>
-    <button id="edit" onclick="beginEdit(crystal_control)">Edit</button>
-    <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
+    <a id="count" class="button" href="{% url 'count_my' object.pk %}">Count</a>
+    <a id="images" class="button" href="{% url 'grain_images' object.pk %}">Edit Image Stack</a>
+    <a id="meta" class="button" href="{% url 'grain_update_meta' object.pk %}">Edit Metadata</a>
+    <button id="edit" onclick="beginEdit(crystal_control)">Edit Region</button>
+    <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update_roi' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
 </div>
-
+<div>
+    <table class="metadata">
+        <tr><td>Image size:</td><td>{{ object.image_width }}&#x00D7;{{ object.image_height }}</td></tr>
+        <tr><td>Image scale:</td><td>{{ object.scale_x }}&#x00D7;{{ object.scale_y }}</td></tr>
+        <tr><td>Stage position:</td><td>{{ object.stage_x }}&#x00D7;{{ object.stage_y }}</td></tr>
+    </table>
+</div>
 <div id="map"></div>
 
 <ul>

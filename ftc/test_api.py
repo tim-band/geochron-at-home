@@ -332,7 +332,7 @@ class ApiGrainCreate(ApiTestMixin, TestCase):
 class ApiGrainUpdate(ApiTestMixin, TestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
 
-    def test_grain_update(self):
+    def test_grain_update_roi(self):
         new_index = 23
         r = self.client.patch('/ftc/api/grain/2/', {
             'index' : new_index

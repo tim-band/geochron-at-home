@@ -5,7 +5,7 @@ from django.db.models.aggregates import Max
 from django.forms import (ModelForm, CharField, Textarea, FileField,
     ClearableFileInput, ValidationError)
 from django.views.decorators.csrf import csrf_protect
-from django.views.generic.edit import CreateView, UpdateView
+from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic import DetailView
 from django.urls import reverse
 from django.http import (HttpResponse, HttpResponseRedirect,
@@ -173,7 +173,16 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
     template_name = "ftc/grain.html"
 
 
-class CrystalImageInput(ClearableFileInput):
+class GrainDetailUpdateView(CreatorOrSuperuserMixin, UpdateView):
+    model = Grain
+    template_name = "ftc/grain_update_meta.html"
+    fields = [
+        'index', 'image_width', 'image_height',
+        'scale_x', 'scale_y', 'stage_x', 'stage_y'
+    ]
+
+
+class StackImageInput(ClearableFileInput):
     def value_from_datadict(self, data, files, name):
         return files.getlist(name)
 
@@ -181,7 +190,7 @@ class CrystalImageInput(ClearableFileInput):
 def validate_file_image(f):
     if not parse_image_name(f.name):
         raise ValidationError(
-            'File %(fn)s is not called image<nn> or refl-image',
+            'File %(fn)s is not an expected image name',
             params={'fn': f.name},
             code='bad-image-file-name'
         )
@@ -205,7 +214,7 @@ class GrainForm(ModelForm):
         fields = ['images']
 
     images = ImageStackField(
-        widget=CrystalImageInput(attrs={'multiple': True}),
+        widget=StackImageInput(attrs={'multiple': True}),
         validators=[validate_file_image])
 
     def clean(self):
@@ -238,11 +247,26 @@ class GrainForm(ModelForm):
         self.cleaned_data['files'] = files
         return self.cleaned_data
 
-    def save(self, commit=True):
-        max_index = self.sample.grain_set.aggregate(Max('index'))['index__max']
+    def next_grain_number(self, sample):
+        """
+        Set the grain number to the next available number
+        """
+        self.sample = sample
+        max_index = sample.grain_set.aggregate(Max('index'))['index__max']
         if not max_index:
             max_index = 0
-        self.instance.index = max_index + 1
+        self.grain_index = max_index + 1
+
+    def explicit_grain(self, grain):
+        """
+        Set the grain explicitly
+        """
+        self.sample = None
+        self.grain = grain
+        self.grain_index = grain.index
+
+    def save(self, commit=True):
+        self.instance.index = self.grain_index
         max_w = 0
         max_h = 0
         for f in self.cleaned_data['files']:
@@ -254,7 +278,8 @@ class GrainForm(ModelForm):
                 max_h = h
         self.instance.image_width = max_w
         self.instance.image_height = max_h
-        self.instance.sample = self.sample
+        if self.sample is not None:
+            self.instance.sample = self.sample
         region = Region(grain=self.instance, shift_x=0, shift_y=0)
         x_margin = int(max_w / 20)
         y_margin = int(max_h / 20)
@@ -282,9 +307,9 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
         self.object = None
         form_class = self.get_form_class()
         form = self.get_form(form_class)
-        form.sample = self.parent_object
         if not form.is_valid():
             return self.form_invalid(form)
+        form.next_grain_number(self.parent_object)
         rtn = self.form_valid(form)
         with transaction.atomic():
             for f in form.cleaned_data['files']:
@@ -301,9 +326,35 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
         return reverse('grain', kwargs={'pk': self.object.pk})
 
 
+class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
+    model = Grain
+    template_name = "ftc/grain_images.html"
+    form_class = GrainForm
+    #fields = ["index", "image_width", "image_height", "scale_x", "scale_y", "stage_x", "stage_y"]
+    def post(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        form.explicit_grain(self.object)
+        if not form.is_valid():
+            return self.form_invalid(form)
+        rtn = self.form_valid(form)
+        with transaction.atomic():
+            for f in form.cleaned_data['files']:
+                image = Image(
+                    grain=self.object,
+                    format=f['format'],
+                    ft_type='S',
+                    index=f['index'],
+                    data=f['data']
+                ).save()
+        return rtn
+
+    def get_success_url(self):
+        return reverse('grain_images', kwargs={'pk': self.object.pk})
+
 @csrf_protect
 @user_passes_test(user_is_staff)
-def grain_update(request, pk):
+def grain_update_roi(request, pk):
     grain = Grain.objects.get(pk=pk)
     if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
         return HttpResponse("Grain update forbidden", status=403)
@@ -531,6 +582,11 @@ def count_my_grain_extra_links(user, current_id):
         r['prev_url'] = reverse('count_my', args=[prev_grain.id])
     return r
 
+class ImageDeleteView(CreatorOrSuperuserMixin, DeleteView):
+    model = Image
+    template_name = "ftc/image_delete.html"
+    def get_success_url(self):
+        return reverse('grain_images', args=[self.object.grain_id])
 
 class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
     model = Grain

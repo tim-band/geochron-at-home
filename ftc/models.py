@@ -72,13 +72,16 @@ class Grain(models.Model):
     index = models.IntegerField()
     image_width = models.IntegerField()
     image_height = models.IntegerField()
-    scale_x = models.FloatField(null=True)
-    scale_y = models.FloatField(null=True)
-    stage_x = models.FloatField(null=True)
-    stage_y = models.FloatField(null=True)
+    scale_x = models.FloatField(null=True, blank=True)
+    scale_y = models.FloatField(null=True, blank=True)
+    stage_x = models.FloatField(null=True, blank=True)
+    stage_y = models.FloatField(null=True, blank=True)
 
     class Meta:
         unique_together = ('sample', 'index',)
+
+    def get_absolute_url(self):
+        return reverse('grain', args=[self.pk])
 
     def get_owner(self):
         return self.sample.get_owner()
