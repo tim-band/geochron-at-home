@@ -178,8 +178,8 @@ window.addEventListener('load', function() {
 <div id="heading-row">
     <span id="heading">
         Images for grain {{ object.index }}
-        in sample <strong>{{ object.sample.sample_name }}</strong>,
-        in project <strong>{{ object.sample.in_project.project_name }}</strong>
+        in sample <a href="{% url 'sample' object.sample.pk %}">{{ object.sample.sample_name }}</a>,
+        in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
     </span>
     <span id="control-row">
         <button id="configure">Configure View</button>

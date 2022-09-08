@@ -4,10 +4,14 @@
 
 {% block content %}
 
-<h1> Sample <strong>{{ object.sample_name }}</strong></h1>
-<div><a href="{% url 'sample_update' object.pk %}">Edit</a></div>
-<div><a id="create-grain" href="{% url 'grain_create' object.pk %}">Create new grain</a></div>
-<div>
+<h1> Sample
+    <strong>{{ object.sample_name }}</strong>
+    of project
+    <a href="{% url 'project' object.in_project.pk %}">
+        {{object.in_project.project_name}}
+    </a>
+</h1>
+<div class="details">
     <table>
         <tr><td>Property</td><td>{{object.get_sample_property_display}}</td></tr>
         <tr><td>Total grains</td><td>{{object.total_grains}}</td></tr>
@@ -15,7 +19,9 @@
         <tr><td>Minimum contributor number</td><td>{{object.min_contributor_num}}</td></tr>
         <tr><td>Completed?</td><td>{{object.completed}}</td></tr>
     </table>
+    <a href="{% url 'sample_update' object.pk %}">Edit</a>
 </div>
+<div><a id="create-grain" href="{% url 'grain_create' object.pk %}">Create new grain</a></div>
 <h2>Grains</h2>
 <ul>
     {% for g in object.grain_set.all %}
@@ -24,4 +30,3 @@
 </ul>
 
 {% endblock %}
-
