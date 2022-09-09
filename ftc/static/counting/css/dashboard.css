@@ -158,6 +158,214 @@ body {
 	margin-top: 0;
 }
 
+@media (min-width: 1200px) {
+    .col-lg-4 {
+        float: left;
+        width: 33.33333333%;
+    }
+}
+
+.row {
+    box-sizing: border-box;
+}
+
+.row:before, .row:after {
+    display: table;
+    content: " ";
+}
+
+.row:after {
+    clear: both;
+}
+  
+.col-lg-4 {
+    position: relative;
+    min-height: 1px;
+    padding-right: 15px;
+    padding-left: 15px;
+    box-sizing: border-box;
+}
+
+.col-lg-4 h3 {
+    font-size: 24px;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-weight: 500;
+    line-height: 1.1;
+}
+
+.img-responsive {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+.container {
+    padding-right: 15px;
+    padding-left: 15px;
+    margin-right: auto;
+    margin-left: auto;
+    box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+    .container {
+        width: 750px;
+    }
+}
+
+@media (min-width: 992px) {
+    .container {
+        width: 970px;
+    }
+}
+
+@media (min-width: 1200px) {
+    .container {
+        width: 1170px;
+    }
+}
+
+.container-fluid {
+    padding-right: 15px;
+    padding-left: 15px;
+    margin-right: auto;
+    margin-left: auto;
+    box-sizing: border-box;
+}
+
+.jumbotron {
+    padding: 40px 60px;
+    border-radius: 6px;
+    margin-bottom: 30px;
+    background-color: #eee;
+    box-sizing: border-box;
+}
+
+h2 {
+    font-size: 30px;
+    font-weight: 100;
+    line-height: 1.1;
+}
+
+.jumbotron h2 {
+    margin: 20px 0 10px 0;
+    box-sizing: border-box;
+    font-weight: 500;
+}
+
+.jumbotron p {
+    margin: 0 0 15px 0;
+    font-size: 21px;
+    font-weight: 200;
+    line-height: 1.4;
+    box-sizing: border-box;
+}
+
+.btn {
+    background-image: linear-gradient(to bottom, #6c6 0, #494 100%);
+    color: #fff;
+    border: 1px solid transparent;
+    padding: 10px 16px;
+    font-size: 18px;
+    line-height: 1.33;
+    border-radius: 6px;
+    display: inline-block;
+    user-select: none;
+    cursor: pointer;
+    box-sizing: border-box;
+    text-decoration: none;
+}
+
+.btn:hover {
+    background-image: none;
+    background-color: #383;
+}
+
+.btn[disabled] {
+    background-image: linear-gradient(to bottom, #aaa 0, #888 100%);
+    color: #ccc;
+}
+
+.alert-success {
+    color: #373;
+    padding: 15px;
+    box-sizing: border-box;
+    background-image: linear-gradient(to bottom, #efd 0, #dec 100%);
+}
+
+button.close {
+    position: relative;
+    top: -3px;
+    background: 0 0;
+    border: 0;
+    line-height: 1;
+    color: inherit;
+    cursor: pointer;
+    float: right;
+    font-size: 21px;
+    box-sizing: border-box;
+}
+
+.col-xs-12 {
+  position: relative;
+  min-height: 1px;
+  padding-right: 15px;
+  padding-left: 15px;
+  float: left;
+  width: 100%;
+}
+
+.sidebar-right {
+    width: 25%;
+    float: right;
+}
+
+.main-sidebar-right {
+    width: 75%;
+    float: left;
+}
+
+.list-group {
+    border-radius: 4px;
+    padding: 0 15px;
+    box-shadow: 0 1px 2px #00000001;
+    box-sizing: border-box;
+}
+
+.list-group-item {
+    background-color: #fff;
+    color: #555;
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    border: 1px solid #eee;
+    box-sizing: border-box;
+}
+
+.list-group-item:hover {
+    background-color: #eee;
+}
+
+.list-group-item.active {
+    background-image: linear-gradient(to bottom, #26b 0, #37a 100%);
+    color: #fff;
+}
+
+.list-group-item.active:hover {
+    background-image: linear-gradient(to bottom, #15a 0, #269 100%);
+    color: 0xfff;
+}
+
+.list-group-item:first-child {
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+.list-group-item:last-child {
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
 
 /*
  * Placeholder dashboard ideas
@@ -268,6 +476,11 @@ section {
 }
 
 /* ------------ */
+
+.dropdown-menu .fa {
+    padding-right: 5px;
+}
+
 /*
 #dropdown-tracknum, #tracknum {
 	font-family: 'ds-digitalitalic';
@@ -316,4 +529,23 @@ section {
 .leaflet-bar a.selecting {
 	background-color: #80dbdb;
 }
-    
+
+.details td {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.grain_table th {
+    padding-left: 5px;
+    padding-right: 5px;
+    background-color: #8fbc8f;
+}
+
+.grain_table td {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.grain_table tr:nth-child(even) {
+    background-color: #ffebcd;
+}

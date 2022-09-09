@@ -18,15 +18,35 @@
         <tr><td>Priority</td><td>{{object.priority}}</td></tr>
         <tr><td>Minimum contributor number</td><td>{{object.min_contributor_num}}</td></tr>
         <tr><td>Completed?</td><td>{{object.completed}}</td></tr>
+        <tr><td>Project owner</td><td>{{object.get_owner}}</td></tr>
     </table>
     <a href="{% url 'sample_update' object.pk %}">Edit</a>
 </div>
 <div><a id="create-grain" href="{% url 'grain_create' object.pk %}">Create new grain</a></div>
 <h2>Grains</h2>
-<ul>
+<table class="grain_table">
+    <tr>
+        <th>Grain</th>
+        <th>Number of results</th>
+        <th>Owner's track count</th>
+    </tr>
     {% for g in object.grain_set.all %}
-    <li><a href="{% url 'grain' g.pk %}">{{ g.index }}</a></li>
+    <tr>
+        <td><a href="{% url 'grain' g.pk %}">{{ g.index }}</a></td>
+        <td>{{ g.count_results }}</td>
+        <td>
+            {% with result=g.owners_result %}
+            {% if result == None %}
+                Not started
+            {% elif result < 0 %}
+                Not submitted
+            {% else %}
+                {{ result }}
+            {% endif %}
+            {% endwith %}
+        </td>
+    </tr>
     {% endfor %}
-</ul>
+</table>
 
 {% endblock %}

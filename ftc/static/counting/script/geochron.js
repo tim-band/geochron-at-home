@@ -642,7 +642,7 @@ function grain_view(options) {
     sliders2.updateOptions({
         range: {
             'min': 0,
-            'max': sliderNum - 1
+            'max': Math.max(1, sliderNum - 1)
         }
     }, true);
     var yOverX = grain_info.image_height / grain_info.image_width;
@@ -675,10 +675,10 @@ function grain_view(options) {
                 element.setRangeText(v, 0, 3, 'end');
             });
         },
-        submitTrackCount: function(upateUrl, newGrainUrl) {
+        submitTrackCount: function(updateUrl, newGrainUrl) {
             if (confirm("submit the result?") == true) {
                 var xhr = new XMLHttpRequest();
-                xhr.open('POST', upateUrl);
+                xhr.open('POST', updateUrl);
                 xhr.onload = function() {
                     console.log('submitted: ' + xhr.responseText);
                     window.location.href = newGrainUrl;

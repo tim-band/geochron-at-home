@@ -31,6 +31,7 @@ services:
     environment:
       - STATIC_ROOT=/code/static
       - DB_HOST=db
+      - DB_PORT=5432
       - PROMETHEUS_METRICS_EXPORT_PORT_RANGE=8001-8019
       - DJANGO_DEBUG=0
     ports:

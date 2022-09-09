@@ -1,11 +1,11 @@
 from django.shortcuts import render, get_object_or_404
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q, Subquery
 from django.db.models.aggregates import Max
 from django.forms import (ModelForm, CharField, Textarea, FileField,
     ClearableFileInput, ValidationError)
 from django.views.decorators.csrf import csrf_protect
-from django.views.generic.edit import CreateView, UpdateView
+from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic import DetailView
 from django.urls import reverse
 from django.http import (HttpResponse, HttpResponseRedirect,
@@ -22,6 +22,7 @@ from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 import base64
 import io
 import json
+import sys
 
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex)
@@ -172,7 +173,16 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
     template_name = "ftc/grain.html"
 
 
-class CrystalImageInput(ClearableFileInput):
+class GrainDetailUpdateView(CreatorOrSuperuserMixin, UpdateView):
+    model = Grain
+    template_name = "ftc/grain_update_meta.html"
+    fields = [
+        'index', 'image_width', 'image_height',
+        'scale_x', 'scale_y', 'stage_x', 'stage_y', 'shift_x', 'shift_y'
+    ]
+
+
+class StackImageInput(ClearableFileInput):
     def value_from_datadict(self, data, files, name):
         return files.getlist(name)
 
@@ -180,7 +190,7 @@ class CrystalImageInput(ClearableFileInput):
 def validate_file_image(f):
     if not parse_image_name(f.name):
         raise ValidationError(
-            'File %(fn)s is not called image<nn> or refl-image',
+            'File %(fn)s is not an expected image name',
             params={'fn': f.name},
             code='bad-image-file-name'
         )
@@ -204,7 +214,7 @@ class GrainForm(ModelForm):
         fields = ['images']
 
     images = ImageStackField(
-        widget=CrystalImageInput(attrs={'multiple': True}),
+        widget=StackImageInput(attrs={'multiple': True}),
         validators=[validate_file_image])
 
     def clean(self):
@@ -237,11 +247,26 @@ class GrainForm(ModelForm):
         self.cleaned_data['files'] = files
         return self.cleaned_data
 
-    def save(self, commit=True):
-        max_index = self.sample.grain_set.aggregate(Max('index'))['index__max']
+    def next_grain_number(self, sample):
+        """
+        Set the grain number to the next available number
+        """
+        self.sample = sample
+        max_index = sample.grain_set.aggregate(Max('index'))['index__max']
         if not max_index:
             max_index = 0
-        self.instance.index = max_index + 1
+        self.grain_index = max_index + 1
+
+    def explicit_grain(self, grain):
+        """
+        Set the grain explicitly
+        """
+        self.sample = None
+        self.grain = grain
+        self.grain_index = grain.index
+
+    def save(self, commit=True):
+        self.instance.index = self.grain_index
         max_w = 0
         max_h = 0
         for f in self.cleaned_data['files']:
@@ -253,8 +278,9 @@ class GrainForm(ModelForm):
                 max_h = h
         self.instance.image_width = max_w
         self.instance.image_height = max_h
-        self.instance.sample = self.sample
-        region = Region(grain=self.instance)
+        if self.sample is not None:
+            self.instance.sample = self.sample
+        region = Region(grain=self.instance, shift_x=0, shift_y=0)
         x_margin = int(max_w / 20)
         y_margin = int(max_h / 20)
         v0 = Vertex(region=region, x=x_margin, y=y_margin)
@@ -281,9 +307,9 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
         self.object = None
         form_class = self.get_form_class()
         form = self.get_form(form_class)
-        form.sample = self.parent_object
         if not form.is_valid():
             return self.form_invalid(form)
+        form.next_grain_number(self.parent_object)
         rtn = self.form_valid(form)
         with transaction.atomic():
             for f in form.cleaned_data['files']:
@@ -300,9 +326,35 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
         return reverse('grain', kwargs={'pk': self.object.pk})
 
 
+class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
+    model = Grain
+    template_name = "ftc/grain_images.html"
+    form_class = GrainForm
+    #fields = ["index", "image_width", "image_height", "scale_x", "scale_y", "stage_x", "stage_y"]
+    def post(self, request, *args, **kwargs):
+        form_class = self.get_form_class()
+        form = self.get_form(form_class)
+        form.explicit_grain(self.object)
+        if not form.is_valid():
+            return self.form_invalid(form)
+        rtn = self.form_valid(form)
+        with transaction.atomic():
+            for f in form.cleaned_data['files']:
+                image = Image(
+                    grain=self.object,
+                    format=f['format'],
+                    ft_type='S',
+                    index=f['index'],
+                    data=f['data']
+                ).save()
+        return rtn
+
+    def get_success_url(self):
+        return reverse('grain_images', kwargs={'pk': self.object.pk})
+
 @csrf_protect
 @user_passes_test(user_is_staff)
-def grain_update(request, pk):
+def grain_update_roi(request, pk):
     grain = Grain.objects.get(pk=pk)
     if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
         return HttpResponse("Grain update forbidden", status=403)
@@ -405,7 +457,7 @@ def redirect_to_count(request):
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def get_grain_info(request, pk):
+def get_grain_info(request, pk, **kwargs):
     if pk == 'done':
         return {
             'grain_info': 'null',
@@ -468,13 +520,86 @@ def get_grain_info(request, pk):
         latlngs = json.loads(save.latlngs)
         info['marker_latlngs'] = latlngs
         info['num_markers'] = len(latlngs)
-    return { 'grain_info': json.dumps(info), 'messages': [] }
+    return {
+        'grain_info': json.dumps(info),
+        'messages': [],
+        **kwargs
+    }
 
 
 @login_required
 def count_grain(request, pk):
-    return render(request, 'ftc/counting.html', get_grain_info(request, pk))
+    return render(
+        request,
+        'ftc/counting.html',
+        get_grain_info(request, pk, submit_url=reverse('counting'))
+    )
 
+
+def count_my_grain_extra_links(user, current_id):
+    current_grain = Grain.objects.get(id=current_id)
+    sample = current_grain.sample
+    project = sample.in_project
+    index = current_grain.index
+    done_query = Subquery(FissionTrackNumbering.objects.filter(
+        worker=user,
+        in_sample=sample,
+        grain=OuterRef('index'),
+        result__gte=0
+    ))
+    next_grain = Grain.objects.annotate(
+        done=Exists(done_query)
+    ).filter(
+        sample__in_project__creator=user,
+        sample__in_project=project,
+        sample=sample,
+        index__gt=index,
+        done=False
+    ).order_by(
+        'index'
+    ).first()
+    prev_grain = Grain.objects.annotate(
+        done=Exists(done_query)
+    ).filter(
+        sample__in_project__creator=user,
+        sample__in_project=project,
+        sample=sample,
+        index__lt=index,
+        done=False
+    ).order_by(
+        '-index'
+    ).first()
+    back = reverse('grain', args=[current_id])
+    r = {
+        'submit_url': back,
+        'cancel_url': back
+    }
+    if next_grain != None:
+        url = reverse('count_my', args=[next_grain.id])
+        r['next_url'] = url
+        r['submit_url'] = url
+    if prev_grain != None:
+        r['prev_url'] = reverse('count_my', args=[prev_grain.id])
+    return r
+
+class ImageDeleteView(CreatorOrSuperuserMixin, DeleteView):
+    model = Image
+    template_name = "ftc/image_delete.html"
+    def get_success_url(self):
+        return reverse('grain_images', args=[self.object.grain_id])
+
+class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
+    model = Grain
+    template_name = "ftc/counting.html"
+    def get_context_data(self, **kwargs):
+        pk = self.kwargs['pk']
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(get_grain_info(
+            self.request,
+            pk,
+            **count_my_grain_extra_links(self.request.user, pk)
+        ))
+        return ctx
 
 from django.contrib.auth.models import User
 def tutorialCompleted(request):
@@ -505,6 +630,7 @@ def counting(request, uname=None):
 
 
 @login_required
+@transaction.atomic
 def updateTFNResult(request):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     sep = '~'
@@ -515,6 +641,12 @@ def updateTFNResult(request):
             res_dic = json_obj['counting_res']
             sample = Sample.objects.get(id=res_dic['sample_id'])
             latlng_json_str = json.dumps(res_dic['marker_latlngs'])
+            # Remove any previous or partial save state
+            FissionTrackNumbering.objects.filter(
+                in_sample=sample,
+                grain=res_dic['grain_num'],
+                worker=request.user,
+            ).delete()
             fts = FissionTrackNumbering(in_sample=sample, 
                                         grain=res_dic['grain_num'], 
                                         ft_type=res_dic['ft_type'], 
@@ -523,15 +655,7 @@ def updateTFNResult(request):
                                         latlngs=latlng_json_str,
             )
             fts.save()
-            user = User.objects.get(username=request.user.username)
             project = Project.objects.get(id=res_dic['proj_id'])
-            # Remove any partial save state
-            FissionTrackNumbering.objects.filter(
-                in_sample=sample,
-                grain=res_dic['grain_num'],
-                worker=user,
-                result=-1,
-            ).delete()
         except (KeyError, Project.DoesNotExist):
             return HttpResponseNotFound("you have no project currrently.")
         else:
@@ -540,9 +664,8 @@ def updateTFNResult(request):
     else:
         return HttpResponseForbidden("Sorry, You have to active your account first.")
 
-import sys
-import fnmatch
 @login_required
+@transaction.atomic
 def saveWorkingGrain(request):
     if request.user.is_active:
         with transaction.atomic():
@@ -551,12 +674,11 @@ def saveWorkingGrain(request):
             res_json = json.loads(json_str)
             res = res_json['intermedia_res']
             sample = Sample.objects.get(id=res['sample_id'])
-            # Remove any previous partial save state
+            # Remove any previous or partial save state
             FissionTrackNumbering.objects.filter(
                 in_sample=sample,
                 grain=res['grain_num'],
                 worker=user,
-                result=-1,
             ).delete()
             # Save the new state
             ftn = FissionTrackNumbering(

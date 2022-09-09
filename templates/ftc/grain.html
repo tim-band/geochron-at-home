@@ -46,6 +46,19 @@ body {
     background: #ccc;
 }
 
+.button {
+    padding: 1px 10px;
+    border: black solid 1px;
+}
+
+table.metadata {
+    padding: 1px 10px;
+}
+
+table.metadata td:nth-child(odd) {
+    background-color: #ccc;
+}
+
 button {
     border: #888;
     border-radius: 4px;
@@ -63,7 +76,9 @@ button:disabled {
 }
 
 #map {
-    position: fixed;
+    position: absolute;
+    top:142px;
+    bottom: 0;
     width: 100%;
     height: 100%;
 }
@@ -140,8 +155,6 @@ function makeGrainMap() {
         grain_info: {
             image_width: image_width,
             image_height: image_height,
-            shift_x: {{ object.shift_x }},
-            shift_y: {{ object.shift_y }},
             // scale_x
             images_crystal: [
                 //{% for i in object.get_images_crystal %}
@@ -184,12 +197,20 @@ window.addEventListener('load', function() {
     <span id="control-row">
         <button id="configure">Configure View</button>
         <span class="control-divider"></span>
-        <!--got to figure out how to fix this-->
-        <button id="edit" onclick="beginEdit(crystal_control)">Edit</button>
-        <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
+        <a id="count" class="button" href="{% url 'count_my' object.pk %}">Count</a>
+    <a id="images" class="button" href="{% url 'grain_images' object.pk %}">Edit Image Stack</a>
+    <a id="meta" class="button" href="{% url 'grain_update_meta' object.pk %}">Edit Metadata</a>
+        <button id="edit" onclick="beginEdit(crystal_control)">Edit Region</button>
+        <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update_roi' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
     </span>
 </div>
-
+<div>
+    <table class="metadata">
+        <tr><td>Image size:</td><td>{{ object.image_width }}&#x00D7;{{ object.image_height }}</td></tr>
+        <tr><td>Image scale:</td><td>{{ object.scale_x }}&#x00D7;{{ object.scale_y }}</td></tr>
+        <tr><td>Stage position:</td><td>{{ object.stage_x }}&#x00D7;{{ object.stage_y }}</td></tr>
+    </table>
+</div>
 <div id="map"></div>
 
 <ul>

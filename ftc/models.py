@@ -72,15 +72,18 @@ class Grain(models.Model):
     index = models.IntegerField()
     image_width = models.IntegerField()
     image_height = models.IntegerField()
-    scale_x = models.FloatField(null=True)
-    scale_y = models.FloatField(null=True)
-    stage_x = models.FloatField(null=True)
-    stage_y = models.FloatField(null=True)
-    shift_x = models.IntegerField(default=0)
-    shift_y = models.IntegerField(default=0)
+    scale_x = models.FloatField(null=True, blank=True)
+    scale_y = models.FloatField(null=True, blank=True)
+    stage_x = models.FloatField(null=True, blank=True)
+    stage_y = models.FloatField(null=True, blank=True)
+    shift_x = models.IntegerField(default=0, blank=True)
+    shift_y = models.IntegerField(default=0, blank=True)
 
     class Meta:
         unique_together = ('sample', 'index',)
+
+    def get_absolute_url(self):
+        return reverse('grain', args=[self.pk])
 
     def get_owner(self):
         return self.sample.get_owner()
@@ -94,6 +97,22 @@ class Grain(models.Model):
     
     def get_images_mica(self):
         return self.image_set.filter(ft_type='I').order_by('index')
+
+    def count_results(self):
+        return FissionTrackNumbering.objects.filter(
+            in_sample=self.sample,
+            grain=self.index
+        ).count()
+
+    def owners_result(self):
+        ftn = FissionTrackNumbering.objects.filter(
+            in_sample=self.sample,
+            grain=self.index,
+            worker=self.get_owner()
+        ).first()
+        if ftn == None:
+            return None
+        return ftn.result
 
 #
 class Region(models.Model):

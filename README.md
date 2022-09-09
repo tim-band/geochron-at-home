@@ -132,6 +132,7 @@ STATIC_ROOT=/var/www/html/geochron_at_home/static/
 STATIC_URL=/geochron_at_home/static/
 SSL_ONLY=false
 DB_HOST=localhost
+DB_PORT=5432
 DJANGO_DEBUG=false
 ```
 
@@ -196,8 +197,8 @@ Multiple hosts can be specified in `ALLOWED_HOSTS` as a
 comma-separated list. Any host can be allowed with `ALLOWED_HOSTS='*'`.
 The `localhost,` setting is needed if you want any local access, for
 example a local prometheus collecting metrics.
-You can ignore (or delete) the settings for `DB_HOST` and `STATIC_ROOT`
-as these are overridden in the compose file.
+You can ignore (or delete) the settings for `DB_HOST`,
+`DB_PORT` and `STATIC_ROOT` as these are overridden in the compose file.
 
 Now you can build it with `docker-compose build` and run it with
 `docker-compose up -d`. Or you can do both with at once with
