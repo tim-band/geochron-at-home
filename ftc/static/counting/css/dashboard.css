@@ -45,6 +45,7 @@ body {
 	padding: 0;
 	margin: 0;
 	list-style: none;
+    align-items: center;
 }
 #navigation-header .brand {
 	display: flex;
@@ -186,7 +187,7 @@ body {
     box-sizing: border-box;
 }
 
-.col-lg-4 h3 {
+h3 {
     font-size: 24px;
     margin-top: 20px;
     margin-bottom: 10px;
@@ -263,8 +264,8 @@ h2 {
 }
 
 .btn {
-    background-image: linear-gradient(to bottom, #6c6 0, #494 100%);
-    color: #fff;
+    background-image: linear-gradient(to bottom, #fff 0, #ddd 100%);
+    color: #333;
     border: 1px solid transparent;
     padding: 10px 16px;
     font-size: 18px;
@@ -275,11 +276,32 @@ h2 {
     cursor: pointer;
     box-sizing: border-box;
     text-decoration: none;
+    white-space: nowrap;
 }
 
 .btn:hover {
     background-image: none;
+    background-color: #bbb;
+}
+
+.btn-success {
+    background-image: linear-gradient(to bottom, #6c6 0, #494 100%);
+    color: #fff;
+}
+
+.btn-success:hover {
+    background-image: none;
     background-color: #383;
+}
+
+.btn-primary {
+    background-image: linear-gradient(to bottom, #89a 0, #269 100%);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-image: none;
+    background-color: #269;
 }
 
 .btn[disabled] {
@@ -548,4 +570,43 @@ section {
 
 .grain_table tr:nth-child(even) {
     background-color: #ffebcd;
+}
+
+.form-sign {
+    max-width: 400px;
+    padding: 30px 60px 30px 60px;
+    margin: 0 auto;
+    background-color: #fff;
+    display: flex;
+    flex-direction: column;
+}
+#signup_form {
+    max-width: 480px;
+}
+.form-sign .form-sign-heading,
+.form-sign .checkbox {
+  margin-bottom: 10px;
+}
+.form-sign .checkbox {
+  font-weight: normal;
+}
+.form-sign .form-control {
+    position: relative;
+    height: auto;
+    -webkit-box-sizing: border-box;
+       -moz-box-sizing: border-box;
+            box-sizing: border-box;
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 0px;
+}
+.form-sign .form-control:focus {
+    z-index: 2;
+}
+.form-sign input[type="text"],
+             input[type="email"],
+             input[type="password"] {
+    margin-bottom: 10px;
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
 }

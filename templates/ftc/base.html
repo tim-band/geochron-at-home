@@ -37,7 +37,7 @@
         <ul class="bar-right">
           {% block right_nav_li %}{% endblock %}
           {% if not user.is_authenticated or user.username == "guest" %}
-          <li><div><a href="{% url 'signmeup' %}">Sign Up</a></div></li>
+          <li><div><a class="btn btn-primary" href="{% url 'signmeup' %}">Sign Up</a></div></li>
           <li>&nbsp;&nbsp;&nbsp;</li>
           {% endif %}
           </li><li class="help-button"><a href="{%url 'tutorial' %}" target="_blank"><i class="fa fa-question-circle fa-lg"></i></a></li>

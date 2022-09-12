@@ -123,15 +123,10 @@ footer {
                   Go &raquo;
                 </a></p>
             </div>
-            <div class="col-lg-4">
-                <h2>View site statistics</h2>
-                <p><a class="btn" id="site-statistics-link" href="#" role="button">View details &raquo;</a></p>
-            </div>
             {% if user.is_staff %}
             <div class="col-lg-4">
-                <h2>Set up a project</h2>
-                <p>Learn how to start a project, preparing the folder structure and following the naming guidelines for files and directories.</p>
-                <p><a href="#" class="btn" role="button">View details &raquo;</a></p>
+                <h2>Administration</h2>
+                <p><a class="btn" id="admin-link" href="{% url 'admin:index' %}" role="button">View details &raquo;</a></p>
             </div>
             <div class="col-lg-4">
                 <h2>Get results</h2>
