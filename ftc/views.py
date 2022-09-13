@@ -280,7 +280,7 @@ class GrainForm(ModelForm):
         self.instance.image_height = max_h
         if self.sample is not None:
             self.instance.sample = self.sample
-        region = Region(grain=self.instance, shift_x=0, shift_y=0)
+        region = Region(grain=self.instance)
         x_margin = int(max_w / 20)
         y_margin = int(max_h / 20)
         v0 = Vertex(region=region, x=x_margin, y=y_margin)
