@@ -1,15 +1,17 @@
 from django.test import Client, tag, TestCase
+from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.common.alert import Alert
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
-import subprocess
-import time
+import base64
 import glob
 import os
-import base64
+import subprocess
+import tempfile
+import time
 
 def retrying(retries, f, delay=1):
     if retries == 1:
@@ -331,7 +333,7 @@ class CountingPage(BasePage):
 class NavBar(BasePage):
     def get_dropdown(self):
         return self.driver.find_element(By.CSS_SELECTOR,
-            ".navbar-fixed-top .navbar-right a.dropdown-toggle"
+            "#account-dropdown a"
         )
 
     def check(self):
@@ -560,7 +562,17 @@ class WebUploader:
 class DjangoTests(TestCase):
     def setUp(self):
         self.dc = DockerCompose("./docker-compose-test.yml").down().up().init()
-        self.driver = webdriver.Firefox()
+        self.tmp = tempfile.mkdtemp(prefix='tmp', dir=Path.home())
+        service = webdriver.firefox.service.Service(service_args=[
+            "--profile-root",
+            self.tmp
+        ])
+        self.driver = webdriver.Firefox(service=service)
+
+    def tearDown(self):
+        self.driver.close()
+        self.dc.down()
+        os.rmdir(self.tmp)
 
     def test_onboard(self):
         # Upload Z-Stack images
@@ -699,8 +711,3 @@ class DjangoTests(TestCase):
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
         self.assertEqual(report.result("1"), "5")
-
-    def tearDown(self):
-        self.driver.close()
-        self.dc.down()
-

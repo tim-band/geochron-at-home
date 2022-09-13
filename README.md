@@ -333,7 +333,7 @@ the new samples.
 From the pipenv shell:
 
 ```sh
-(geochron-at-home) $ pipenv lock -r >requirements.txt
+(geochron-at-home) $ pipenv requirements >requirements.txt
 (geochron-at-home) $ ./manage.py test
 ```
 
