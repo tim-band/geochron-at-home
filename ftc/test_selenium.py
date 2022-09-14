@@ -453,13 +453,16 @@ class GrainCreatePage(BasePage):
 
 
 class GrainPage(BasePage):
+    def get_image_layer(self):
+        return self.driver.find_elements(By.CSS_SELECTOR, 'img.leaflet-image-layer')
+
     def edit(self):
         zoom_outs = self.driver.find_elements(By.CLASS_NAME, 'leaflet-control-zoom-out')
         assert len(zoom_outs) == 1
-        imgs = self.driver.find_elements(By.CSS_SELECTOR, 'img.leaflet-image-layer')
-        while (600 < imgs[0].rect['width']
-                and not self.element_is_disabled(zoom_outs[0])):
-            zoom_outs[0].click()
+        zoom_out = zoom_outs[0]
+        while (600 < self.get_image_layer()[0].rect['width']
+                and not self.element_is_disabled(zoom_out)):
+            zoom_out.click()
         self.driver.find_element(By.ID, 'edit').click()
         return self
 

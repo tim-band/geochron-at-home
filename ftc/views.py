@@ -513,7 +513,8 @@ def get_grain_info(request, pk, **kwargs):
         'image_width': width,
         'image_height': height,
         'scale_x': grain.scale_x,
-        'images': images_list,
+        'images_crystal': images_list,
+        'images_mica': [],
         'rois': rois
     }
     if save:

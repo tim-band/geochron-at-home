@@ -499,33 +499,21 @@ section {
 
 /* ------------ */
 
+.caret {
+    display: inline-block;
+    width: 0;
+    height: 0;
+    vertical-align: middle;
+    border-top: 4px dashed;
+    border-right: 4px solid transparent;
+    border-left: 4px solid transparent;
+}
+  
 .dropdown-menu .fa {
     padding-right: 5px;
 }
 
-/*
-#dropdown-tracknum, #tracknum {
-	font-family: 'ds-digitalitalic';
-
-	z-index: 10001;
-
-	width: 160px; height: 50px;
-	background: white;
-	font-size: 4em;
-	color: #707070;
-
-	position: absolute;
-	left: 50%; top: 0px;
-	margin-left: -50px; margin-top: 0;
-
-	text-align: center;
-	line-height: 45px;
-
-	border-top: 5px solid #E54B6B;
-	background-image: linear-gradient(#f0f0f0, white);
-} */
 #dropdown-tracknum {
-	/* font-family: "ds-digitalitalic";*/
 	z-index: 10001;
 	width: 120px;
 	height: 50px;
