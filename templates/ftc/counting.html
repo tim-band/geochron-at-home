@@ -8,43 +8,25 @@
 <link rel="stylesheet" href="{% static 'noUiSlider-14.6.3/nouislider.min.css' %}" />
 <style type="text/css">
 #map {
-      position: absolute;
-      top: 40px;
-      bottom: 0;
-      width: 100%;
-    }
+    position: absolute;
+    top: 40px;
+    bottom: 0;
+    width: 100%;
+}
+#dropdown-tracknum {
+	z-index: 10001;
+	width: 120px;
+	position: absolute;
+	left: 50%;
+	top: 0px;
+	margin-left: -50px;
+	margin-top: 0px;
+	border-top: 4px solid #E54B6B;
+}
 #dropdown-tracknum  .form-control, .dropdown-menu {
 border-radius: 0px;
+margin: 0;
 }
-
-.dropdown-menu {
-    list-style: none;
-    font-size: 14px;
-    padding: 5px 0;
-    margin: 2px 0;
-    width: max-content;
-    background-color: #fff;
-    display: none;
-}
-
-.dropdown-menu:focus-within, .dropdown-menu.open {
-    display: inherit;
-}
-
-.dropdown-menu li {
-    text-decoration: none;
-    padding: 2px 20px;
-}
-
-.dropdown-menu li:hover {
-    background-image: linear-gradient(to bottom, #eee 0, #ddd 100%);
-}
-
-.dropdown-menu li a {
-    text-decoration: none;
-    color: #222;
-}
-
 #dropdown-tracknum .input-group-lg > .input-group-addon{
 border-radius: 0px;
 padding: 0px 6px;
@@ -173,12 +155,6 @@ function setup() {
     document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
     map.enableEditing();
 }
-function tracknum_dropdown_open() {
-    var tnd = document.getElementById('tracknum-dropdown');
-    tnd.classList.add('open');
-    tnd.getElementsByTagName('a')[0].focus();
-    tnd.classList.remove('open');
-}
 </script>
 {% endblock %}
 
@@ -196,14 +172,15 @@ function tracknum_dropdown_open() {
 {% block body_attributes %}onload='setup()'{% endblock %}
 
 {% block content %}
-<div id="dropdown-tracknum" class="input-group">
+<div id="dropdown-tracknum" class="input-group dropdown">
 <div id="tracknum-group" class="btn-group">
   <input id="tracknum" class="form-control" type="text" value="000" readonly>
-  <button id="btn-tracknum" type="button" class="dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
-  onclick="tracknum_dropdown_open()" tabindex="0">
+  <button id="btn-tracknum" type="button" class="dropdown-toggle"
+  data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+  onclick="dropdown_open('dropdown-tracknum')" tabindex="0">
     <span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
   </button>
-  <ul class="dropdown-menu" id="tracknum-dropdown">
+  <ul class="dropdown-menu">
     {% if user.username != "guest"  %}
     <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>save intermediate result</a></li>
     {% endif %}

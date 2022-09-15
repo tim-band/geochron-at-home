@@ -20,6 +20,16 @@
 <!-- Latest compiled and minified JavaScript -->
 <script src="{% static 'jquery/jquery-1.12.4.min.js' %}" type="text/javascript"></script>
 <script src="{% static 'jquery-ui-1.12.1/jquery-ui.min.js' %}" type="text/javascript"></script>
+<script>
+function dropdown_open(id) {
+    var dropdown = document.getElementById(id);
+    dropdown.classList.add('open');
+    var menu = dropdown.getElementsByClassName('dropdown-menu')[0];
+    var  a = menu.getElementsByTagName('a');
+    a[0].focus();
+    dropdown.classList.remove('open');
+}
+</script>
 
 {% block head %}
 {% endblock %}
@@ -42,13 +52,7 @@
           {% endif %}
           </li><li class="help-button"><a href="{%url 'tutorial' %}" target="_blank"><i class="fa fa-question-circle fa-lg"></i></a></li>
           <li id="account-dropdown" class="dropdown">
-            <a href="#" class="dropdown-toggle" draggable="false" onclick="
-              var dropdown = document.querySelector('.dropdown');
-              var menu = dropdown.querySelector('.dropdown-menu');
-              dropdown.classList.add('visible');
-              menu.children[0].children[0].focus();
-              dropdown.classList.remove('visible');
-            ">
+            <a href="#" class="dropdown-toggle" draggable="false" onclick="dropdown_open('account-dropdown')">
               <i class="fa fa-user fa-lg"></i>&nbsp; {{ user.username | default:"User"}} &nbsp;<span class="caret"></span></a>
             <ul class="dropdown-menu">
               {% if user.is_authenticated %}
