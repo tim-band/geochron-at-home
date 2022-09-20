@@ -122,8 +122,13 @@ function makeGrainMap() {
         grain_info: {
             image_width: image_width,
             image_height: image_height,
-            images: [
-                //{% for i in object.get_images %}
+            images_crystal: [
+                //{% for i in object.get_images_crystal %}
+                "{% url 'get_image' i.pk %}",
+                //{% endfor %}
+            ],
+            images_mica: [
+                //{% for i in object.get_images_mica %}
                 "{% url 'get_image' i.pk %}",
                 //{% endfor %}
             ],
