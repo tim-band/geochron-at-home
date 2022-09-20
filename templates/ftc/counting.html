@@ -23,27 +23,6 @@
 	margin-top: 0px;
 	border-top: 4px solid #E54B6B;
 }
-#dropdown-tracknum  .form-control, .dropdown-menu {
-border-radius: 0px;
-margin: 0;
-}
-#dropdown-tracknum .input-group-lg > .input-group-addon{
-border-radius: 0px;
-padding: 0px 6px;
-}
-
-#dropdown-tracknum .form-control {
-background-color: #fff;
-box-sizing: border-box;
-}
-.input-group-lg > .form-control {
-padding: 0px 8px;
-font-size: 44px; /*canot set too big otherwise chromium will not vartical center*/
-font-family: "ds-digitalitalic";
-}
-.input-group-addon {
-    padding: 6px 6px;
-}
 
 .noUi-base {
     box-shadow: 0 1px 5px rgba(0,0,0,0.65);
@@ -67,6 +46,7 @@ font-family: "ds-digitalitalic";
 }
 
 #tracknum {
+  display: inline-block;
   width:90px;
   height:46px;
   line-height: 1.3px;
@@ -74,6 +54,7 @@ font-family: "ds-digitalitalic";
   font-family: 'ds-digitalitalic';
   font-size: 44px;
   padding-top: 3px;
+  border-radius: 0;
 }
 
 #btn-tracknum {
@@ -137,25 +118,26 @@ font-family: "ds-digitalitalic";
 <script type='text/javascript' src="{% static 'noUiSlider-14.6.3/nouislider.min.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 <script type='text/javascript'>
-function setup() {
-    var map = grain_view({
-        grain_info: JSON.parse('{{ grain_info|escapejs }}'),
-        atoken: '{{ csrf_token }}',
-        iconUrl_normal: "{% static 'counting/images/circle.png' %}",
-        iconUrl_selected: "{% static 'counting/images/redCircle.png' %}"
-    });
-    map.setTrackCounterElement(document.getElementById('tracknum'));
-    document.getElementById('tracknum-submit').onclick = function() {
-        var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
-        map.submitTrackCount("{% url 'updateTFNResult'%}", submit_url);
-    };
-    document.getElementById('tracknum-save').onclick = function() {
-        map.saveTrackCount("{% url 'saveWorkingGrain'%}");
-    };
-    document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
-    map.enableEditing();
-}
 </script>
+{% endblock %}
+
+{% block setup_script %}
+var map = grain_view({
+    grain_info: JSON.parse('{{ grain_info|escapejs }}'),
+    atoken: '{{ csrf_token }}',
+    iconUrl_normal: "{% static 'counting/images/circle.png' %}",
+    iconUrl_selected: "{% static 'counting/images/redCircle.png' %}"
+});
+map.setTrackCounterElement(document.getElementById('tracknum'));
+document.getElementById('tracknum-submit').onclick = function() {
+    var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
+    map.submitTrackCount("{% url 'updateTFNResult'%}", submit_url);
+};
+document.getElementById('tracknum-save').onclick = function() {
+    map.saveTrackCount("{% url 'saveWorkingGrain'%}");
+};
+document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
+map.enableEditing();
 {% endblock %}
 
 {% block left_nav_li %}{% endblock %}
@@ -168,8 +150,6 @@ function setup() {
         <li><a href="{%url 'report'%}"><i class="fa fa-cubes"></i>Manage your projects</a></li>
     {% endif %}
 {% endblock %}
-
-{% block body_attributes %}onload='setup()'{% endblock %}
 
 {% block content %}
 <div id="dropdown-tracknum" class="input-group dropdown">

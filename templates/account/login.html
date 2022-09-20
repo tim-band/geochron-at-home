@@ -7,7 +7,7 @@
 {% block head_title %}{% trans "Sign In" %}{% endblock %}
 
 {% block content %}
-<div class="container" style="margin-top:40px">
+<div class="container">
 
 <form class="form-sign" role="form" method="post" action="{% url 'account_login' %}">
 <h3>{{site.name}}</h3>
@@ -21,11 +21,11 @@
   <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
 {% endif %}
 
-<div class="checkbox">
+<div class="checkbox row">
   <label class="pull-left">
      <input type="checkbox" value="remember-me"> Remember me
   </label>
-<a class="forgot pull-right" href="{% url 'account_reset_password' %}">{% trans "Forgot Password?" %}</a>
+  <a class="forgot pull-right" href="{% url 'account_reset_password' %}">{% trans "Forgot Password?" %}</a>
 </div>
 <a class="signup" href="{{ signup_url }}">Need an account? Sign up free.</a>
 </form>

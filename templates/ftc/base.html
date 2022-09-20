@@ -29,13 +29,25 @@ function dropdown_open(id) {
     a[0].focus();
     dropdown.classList.remove('open');
 }
+function dropModal() {
+    $('.modal,.modal-backdrop').removeClass('in');
+}
+function base_html_setup() {
+    $('[data-dismiss="modal"]').bind('click', function() {
+        dropModal();
+    });
+    $('[data-dismiss="alert"]').bind('click', function() {
+        $(this).closest('.alert').remove();
+    });
+    {% block setup_script %}{% endblock %}
+}
 </script>
 
 {% block head %}
 {% endblock %}
 
 </head>
-<body {% block body_attributes %}{% endblock %}>
+<body onload="base_html_setup()" {% block body_attributes %}{% endblock %}>
     <div id="navigation-header">
       <div class="brand">
         <a class="logo" href="{% url 'home' %}">Geochron@home</a>
@@ -79,9 +91,8 @@ function dropdown_open(id) {
     </div>
 
     <div class="container-fluid">
-      <div class="row">
       {% block content %}{% endblock %}
       {% block footer %}{% endblock %}
-    </div>
+    <div class="modal-backdrop fade"></div>
 </body>
 </html>
