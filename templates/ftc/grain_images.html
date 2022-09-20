@@ -4,14 +4,12 @@
 {% load order_by %}
 
 {% block content %}
-<table>
-    <thead>
-        <tr>
-            <th></th>
-        </tr>
-    </thead>
-</table>
-<table>
+<h2>
+    Images for <a href="{% url 'grain' object.pk %}">grain {{ object.index }}</a>
+    of sample <a href="{% url 'sample' object.sample.pk %}">{{ object.sample.sample_name }}</a>
+    in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
+</h2>
+<table class="table">
     <thead>
         <tr>
             <th>format</th>

@@ -22,11 +22,6 @@
     margin-right: 5px;;
 }
 
-.button {
-    padding: 1px 10px;
-    border: black solid 1px;
-}
-
 table.metadata {
     padding: 1px 10px;
 }
@@ -35,25 +30,13 @@ table.metadata td:nth-child(odd) {
     background-color: #ccc;
 }
 
-button {
-    border: #888;
-    border-radius: 4px;
-    padding: 2px 20px;
-    margin: 3px;
-}
-
-button:disabled {
-    background: #eee;
-    color: #bbb;
-}
-
 #edit-container {
     display: block;
 }
 
 #map {
     position: absolute;
-    top:132px;
+    top:144px;
     bottom: 0;
     width: 100%;
 }
@@ -159,9 +142,9 @@ window.addEventListener('load', function() {
         in sample <a href="{% url 'sample' object.sample.pk %}">{{ object.sample.sample_name }}</a>,
         in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
     </span>
-    <a id="count" class="button" href="{% url 'count_my' object.pk %}">Count</a>
-    <a id="images" class="button" href="{% url 'grain_images' object.pk %}">Edit Image Stack</a>
-    <a id="meta" class="button" href="{% url 'grain_update_meta' object.pk %}">Edit Metadata</a>
+    <a id="count" class="btn btn-default" href="{% url 'count_my' object.pk %}">Count</a>
+    <a id="images" class="btn btn-default" href="{% url 'grain_images' object.pk %}">Edit Image Stack</a>
+    <a id="meta" class="btn btn-default" href="{% url 'grain_update_meta' object.pk %}">Edit Metadata</a>
     <button id="edit" onclick="beginEdit(crystal_control)">Edit Region</button>
     <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update_roi' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
 </div>

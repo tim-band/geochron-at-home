@@ -2,6 +2,14 @@
 
 {% load static %}
 
+{% block head %}
+<style>
+.no-stretch {
+    width: max-content;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 
 <h1> Sample
@@ -11,8 +19,8 @@
         {{object.in_project.project_name}}
     </a>
 </h1>
-<div class="details">
-    <table>
+<div>
+    <table class="table no-stretch">
         <tr><td>Property</td><td>{{object.get_sample_property_display}}</td></tr>
         <tr><td>Total grains</td><td>{{object.total_grains}}</td></tr>
         <tr><td>Priority</td><td>{{object.priority}}</td></tr>
@@ -24,7 +32,7 @@
 </div>
 <div><a id="create-grain" href="{% url 'grain_create' object.pk %}">Create new grain</a></div>
 <h2>Grains</h2>
-<table class="grain_table">
+<table class="table">
     <tr>
         <th>Grain</th>
         <th>Number of results</th>
