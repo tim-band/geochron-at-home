@@ -127,7 +127,7 @@ class GrainSerializer(serializers.ModelSerializer):
         model = Grain
         fields = [
             'id', 'sample', 'index', 'image_width', 'image_height',
-            'scale_x', 'scale_y', 'stage_x', 'stage_y'
+            'scale_x', 'scale_y', 'stage_x', 'stage_y', 'shift_x', 'shift_y'
         ]
 
     index = serializers.IntegerField(required=False, read_only=False)
@@ -147,6 +147,7 @@ class GrainSerializer(serializers.ModelSerializer):
         if index == None:
             max_index = sample.grain_set.aggregate(Max('index'))['index__max'] or 0
             index = max_index + 1
+        region_first = rois['regions'][0]
         grain = self.save(
             index = index,
             sample = sample,
@@ -156,6 +157,8 @@ class GrainSerializer(serializers.ModelSerializer):
             scale_y=rois.get('scale_y'),
             stage_x=rois.get('stage_x'),
             stage_y=rois.get('stage_y'),
+            shift_x=region_first['shift'][0] if region_first else 0,
+            shift_y=region_first['shift'][1] if region_first else 0,
         )
         save_rois_regions(rois, grain)
 

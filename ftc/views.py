@@ -178,7 +178,7 @@ class GrainDetailUpdateView(CreatorOrSuperuserMixin, UpdateView):
     template_name = "ftc/grain_update_meta.html"
     fields = [
         'index', 'image_width', 'image_height',
-        'scale_x', 'scale_y', 'stage_x', 'stage_y'
+        'scale_x', 'scale_y', 'stage_x', 'stage_y', 'shift_x', 'shift_y'
     ]
 
 
@@ -383,7 +383,7 @@ def grain_update_roi(request, pk):
     with transaction.atomic():
         Region.objects.filter(grain=grain).delete()
         for _, vertices in sorted(regions.items()):
-            region = Region(grain=grain, shift_x=0, shift_y=0)
+            region = Region(grain=grain)
             region.save()
             for _, v in sorted(vertices.items()):
                 x = float(v['x']) * w
@@ -513,7 +513,8 @@ def get_grain_info(request, pk, **kwargs):
         'image_width': width,
         'image_height': height,
         'scale_x': grain.scale_x,
-        'images': images_list,
+        'images_crystal': images_list,
+        'images_mica': [],
         'rois': rois
     }
     if save:

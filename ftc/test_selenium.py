@@ -78,6 +78,14 @@ class BasePage:
             elt = self.driver.find_element(By.ID, elt)
         return 'leaflet-disabled' in elt.get_attribute('class').split(' ')
 
+    def scroll_into_view(self, elt):
+        r = elt.rect
+        wr = self.driver.get_window_rect()
+        js = 'window.scroll({0},{1})'.format(
+            r['x'] + (r['width'] - wr['width'])/2,
+            r['y'] + (r['height'] - wr['height'])/2
+        )
+        self.driver.execute_script(js)
 
 class WebMail(BasePage):
     def go(self):
@@ -163,7 +171,9 @@ class TutorialPage(BasePage):
         return self
 
     def go_next(self):
-        self.driver.find_element(By.ID, 'next').click()
+        e = self.driver.find_element(By.ID, 'next')
+        self.scroll_into_view(e)
+        e.click()
         return self
 
     def go_previous(self):
@@ -324,8 +334,10 @@ class CountingPage(BasePage):
                     return False
                 return es
 
+        # we used to wait for all four to be loaded, but now it seems only one
+        # gets loaded at a time.
         images = WebDriverWait(self.driver, 3).until(
-            ElementsLoaded(By.CLASS_NAME, "leaflet-image-layer", 4))
+            ElementsLoaded(By.CLASS_NAME, "leaflet-image-layer", 1))
 
         return images[-1].get_attribute("src")
 
@@ -453,13 +465,16 @@ class GrainCreatePage(BasePage):
 
 
 class GrainPage(BasePage):
+    def get_image_layer(self):
+        return self.driver.find_elements(By.CSS_SELECTOR, 'img.leaflet-image-layer')
+
     def edit(self):
         zoom_outs = self.driver.find_elements(By.CLASS_NAME, 'leaflet-control-zoom-out')
         assert len(zoom_outs) == 1
-        imgs = self.driver.find_elements(By.CSS_SELECTOR, 'img.leaflet-image-layer')
-        while (600 < imgs[0].rect['width']
-                and not self.element_is_disabled(zoom_outs[0])):
-            zoom_outs[0].click()
+        zoom_out = zoom_outs[0]
+        while (600 < self.get_image_layer()[0].rect['width']
+                and not self.element_is_disabled(zoom_out)):
+            zoom_out.click()
         self.driver.find_element(By.ID, 'edit').click()
         return self
 
