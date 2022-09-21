@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from ftc.get_image_size import get_image_size_from_handle
 from ftc.load_rois import get_rois
 from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering
-from ftc.parse_image_name import parse_image_name
+from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
 
 
@@ -229,7 +229,7 @@ class ImageSerializer(serializers.ModelSerializer):
             grain.get_owner() != request.user):
             raise exceptions.PermissionDenied
         filename = self.initial_data['data'].name
-        info = parse_image_name(filename)
+        info = parse_upload_name(filename)
         data = self.initial_data['data'].read()
         self.save(
             index=info['index'],
@@ -276,8 +276,10 @@ class ImageInfoView(RetrieveUpdateDeleteView):
                 raise exceptions.PermissionDenied
         if 'data' in serializer.initial_data:
             filename = serializer.initial_data['data'].name
-            info = parse_image_name(filename)
-            kwargs.update(info)
+            info = parse_upload_name(filename)
+            kwargs['ft_type'] = info['ft_type']
+            kwargs['index'] = info['index']
+            kwargs['format'] = info['format']
             kwargs['data'] = serializer.initial_data['data'].read().decode('utf-8')
         serializer.save(**kwargs)
 

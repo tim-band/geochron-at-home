@@ -1,21 +1,21 @@
 import os, sys, shutil
 from optparse import OptionParser
 from django.db import transaction
-from ftc.parse_image_name import parse_image_name
+from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
 import json
 
 
 def copyimages(src, grain):
     for n in sorted(os.listdir(src)):
-        v = parse_image_name(n)
+        v = parse_upload_name(n)
         srcname = os.path.join(src, n)
-        if os.path.isfile(srcname) and v != None:
+        if os.path.isfile(srcname) and v != None and v['is_image']:
             with open(srcname, mode='rb') as f:
                 Image(
                     grain=grain,
                     format=v['format'],
-                    ft_type='S',
+                    ft_type=v['ft_type'],
                     index=v['index'],
                     data=f.read()
                 ).save()

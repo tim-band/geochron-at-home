@@ -15,7 +15,7 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import redirect
 
-from ftc.parse_image_name import parse_image_name
+from ftc.parse_image_name import parse_upload_name
 from ftc.get_image_size import get_image_size_from_handle
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 
@@ -188,7 +188,7 @@ class StackImageInput(ClearableFileInput):
 
 
 def validate_file_image(f):
-    if not parse_image_name(f.name):
+    if parse_upload_name(f.name) is None:
         raise ValidationError(
             'File %(fn)s is not an expected image name',
             params={'fn': f.name},
@@ -222,26 +222,34 @@ class GrainForm(ModelForm):
         errors = []
         images = 'images' in self.cleaned_data and self.cleaned_data['images'] or []
         for f in images:
-            v = parse_image_name(f.name)
-            data = f.read()
-            size = get_image_size_from_handle(io.BytesIO(data), len(data))
-            if size:
-                files.append({
-                    'name': f.name,
-                    'data': data,
-                    'width': size[0],
-                    'height': size[1],
-                    'index': v['index'],
-                    'format': v['format']
-                })
+            v = parse_upload_name(f.name)
+            if v is None:
+                errors.append(ValidationError(
+                    "File '%(fn)s' is not a recognized name",
+                    params={'fn': f.name},
+                    code='unknown-file-name'
+                ))
             else:
-                errors.append(
-                    ValidationError(
-                        "File '%(fn)s' neither a Jpeg nor a PNG",
-                        params={'fn': f.name},
-                        code='unknown-file-format'
+                data = f.read()
+                size = get_image_size_from_handle(io.BytesIO(data), len(data))
+                if size:
+                    files.append({
+                        'name': f.name,
+                        'data': data,
+                        'width': size[0],
+                        'height': size[1],
+                        'index': v['index'],
+                        'format': v['format'],
+                        'ft_type': v['ft_type']
+                    })
+                else:
+                    errors.append(
+                        ValidationError(
+                            "File '%(fn)s' neither a Jpeg nor a PNG",
+                            params={'fn': f.name},
+                            code='unknown-file-format'
+                        )
                     )
-                )
         if errors:
             raise ValidationError(errors)
         self.cleaned_data['files'] = files
@@ -316,7 +324,7 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
                 image = Image(
                     grain=self.object,
                     format=f['format'],
-                    ft_type='S',
+                    ft_type=f['ft_type'],
                     index=f['index'],
                     data=f['data']
                 ).save()
