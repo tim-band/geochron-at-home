@@ -121,23 +121,23 @@ footer {
               <h2>How to</h2>
               <!--<p>A tutorial on how to count tracks.</p>-->
               <p><a id="tutorial-link"
-                class="btn btn-default{% if not tutorial_completed %} btn-success{% endif %}"
+                class="btn btn-default{% if not tutorial_completed %} btn-primary{% endif %}"
                 href="{%url 'tutorial' %}" role="button">Tutorial &raquo;</a></p>
-            </div><!--/span-->
+            </div>
             <div class="col-6 col-sm-6 col-lg-4">
               <h2>Start counting</h2>
               <!--<p>Counting the tracks</p>-->
               <p><a id="start-counting-link"
-                class="btn btn-default{% if tutorial_completed %} btn-success{% endif %}"
+                class="btn btn-default{% if tutorial_completed %} btn-primary{% endif %}"
                 role="button"
-                {% if tutorial_completed %} href="{% url 'counting' %}"{% else %}disabled{% endif %}
+                {% if tutorial_completed %}href="{% url 'counting' %}"{% else %}disabled{% endif %}
                 >Go &raquo;</a></p>
-            </div><!--/span-->
+            </div>
             {% if user.is_staff %}
             <div class="col-6 col-sm-6 col-lg-4">
                 <h2>Administration</h2>
                 <p><a id="admin-link" class="btn btn-default" href="{% url 'admin:index' %}" role="button">View details &raquo;</a></p>
-              </div><!--/span-->
+              </div>
               <div class="col-6 col-sm-6 col-lg-4">
               <h2>Get the results</h2>
               <p>Download your project results. Download the results for offline analysis.</p>
@@ -149,8 +149,8 @@ footer {
                 <p><a class="btn btn-default" href="{% url 'projects'%}" role="button">View details &raquo;</a></p>
               </div>
               {% endif%}
-          </div><!--/row-->
-        </div><!--/span-->
+          </div>
+        </div>
 
         <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
           <div class="list-group">
@@ -159,16 +159,15 @@ footer {
             <a href="{% url 'account_change_password'%}" class="list-group-item">Change password</a>
             {% endif %}
           </div>
-        </div><!--/span-->
-      </div><!--/row-->
+        </div>
+      </div>
 
       <hr>
-
       <footer>
         <p>&copy; Jiangping He 2014 - 2021</p>
       </footer>
 
-    </div><!--/.container-->
+    </div>
 <!-- ========== -->
 
 {% endblock %}
