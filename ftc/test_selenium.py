@@ -457,7 +457,7 @@ class SamplePage(BasePage):
 
 class GrainCreatePage(BasePage):
     def create(self, paths):
-        browse = self.driver.find_element(By.ID, 'id_images')
+        browse = self.driver.find_element(By.ID, 'id_uploads')
         for p in paths:
             browse.send_keys(p)
         assert self.submit()

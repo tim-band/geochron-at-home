@@ -13,6 +13,107 @@ from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 
 
+def parse_metadata_file(metadata, floats={}, texts={}):
+    root = ET.parse(metadata).getroot()
+    out = {}
+    for k,v in floats.items():
+        out[k] = float(root.find(v).text)
+    for k,v in texts.items():
+        out[k] = root.find(v).text
+    return out
+
+
+def parse_metadata_grain(metadata):
+    """
+    Loads and parses a Zeiss metadata file (so an image x.jpg might have
+    a metadata file x.jpg_metadata.xml), returning a dict with the following
+    (grain-specific) elements (any of which could be none):
+    'image_width': Image width in pixels.
+    'image_height': Image height in pixels.
+    'scale_x': width of a pixel in millimeters.
+    'scale_y': height of a pixel in millimeters.
+    'stage_x': stage X position in millimeters.
+    'stage_y': stage Y position in millimeters.
+
+    `metadata` is a filename or file object.
+    """
+    xpaths_float = {
+        'image_width': "Information/Image/SizeX",
+        'image_height': "Information/Image/SizeY",
+        'scale_x': "Scaling/Items/Distance[@Id='X']/Value",
+        'scale_y': "Scaling/Items/Distance[@Id='Y']/Value",
+        'stage_x': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisX']/Position",
+        'stage_y': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisY']/Position",
+    }
+    return parse_metadata_file(metadata, xpaths_float)
+
+
+def rlTlSwitchTranslate(lp):
+    if lp == 'RLTLSwitch.RL':
+        return 'R'
+    if lp == 'RLTLSwitch.TL':
+        return 'T'
+    return None
+
+
+def parse_metadata_image(metadata):
+    """
+    Loads and parses a Zeiss metadata file (so an image x.jpg might have
+    a metadata file x.jpg_metadata.xml), returning a dict with the following
+    (image-specific) elements (any of which could be none):
+
+    'light_path': 'R' or 'T' depending on whether the image was taken using
+    reflected or transmitted light.
+    'focus': focus (Z) position in millimeters.
+
+    `metadata` is a filename or file object.
+    """
+    xpath_text = {
+        'light_path': "HardwareSetting/ParameterCollection[@Id='MTBRLTLSwitch']/PositionName"
+    }
+    xpaths_float = {
+        'focus': "HardwareSetting/ParameterCollection[@Id='MTBFocus']/Position"
+    }
+    out = parse_metadata_file(metadata, xpaths_float, xpath_text)
+    out['light_path'] = rlTlSwitchTranslate(out['light_path'])
+    return out
+
+
+def generate_rois_file(dir, metadata):
+    vs = parse_metadata_grain(metadata)
+    w = vs['image_width']
+    h = vs['image_height']
+    fname = os.path.join(dir, 'rois.json')
+    x1 = int(w * 0.1)
+    x2 = int(w * 0.9)
+    y1 = int(h * 0.1)
+    y2 = int(h * 0.9)
+    vs['regions'] = [{
+        'vertices': [[x1, y1], [x1, y2], [x2, y2], [x2, y1]],
+        'shift': [0,0]
+    }]
+    with open(fname, 'w') as h:
+        json.dump(vs, h)
+    return fname
+
+
+def generate_roiss(opts, config):
+    # Find all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files
+    meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
+    metadata_by_dir = {}
+    for root, dirs, files in os.walk(opts.path):
+        metas = [
+            os.path.join(root, f)
+            for f in files
+            if meta_re.fullmatch(f)
+        ]
+        if metas and (opts.overwrite or 'rois.json' not in files):
+            metadata_by_dir[root] = metas[0]
+    for d,m in metadata_by_dir.items():
+        r = generate_rois_file(d, m)
+        print('wrote {0}'.format(r))
+
+
 def get_values(d, ks):
     r = {}
     for k in ks:
@@ -646,83 +747,6 @@ def add_count_subparser(subparsers):
     list_counts.add_argument('--grain', help='only report the grain with this index')
 
 
-def parse_metadata_file(metadata, floats={}, texts={}):
-    root = ET.parse(metadata).getroot()
-    out = {}
-    for k,v in floats.items():
-        out[k] = float(root.find(v).text)
-    for k,v in texts.items():
-        out[k] = root.find(v).text
-    return out
-
-
-def parse_metadata_grain(metadata):
-    xpaths_float = {
-        'image_width': "Information/Image/SizeX",
-        'image_height': "Information/Image/SizeY",
-        'scale_x': "Scaling/Items/Distance[@Id='X']/Value",
-        'scale_y': "Scaling/Items/Distance[@Id='Y']/Value",
-        'stage_x': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisX']/Position",
-        'stage_y': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisY']/Position",
-    }
-    return parse_metadata_file(metadata, xpaths_float)
-
-
-def rlTlSwitchTranslate(lp):
-    if lp == 'RLTLSwitch.RL':
-        return 'R'
-    if lp == 'RLTLSwitch.TL':
-        return 'T'
-    return None
-
-
-def parse_metadata_image(metadata):
-    xpath_text = {
-        'light_path': "HardwareSetting/ParameterCollection[@Id='MTBRLTLSwitch']/PositionName"
-    }
-    xpaths_float = {
-        'focus': "HardwareSetting/ParameterCollection[@Id='MTBFocus']/Position"
-    }
-    out = parse_metadata_file(metadata, xpaths_float, xpath_text)
-    out['light_path'] = rlTlSwitchTranslate(out['light_path'])
-    return out
-
-
-def generate_rois_file(dir, metadata):
-    vs = parse_metadata_grain(metadata)
-    w = vs['image_width']
-    h = vs['image_height']
-    fname = os.path.join(dir, 'rois.json')
-    x1 = int(w * 0.1)
-    x2 = int(w * 0.9)
-    y1 = int(h * 0.1)
-    y2 = int(h * 0.9)
-    vs['regions'] = [{
-        'vertices': [[x1, y1], [x1, y2], [x2, y2], [x2, y1]],
-        'shift': [0,0]
-    }]
-    with open(fname, 'w') as h:
-        json.dump(vs, h)
-    return fname
-
-
-def generate_roiss(opts, config):
-    # Find all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files
-    meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
-    metadata_by_dir = {}
-    for root, dirs, files in os.walk(opts.path):
-        metas = [
-            os.path.join(root, f)
-            for f in files
-            if meta_re.fullmatch(f)
-        ]
-        if metas and (opts.overwrite or 'rois.json' not in files):
-            metadata_by_dir[root] = metas[0]
-    for d,m in metadata_by_dir.items():
-        r = generate_rois_file(d, m)
-        print('wrote {0}'.format(r))
-
-
 def add_genrois_subparser(subparsers):
     parser = subparsers.add_parser(
         'genrois',
@@ -758,54 +782,59 @@ class ExceptionExtractor(HTMLParser):
             print(data)                
 
 
-usage = "usage: %prog -s SETTINGS | --settings=SETTINGS"
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    '-c',
-    '--config',
-    help='configuration file',
-    default='gah.config',
-    dest='config',
-    metavar='FILE'
-)
-parser.set_defaults(func=None)
-subparsers = parser.add_subparsers(dest='command')
-subparsers.required = True
-add_set_subparser(subparsers)
-add_login_subparser(subparsers)
-add_project_subparser(subparsers)
-add_sample_subparser(subparsers)
-add_grain_subparser(subparsers)
-add_image_subparser(subparsers)
-add_count_subparser(subparsers)
-add_genrois_subparser(subparsers)
+def parse_argv():
+    usage = "usage: %prog -s SETTINGS | --settings=SETTINGS"
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-c',
+        '--config',
+        help='configuration file',
+        default='gah.config',
+        dest='config',
+        metavar='FILE'
+    )
+    parser.set_defaults(func=None)
+    subparsers = parser.add_subparsers(dest='command')
+    subparsers.required = True
+    add_set_subparser(subparsers)
+    add_login_subparser(subparsers)
+    add_project_subparser(subparsers)
+    add_sample_subparser(subparsers)
+    add_grain_subparser(subparsers)
+    add_image_subparser(subparsers)
+    add_count_subparser(subparsers)
+    add_genrois_subparser(subparsers)
+    return parser.parse_args()
 
-options = parser.parse_args()
+def open_config(options):
+    config_mode = os.path.exists(options.config) and 'r+' or 'w+'
+    return open(options.config, config_mode)
 
-#if options.func is None:
-#    print(options)
-#    parser.print_help()
-#    exit(0)
+def load_config(config_fh, options):
+    config_file = config_fh.read()
+    if len(config_file) == 0:
+        return {}
+    return json.loads(config_file)
 
-config_mode = os.path.exists(options.config) and 'r+' or 'w+'
-config_fh = open(options.config, config_mode)
-config_file = config_fh.read()
-config = {}
-if len(config_file) != 0:
-    config = json.loads(config_file)
+def save_config(config_fh, config):
+    if config:
+        config_fh.seek(0)
+        json.dump(config, config_fh)
+        config_fh.truncate()
 
-# Actually perform the action!
-try:
-    config_altered = options.func(options, config)
-except HTTPError as e:
-    print("Failed (with HTTP code {0}: {1})".format(e.code, e.reason))
-    body = e.read().decode()
-    ExceptionExtractor().feed(body)
-    exit(1)
+def perform_action(options):
+    config_fh = open_config(options)
+    config = load_config(config_fh, options)
+    try:
+        config_altered = options.func(options, config)
+        save_config(config_fh, config_altered)
+        config_fh.close()
+    except HTTPError as e:
+        print("Failed (with HTTP code {0}: {1})".format(e.code, e.reason))
+        body = e.read().decode()
+        ExceptionExtractor().feed(body)
+        exit(1)
 
-if config_altered:
-    config_fh.seek(0)
-    json.dump(config_altered, config_fh)
-    config_fh.truncate()
-
-config_fh.close()
+if __name__ == '__main__':
+    options = parse_argv()
+    perform_action(options)

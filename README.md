@@ -397,9 +397,10 @@ $ docker-compose up -d --build
 
 ### Using the API
 
-You can use the `./gah.py` script from any machine that
+You can use the `./geochron/gah.py` script from any machine that
 can see the API endpoints. But first, you have to tell it where
-the endpoints are:
+the endpoints are (here we are running it from the `geochron`
+directory):
 
 ```sh
 (geochron-at-home) $ ./gah.py set url https://my.domain.com/geochron@home

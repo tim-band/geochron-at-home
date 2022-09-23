@@ -17,6 +17,7 @@ from django.shortcuts import redirect
 
 from ftc.parse_image_name import parse_upload_name
 from ftc.get_image_size import get_image_size_from_handle
+from geochron.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 
 import base64
@@ -190,7 +191,7 @@ class StackImageInput(ClearableFileInput):
 def validate_file_image(f):
     if parse_upload_name(f.name) is None:
         raise ValidationError(
-            'File %(fn)s is not an expected image name',
+            'File %(fn)s is not an expected image or metadata name',
             params={'fn': f.name},
             code='bad-image-file-name'
         )
@@ -211,48 +212,136 @@ class ImageStackField(FileField):
 class GrainForm(ModelForm):
     class Meta:
         model = Grain
-        fields = ['images']
+        fields = ['uploads']
 
-    images = ImageStackField(
+    uploads = ImageStackField(
         widget=StackImageInput(attrs={'multiple': True}),
         validators=[validate_file_image])
 
+    def set_rois(self, upload, info):
+        try:
+            rois_json = json_decoder.decode(upload.read())
+            regions = rois_json['regions']
+            region = regions[0]
+            self.rois = {
+                'shift_x': region['shift'][0] if region else 0,
+                'shift_y': region['shift'][1] if region else 0,
+                'image_width': rois_json['image_width'],
+                'image_height': rois_json['image_height'],
+                'scale_x': rois_json.get('scale_x'),
+                'scale_y': rois_json.get('scale_y'),
+                'stage_x': rois_json.get('stage_x'),
+                'stage_y': rois_json.get('stage_y'),
+                'regions': regions
+            }
+        except Exception as e:
+            self.errors.append(ValidationError(
+                "Parsing for ROI file '%(fn)s' failed: %(message)s",
+                params={'fn': upload.name, 'message': str(e)},
+                code='rois-file-parse'
+            ))
+
+    def set_grain_meta(self, upload):
+        try:
+            m = parse_metadata_grain(upload)
+            self.grain_meta = m
+        except Exception as e:
+            self.errors.append(ValidationError(
+                "Parsing for metadata file '%(fn)s' failed: %(message)s",
+                params={'fn': upload.name, 'message': str(e)},
+                code='metadata-file-parse'
+            ))
+
+    def set_image_data(self, info, data):
+        ims = self.images[info['ft_type']]
+        index = info['index']
+        if index not in ims:
+            ims[index] = {}
+        ims[index].update(data)
+
+    def add_meta(self, upload, info):
+        try:
+            m = parse_metadata_image(upload)
+            self.set_image_data(info, {
+                'index': info['index'],
+                'ft_type': info['ft_type'],
+                'light_path': m['light_path'],
+                'focus': m['focus']
+            })
+        except Exception as e:
+            self.errors.append(ValidationError(
+                "Parsing for metadata file '%(fn)s' failed: %(message)s",
+                params={'fn': upload.name, 'message': str(e)},
+                code='metadata-file-parse'
+            ))
+
+    def add_image(self, upload, info):
+        data = upload.read()
+        size = get_image_size_from_handle(io.BytesIO(data), len(data))
+        if not size:
+            self.errors.append(
+                ValidationError(
+                    "File '%(fn)s' neither a Jpeg nor a PNG file",
+                    params={'fn': upload.name},
+                    code='unknown-file-format'
+                )
+            )
+        else:
+            if self.max_width < size[0]:
+                self.max_width = size[0]
+            if self.max_height < size[1]:
+                self.max_height = size[1]
+            self.set_image_data(info, {
+                'data': data,
+                'index': info['index'],
+                'format': info['format'],
+                'ft_type': info['ft_type']
+            })
+
     def clean(self):
-        files = []
-        errors = []
-        images = 'images' in self.cleaned_data and self.cleaned_data['images'] or []
-        for f in images:
+        self.images = {
+            # Spontaneous Track image information keyed by index
+            'S': {},
+            # Induced Track image information keyed by index
+            'I': {}
+        }
+        self.rois = None
+        self.grain_meta = None
+        self.errors = []
+        self.max_width = 0
+        self.max_height = 0
+        uploads = self.cleaned_data['uploads'] if 'uploads' in self.cleaned_data else []
+        json_decoder = json.JSONDecoder(strict=False)
+        for f in uploads:
             v = parse_upload_name(f.name)
             if v is None:
-                errors.append(ValidationError(
+                self.errors.append(ValidationError(
                     "File '%(fn)s' is not a recognized name",
                     params={'fn': f.name},
                     code='unknown-file-name'
                 ))
             else:
-                data = f.read()
-                size = get_image_size_from_handle(io.BytesIO(data), len(data))
-                if size:
-                    files.append({
-                        'name': f.name,
-                        'data': data,
-                        'width': size[0],
-                        'height': size[1],
-                        'index': v['index'],
-                        'format': v['format'],
-                        'ft_type': v['ft_type']
-                    })
+                if v['rois']:
+                    if self.rois is None:
+                        set_rois(f, v)
+                elif v['meta']:
+                    self.add_meta(upload, info)
+                    if self.grain_meta is None:
+                        self.set_grain_meta(upload)
                 else:
-                    errors.append(
-                        ValidationError(
-                            "File '%(fn)s' neither a Jpeg nor a PNG",
-                            params={'fn': f.name},
-                            code='unknown-file-format'
-                        )
-                    )
-        if errors:
-            raise ValidationError(errors)
-        self.cleaned_data['files'] = files
+                    self.add_image(upload, info)
+        if self.errors:
+            raise ValidationError(self.errors)
+        self.cleaned_data['images'] = self.images
+        self.cleaned_data['meta'] = self.meta
+        self.cleaned_data['rois'] = self.rois
+        if self.grain_meta is None:
+            self.cleaned_data.update(self.grain_meta)
+        else:
+            if 0 < self.max_width:
+                self.cleaned_data['image_width'] = self.max_width
+            if 0 < self.max_height:
+                self.cleaned_data['image_width'] = self.max_height
         return self.cleaned_data
 
     def next_grain_number(self, sample):
@@ -273,35 +362,40 @@ class GrainForm(ModelForm):
         self.grain = grain
         self.grain_index = grain.index
 
-    def save(self, commit=True):
-        self.instance.index = self.grain_index
-        max_w = 0
-        max_h = 0
-        for f in self.cleaned_data['files']:
-            w = f['width']
-            if max_w < w:
-                max_w = w
-            h = f['height']
-            if max_h < h:
-                max_h = h
-        self.instance.image_width = max_w
-        self.instance.image_height = max_h
-        if self.sample is not None:
-            self.instance.sample = self.sample
+    def delete_regions(self):
+        regions = self.instance.region_set.delete()
+
+    def save_region(self, vertices, commit=True):
         region = Region(grain=self.instance)
-        x_margin = int(max_w / 20)
-        y_margin = int(max_h / 20)
-        v0 = Vertex(region=region, x=x_margin, y=y_margin)
-        v1 = Vertex(region=region, x=x_margin, y=max_h-y_margin)
-        v2 = Vertex(region=region, x=max_w-x_margin, y=max_h-y_margin)
-        v3 = Vertex(region=region, x=max_w-x_margin, y=y_margin)
-        inst = super().save(commit)
         if commit:
             region.save()
-            v0.save()
-            v1.save()
-            v2.save()
-            v3.save()
+        for v in vertices:
+            vertex = Vertex(region=region, x=v[0], y=v[1])
+            if commit:
+                vertex.save()
+
+    def save_images(self):
+        for (ft_type, ims) in self.cleaned_data['images'].items():
+            for (index, f) in ims.items():
+                Image.objects.update_or_create(
+                    grain=self.instance,
+                    index=index,
+                    ft_type=ft_type,
+                    defaults=f
+                )
+
+    def save(self, commit=True):
+        self.instance.index = self.grain_index
+        if self.sample is not None:
+            self.instance.sample = self.sample
+        inst = super().save(commit)
+        rois = self.cleaned_data['rois']
+        if rois is not None:
+            self.delete_regions()
+            for region in rois['regions']:
+                if 'vertices' in region:
+                    self.save_region(region['vertices'], commit)
+        self.save_images()
         return inst
 
 
@@ -318,17 +412,7 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
         if not form.is_valid():
             return self.form_invalid(form)
         form.next_grain_number(self.parent_object)
-        rtn = self.form_valid(form)
-        with transaction.atomic():
-            for f in form.cleaned_data['files']:
-                image = Image(
-                    grain=self.object,
-                    format=f['format'],
-                    ft_type=f['ft_type'],
-                    index=f['index'],
-                    data=f['data']
-                ).save()
-        return rtn
+        return self.form_valid(form)
 
     def get_success_url(self):
         return reverse('grain', kwargs={'pk': self.object.pk})
@@ -345,17 +429,7 @@ class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
         form.explicit_grain(self.object)
         if not form.is_valid():
             return self.form_invalid(form)
-        rtn = self.form_valid(form)
-        with transaction.atomic():
-            for f in form.cleaned_data['files']:
-                image = Image(
-                    grain=self.object,
-                    format=f['format'],
-                    ft_type='S',
-                    index=f['index'],
-                    data=f['data']
-                ).save()
-        return rtn
+        return self.form_valid(form)
 
     def get_success_url(self):
         return reverse('grain_images', kwargs={'pk': self.object.pk})

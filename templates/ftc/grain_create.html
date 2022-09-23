@@ -8,8 +8,7 @@
     action="{% url 'grain_create' parent.pk %}"
     method="POST">
     {% csrf_token %}
-    {{ form.images.errors }}
-    {{ form.images }}
+    {{ form }}
     <input type="submit" value="Create Grain">
 </form>
 {% endblock %}
