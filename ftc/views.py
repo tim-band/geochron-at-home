@@ -235,7 +235,7 @@ class GrainForm(ModelForm):
                 'regions': regions
             }
         except Exception as e:
-            self.errors.append(ValidationError(
+            self.validationerrors.append(ValidationError(
                 "Parsing for ROI file '%(fn)s' failed: %(message)s",
                 params={'fn': upload.name, 'message': str(e)},
                 code='rois-file-parse'
@@ -246,7 +246,7 @@ class GrainForm(ModelForm):
             m = parse_metadata_grain(upload)
             self.grain_meta = m
         except Exception as e:
-            self.errors.append(ValidationError(
+            self.validationerrors.append(ValidationError(
                 "Parsing for metadata file '%(fn)s' failed: %(message)s",
                 params={'fn': upload.name, 'message': str(e)},
                 code='metadata-file-parse'
@@ -269,7 +269,7 @@ class GrainForm(ModelForm):
                 'focus': m['focus']
             })
         except Exception as e:
-            self.errors.append(ValidationError(
+            self.validationerrors.append(ValidationError(
                 "Parsing for metadata file '%(fn)s' failed: %(message)s",
                 params={'fn': upload.name, 'message': str(e)},
                 code='metadata-file-parse'
@@ -279,7 +279,7 @@ class GrainForm(ModelForm):
         data = upload.read()
         size = get_image_size_from_handle(io.BytesIO(data), len(data))
         if not size:
-            self.errors.append(
+            self.validationerrors.append(
                 ValidationError(
                     "File '%(fn)s' neither a Jpeg nor a PNG file",
                     params={'fn': upload.name},
@@ -307,41 +307,40 @@ class GrainForm(ModelForm):
         }
         self.rois = None
         self.grain_meta = None
-        self.errors = []
+        self.validationerrors = []
         self.max_width = 0
         self.max_height = 0
         uploads = self.cleaned_data['uploads'] if 'uploads' in self.cleaned_data else []
         json_decoder = json.JSONDecoder(strict=False)
-        for f in uploads:
-            v = parse_upload_name(f.name)
+        for upload in uploads:
+            v = parse_upload_name(upload.name)
             if v is None:
-                self.errors.append(ValidationError(
+                self.validationerrors.append(ValidationError(
                     "File '%(fn)s' is not a recognized name",
-                    params={'fn': f.name},
+                    params={'fn': upload.name},
                     code='unknown-file-name'
                 ))
             else:
                 if v['rois']:
                     if self.rois is None:
-                        set_rois(f, v)
+                        self.set_rois(upload, v)
                 elif v['meta']:
-                    self.add_meta(upload, info)
+                    self.add_meta(upload, v)
                     if self.grain_meta is None:
                         self.set_grain_meta(upload)
                 else:
-                    self.add_image(upload, info)
-        if self.errors:
-            raise ValidationError(self.errors)
+                    self.add_image(upload, v)
+        if self.validationerrors:
+            raise ValidationError(self.validationerrors)
         self.cleaned_data['images'] = self.images
-        self.cleaned_data['meta'] = self.meta
         self.cleaned_data['rois'] = self.rois
-        if self.grain_meta is None:
+        if self.grain_meta is not None:
             self.cleaned_data.update(self.grain_meta)
         else:
             if 0 < self.max_width:
                 self.cleaned_data['image_width'] = self.max_width
             if 0 < self.max_height:
-                self.cleaned_data['image_width'] = self.max_height
+                self.cleaned_data['image_height'] = self.max_height
         return self.cleaned_data
 
     def next_grain_number(self, sample):
@@ -388,6 +387,10 @@ class GrainForm(ModelForm):
         self.instance.index = self.grain_index
         if self.sample is not None:
             self.instance.sample = self.sample
+        for attr in ['image_width', 'image_height', 'scale_x', 'scale_y',
+            'stage_x', 'stage_y', 'shift_x', 'shift_y']:
+            if attr in self.cleaned_data:
+                setattr(self.instance, attr, self.cleaned_data[attr])
         inst = super().save(commit)
         rois = self.cleaned_data['rois']
         if rois is not None:
@@ -412,7 +415,19 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
         if not form.is_valid():
             return self.form_invalid(form)
         form.next_grain_number(self.parent_object)
-        return self.form_valid(form)
+        rtn = self.form_valid(form)
+        if 'rois' not in form.cleaned_data or form.cleaned_data['rois'] is None:
+            width = form.cleaned_data['image_width']
+            height = form.cleaned_data['image_height']
+            margin_x = width / 20
+            margin_y = height / 20
+            form.save_region([
+                [margin_x,margin_y],
+                [width - margin_x, margin_y],
+                [width - margin_x, height - margin_y],
+                [margin_x, height - margin_y]
+            ])
+        return rtn
 
     def get_success_url(self):
         return reverse('grain', kwargs={'pk': self.object.pk})

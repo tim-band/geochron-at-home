@@ -285,6 +285,14 @@ function addRegionMarkers(crystal) {
         iconUrl: static_ring_svg_url,
         iconSize: [20, 20],
         iconAnchor: [10, 10],
+        className: 'region-mid-marker',
+    });
+    var vertexIcon = L.icon({
+        iconUrl: static_pin_url,
+        iconRetinaUrl: static_pin_url_2x,
+        iconSize: [25, 41],
+        iconAnchor: [13, 41],
+        className: 'region-vertex-marker',
     });
     crystal.region_points = normalizeRegions(crystal.region_points);
     var new_regions;
@@ -292,6 +300,7 @@ function addRegionMarkers(crystal) {
         forEach(region, function(vertex, index) {
             var v = L.marker(vertex, {
                 draggable: true,
+                icon: vertexIcon,
             }).addTo(crystal.marker_layer);
             L.DomEvent.on(v, 'dragstart', function() {
                 crystal.mid_marker_layer.clearLayers();
