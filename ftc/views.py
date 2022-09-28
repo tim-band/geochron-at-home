@@ -219,8 +219,10 @@ class GrainForm(ModelForm):
         validators=[validate_file_image])
 
     def set_rois(self, upload, info):
+        json_decoder = json.JSONDecoder(strict=False)
         try:
-            rois_json = json_decoder.decode(upload.read())
+            data = upload.read()
+            rois_json = json_decoder.decode(data.decode('utf-8'))
             regions = rois_json['regions']
             region = regions[0]
             self.rois = {
@@ -311,7 +313,6 @@ class GrainForm(ModelForm):
         self.max_width = 0
         self.max_height = 0
         uploads = self.cleaned_data['uploads'] if 'uploads' in self.cleaned_data else []
-        json_decoder = json.JSONDecoder(strict=False)
         for upload in uploads:
             v = parse_upload_name(upload.name)
             if v is None:
@@ -362,7 +363,7 @@ class GrainForm(ModelForm):
         self.grain_index = grain.index
 
     def delete_regions(self):
-        regions = self.instance.region_set.delete()
+        Region.objects.filter(grain=self.instance).delete()
 
     def save_region(self, vertices, commit=True):
         region = Region(grain=self.instance)
