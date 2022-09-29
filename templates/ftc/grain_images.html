@@ -21,7 +21,7 @@
         </tr>
     </thead>
     <tbody>
-        {% for image in object.image_set.all|order_by:"index" %}
+        {% for image in object.image_set.all|order_by:"-ft_type,index" %}
         <tr>
             <td>{{ image.format }}</td>
             <td>{{ image.ft_type }}</td>

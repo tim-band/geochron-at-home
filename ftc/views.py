@@ -328,6 +328,7 @@ class GrainForm(ModelForm):
                 elif v['meta']:
                     self.add_meta(upload, v)
                     if self.grain_meta is None:
+                        upload.seek(0)
                         self.set_grain_meta(upload)
                 else:
                     self.add_image(upload, v)
