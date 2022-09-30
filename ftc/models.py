@@ -98,6 +98,12 @@ class Grain(models.Model):
     def get_images_mica(self):
         return self.image_set.filter(ft_type='I').order_by('index')
 
+    def count_images_crystal(self):
+        return self.image_set.filter(ft_type='S').count()
+
+    def count_images_mica(self):
+        return self.image_set.filter(ft_type='I').count()
+
     def count_results(self):
         return FissionTrackNumbering.objects.filter(
             in_sample=self.sample,

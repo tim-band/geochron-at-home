@@ -6,7 +6,9 @@ large = ['k', 'M', 'G']
 small = ['m', '\xb5', 'n', 'p']
 
 @register.simple_tag
-def si_mag(num, decimal_places=2):
+def si_mag(num, decimal_places=2, unit='', none='None'):
+    if num is None:
+        return none
     sign = ''
     if num < 0:
         num = -num
@@ -23,5 +25,5 @@ def si_mag(num, decimal_places=2):
         prefix = small[-1 - mag]
     elif 0 < mag:
         prefix = large[mag - 1]
-    format_string = '{0}{1:.' + str(decimal_places) + 'f}{2}'
-    return format_string.format(sign, num, prefix)
+    format_string = '{0}{1:.' + str(decimal_places) + 'f}{2}{3}'
+    return format_string.format(sign, num, prefix, unit)

@@ -2,13 +2,23 @@
 
 {% load static %}
 {% load order_by %}
+{% load si_mag %}
 
 {% block content %}
 <h2>
-    Images for <a href="{% url 'grain' object.pk %}">grain {{ object.index }}</a>
+    <a href="{% url 'grain' object.pk %}">Grain {{ object.index }}</a>
     of sample <a href="{% url 'sample' object.sample.pk %}">{{ object.sample.sample_name }}</a>
     in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
 </h2>
+<h3>Metadata</h3>
+<table class="metadata">
+    <tr><td>Image size:</td><td>{{ object.image_width }}&#x00D7;{{ object.image_height }}</td></tr>
+    <tr><td>Pixel size:</td><td>
+        {% si_mag object.scale_x unit='m' none='?' %}&#x00D7;{% si_mag object.scale_y unit='m' none='?' %}
+    </td></tr>
+    <tr><td>Stage position:</td><td>{{ object.stage_x }}&#x00D7;{{ object.stage_y }}</td></tr>
+</table>
+<h3>Images</h3>
 <table class="table">
     <thead>
         <tr>

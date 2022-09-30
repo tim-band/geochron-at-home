@@ -364,7 +364,10 @@ function grain_view(options) {
         }
     };
 
-    function makeZStack(map, imagesCrystal, imagesMica, imageCount, yOverX, shiftXRelative, shiftYRelative, rois) {
+    function makeZStack(
+        map, imagesCrystal, imagesMica, imageCount,
+        yOverX, shiftXRelative, shiftYRelative, rois
+    ) {
         var boundsCrystal = [
             [0.0, 0.0],
             [1.0, yOverX]
@@ -388,11 +391,6 @@ function grain_view(options) {
             if (imageOverlayersMica[i]) {
                 var imageMica = imageOverlayersMica[i].getElement()
                 imageMica.classList.add("image-mica");
-                var transformation = "translate3d";
-                var components = imageMica.style.transform.slice(transformation.length + 1, -1).split(" ").map(function(component) {
-                    return parseInt(component);
-                });
-                imageMica.style.transform = "(" + [components[0] + imageMica.style.width, components[1] + imageMica.style.height, components[2]].join(" ") + ")";
             }
         }
         var layerCurrent = 0;
@@ -646,8 +644,8 @@ function grain_view(options) {
         }
     }, true);
     var yOverX = grain_info.image_height / grain_info.image_width;
-    var shiftXRelative = grain_info.shift_x / grain_info.image_width;
-    var shiftYRelative = grain_info.shift_y / grain_info.image_width; // TODO check calculations
+    var shiftXRelative = (grain_info.shift_x || 0) / grain_info.image_width;
+    var shiftYRelative = (grain_info.shift_y || 0) / grain_info.image_width; // TODO check calculations
     zStack = makeZStack(map, grain_info.images_crystal, grain_info.images_mica, sliderNum, yOverX, shiftXRelative, shiftYRelative, grain_info.rois);
     markers = makeMarkers(map);
     deleter = markers.makeDeleter();

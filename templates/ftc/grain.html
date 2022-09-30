@@ -156,7 +156,9 @@ window.addEventListener('load', function() {
 <div>
     <table class="metadata">
         <tr><td>Image size:</td><td>{{ object.image_width }}&#x00D7;{{ object.image_height }}</td></tr>
-        <tr><td>Pixel size:</td><td>{% si_mag object.scale_x %}m&#x00D7;{% si_mag object.scale_y %}m</td></tr>
+        <tr><td>Pixel size:</td><td>
+            {% si_mag object.scale_x unit='m' none='?' %}&#x00D7;{% si_mag object.scale_y unit='m' none='?' %}
+        </td></tr>
         <tr><td>Stage position:</td><td>{{ object.stage_x }}&#x00D7;{{ object.stage_y }}</td></tr>
     </table>
 </div>
