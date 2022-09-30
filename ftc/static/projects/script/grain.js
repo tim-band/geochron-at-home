@@ -368,3 +368,11 @@ function save(crystal, url, form, error_callback) {
     xhr.open("POST", url);
     xhr.send(fd);
 }
+
+function beginShiftEdit(crystal) {
+    console.warn('not implemented');
+}
+
+function saveShift(crystal, url, form) {
+    console.warn('not implemented');
+}

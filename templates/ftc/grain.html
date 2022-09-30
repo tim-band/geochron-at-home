@@ -97,26 +97,13 @@ var crystal_control;
 function makeGrainMap() {
     var image_height = {{ object.image_height }};
     var image_width = {{ object.image_width }};
-    var rois = [
-        //{% for region in object.region_set.all %}
-        [
-            //{% for v in region.vertex_set.all|order_by:"id" %}
-            [(image_height - {{v.y}}) / image_width, {{v.x}} / image_width],
-            //{% endfor %}
-        ],
-        //{% endfor %}
-    ]
+    var rois = {{ regions }};
     var view = grain_view({
         grain_info: {
             image_width: image_width,
             image_height: image_height,
-            images_crystal: [
-                //{% for i in object.get_images_crystal %}
-                "{% url 'get_image' i.pk %}",
-                //{% endfor %}
-            ],
-            images_mica: [
-                //{% for i in object.get_images_mica %}
+            images: [
+                //{% for i in images %}
                 "{% url 'get_image' i.pk %}",
                 //{% endfor %}
             ],
@@ -150,8 +137,18 @@ window.addEventListener('load', function() {
     <a id="count" class="btn btn-default" href="{% url 'count_my' object.pk %}">Count</a>
     <a id="images" class="btn btn-default" href="{% url 'grain_images' object.pk %}">Edit Image Stack</a>
     <a id="meta" class="btn btn-default" href="{% url 'grain_update_meta' object.pk %}">Edit Metadata</a>
+    {% if ft_type == 'S' %}
+    <a id="go_mica" class="btn btn-default" href="{% url 'mica' object.pk %}">View Mica</a>
+    {% else %}
+    <a id="go_grain" class="btn btn-default" href="{% url 'grain' object.pk %}">View Grain</a>
+    {% endif %}
+    {% if ft_type == 'S' %}
     <button id="edit" onclick="beginEdit(crystal_control)">Edit Region</button>
     <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update_roi' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
+    {% else %}
+    <button id="edit_shift" onclick="beginShiftEdit(crystal_control)">Adjust Shift</button>
+    <button id="save_shift" onclick="saveShift(crystal_control, &quot;{% url 'grain_update_shift' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
+    {% endif %}
 </div>
 <div>
     <table class="metadata">
@@ -163,12 +160,6 @@ window.addEventListener('load', function() {
     </table>
 </div>
 <div id="map"></div>
-
-<ul>
-    {% for i in images %}
-    <img src="{% url 'get_image' i.pk %}">
-    {% endfor %}
-</ul>
 
 <form id="empty-form" style="display: none;">
     {% csrf_token %}

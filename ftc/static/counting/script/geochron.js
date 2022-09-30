@@ -7,8 +7,7 @@
  * grain_info.shift_x The x-difference in pixels of the Mica layers from the crystal layers
  * grain_info.shift_y The y-difference in pixels of the Mica layers from the crystal layers
  * grain_info.scale_x Meters per pixel, if known
- * grain_info.images_crystal Array of URLs to the z-stack crystal images
- * grain_info.images_mica Array of URLs to the z-stack Mica images
+ * grain_info.images Array of URLs to the z-stack images
  * grain_info.marker_latlngs Array of marker positions
  * grain_info.rois Array of regions of interest, each of which is an array
  *   of vertex positions [x,y] in pixels
@@ -365,16 +364,17 @@ function grain_view(options) {
     };
 
     function makeZStack(
-        map, imagesCrystal, imagesMica, imageCount,
+        map, imagesCrystal, imageCount,
         yOverX, shiftXRelative, shiftYRelative, rois
     ) {
+        // Bounds elements are LatLng values, i.e. [y, x]
         var boundsCrystal = [
             [0.0, 0.0],
-            [1.0, yOverX]
+            [yOverX, 1.0]
         ];
         var boundsMica = [
-            [shiftXRelative, shiftYRelative],
-            [1.0 + shiftXRelative, yOverX + shiftYRelative]
+            [shiftYRelative, shiftXRelative],
+            [yOverX + shiftYRelative, 1.0 + shiftXRelative]
         ];
         var imageOverlayersCrystal = new Array();
         var imageOverlayersMica = new Array();
@@ -383,15 +383,6 @@ function grain_view(options) {
                 imagesCrystal[i], boundsCrystal
             ).addTo(map);
             imageOverlayersCrystal[i].getElement().classList.add("image-crystal");
-            if (imagesMica[i]) {
-                imageOverlayersMica[i] = new L.imageOverlay(
-                    imagesMica[i], boundsMica
-                ).addTo(map);
-            }
-            if (imageOverlayersMica[i]) {
-                var imageMica = imageOverlayersMica[i].getElement()
-                imageMica.classList.add("image-mica");
-            }
         }
         var layerCurrent = 0;
         var layerRendered = 0;
@@ -445,11 +436,6 @@ function grain_view(options) {
             }
             layerRendered = layerCurrent;
             imageOverlayersCrystal[layerRendered].addTo(map);
-            var imageOverlayMica = imageOverlayersMica[layerRendered];
-            if (imageOverlayMica) {
-                imageOverlayMica.addTo(map);
-                var imageMica = imageOverlayMica.getElement();
-            }
         }
         refresh();
         return {
@@ -636,17 +622,24 @@ function grain_view(options) {
         ev.stopPropagation();
     };
 
-    var sliderNum = grain_info.images_crystal.length;
+    var sliderNum = Math.max(
+        grain_info.images.length,
+        2
+    );
     sliders2.updateOptions({
         range: {
             'min': 0,
-            'max': Math.max(1, sliderNum - 1)
+            'max': sliderNum - 1
         }
     }, true);
     var yOverX = grain_info.image_height / grain_info.image_width;
     var shiftXRelative = (grain_info.shift_x || 0) / grain_info.image_width;
     var shiftYRelative = (grain_info.shift_y || 0) / grain_info.image_width; // TODO check calculations
-    zStack = makeZStack(map, grain_info.images_crystal, grain_info.images_mica, sliderNum, yOverX, shiftXRelative, shiftYRelative, grain_info.rois);
+    zStack = makeZStack(
+        map, grain_info.images,
+        sliderNum, yOverX, shiftXRelative, shiftYRelative,
+        grain_info.rois
+    );
     markers = makeMarkers(map);
     deleter = markers.makeDeleter();
     if ('marker_latlngs' in grain_info) {

@@ -169,9 +169,37 @@ class SampleUpdateView(CreatorOrSuperuserMixin, UpdateView):
     fields = ['sample_name', 'sample_property', 'priority', 'min_contributor_num', 'completed']
 
 
+def json_array(arr):
+    return '[' + ','.join(arr) + ']'
+
+
 class GrainDetailView(StaffRequiredMixin, DetailView):
     model = Grain
     template_name = "ftc/grain.html"
+    ft_type = 'S'
+    def json_latlng(self, lat, lng):
+        return '[{0},{1}]'.format(lat, lng)
+    def get_context_data(self, **kwargs):
+        pk = self.kwargs['pk']
+        ctx = super().get_context_data(**kwargs)
+        ctx['images'] = self.object.image_set.filter(ft_type=self.ft_type).order_by('index')
+        ctx['ft_type'] = self.ft_type
+        regions = ''
+        w = self.object.image_width
+        h = self.object.image_height
+        ctx['regions'] = json_array([
+            json_array([
+                self.json_latlng((h - vertex.y) / w, vertex.x / w)
+                for vertex in region.vertex_set.order_by('id').iterator()
+            ])
+            for region in self.object.region_set.order_by('id').iterator()
+        ])
+        return ctx
+
+class MicaDetailView(GrainDetailView):
+    ft_type = 'I'
+    def json_latlng(self, lat, lng):
+        return '[{0},{1}]'.format(lat, 1 - lng)
 
 
 class GrainDetailUpdateView(CreatorOrSuperuserMixin, UpdateView):
@@ -492,6 +520,17 @@ def grain_update_roi(request, pk):
 
     return redirect('grain', pk=pk)
 
+@csrf_protect
+@user_passes_test(user_is_staff)
+def grain_update_shift(request, pk):
+    grain = Grain.objects.get(pk=pk)
+    if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
+        return HttpResponse("Grain update forbidden", status=403)
+    grain.shift_x = request.POST['x']
+    grain.shift_y = request.POST['y']
+    grain.save()
+    return redirect('mica', pk=pk)
+
 
 @login_required
 def getTableData(request):
@@ -612,8 +651,7 @@ def get_grain_info(request, pk, **kwargs):
         'image_width': width,
         'image_height': height,
         'scale_x': grain.scale_x,
-        'images_crystal': images_list,
-        'images_mica': [],
+        'images': images_list,
         'rois': rois
     }
     if save:

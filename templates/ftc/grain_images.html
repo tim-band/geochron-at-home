@@ -43,7 +43,7 @@
         {% endfor %}
     </tbody>
 </table>
-<p>Add more images or image metadata:</p>
+<h2>Add more images or image metadata:</h2>
 <form
     enctype="multipart/form-data"
     action="{% url 'grain_images' object.pk %}"
@@ -52,4 +52,15 @@
     {{ form }}
     <input type="submit" value="Add files">
 </form>
-{% endblock %}
+<p>Uploaded files must have file names in one of the following forms (case insensitive):
+    <ul>
+        <li>rois.json</li>
+        <li><strong>&lt;PREFIX&gt;</strong>Stack-<strong>&lt;NN&gt;</strong>.<strong>&lt;EXT&gt;</strong></li>
+        <li><strong>&lt;PREFIX&gt;</strong>StackFlat.<strong>&lt;EXT&gt;</strong></li>
+        <li><strong>&lt;PREFIX&gt;</strong>Stack-<strong>&lt;NN&gt;</strong>.<strong>&lt;EXT&gt;</strong>_metadata.xml</li>
+        <li><strong>&lt;PREFIX&gt;</strong>StackFlat.<strong>&lt;EXT&gt;</strong>_metadata.xml</li>
+    </ul>
+    where <strong>&lt;NN&gt;</strong> is a one or two digit decimal number and
+    <strong>&lt;EXT&gt;</strong> is one of jpg, jpeg or png, and <strong>&lt;PREFIX&gt;</strong>
+    is optional but if present one of Mica, Refl or MicaRefl</p>
+    {% endblock %}
