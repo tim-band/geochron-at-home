@@ -17,12 +17,6 @@
     width: 100%;
 }
 
-#edit, #save {
-    float: right;
-    margin-left: 5px;
-    margin-right: 5px;;
-}
-
 table.metadata {
     padding: 1px 10px;
 }
@@ -98,6 +92,18 @@ function makeGrainMap() {
     var image_height = {{ object.image_height }};
     var image_width = {{ object.image_width }};
     var rois = {{ regions }};
+    var shift_x = {{ shift_x }};
+    var shift_y = {{ shift_y }};
+    var shift_lat = -shift_y / image_width;
+    var shift_lng = shift_x / image_width;
+    var shifted_rois = rois.map(function(region) {
+        return region.map(function(vertex) {
+            return [
+                vertex[0] + shift_lat,
+                vertex[1] + shift_lng
+            ];
+        });
+    });
     var view = grain_view({
         grain_info: {
             image_width: image_width,
@@ -107,16 +113,20 @@ function makeGrainMap() {
                 "{% url 'get_image' i.pk %}",
                 //{% endfor %}
             ],
-            rois: rois
+            rois: shifted_rois
         },
         atoken: '{{ csrf_token }}'
     });
     return {
+        image_width: image_width,
+        image_height: image_height,
         map: view.map,
         region_layer: view.roisLayer,
         marker_layer: L.layerGroup().addTo(view.map),
         mid_marker_layer: L.layerGroup().addTo(view.map),
         region_points: rois,
+        shift_x: shift_x,
+        shift_y: shift_y
     };
 }
 window.addEventListener('load', function() {
@@ -143,11 +153,11 @@ window.addEventListener('load', function() {
     <a id="go_grain" class="btn btn-default" href="{% url 'grain' object.pk %}">View Grain</a>
     {% endif %}
     {% if ft_type == 'S' %}
-    <button id="edit" onclick="beginEdit(crystal_control)">Edit Region</button>
-    <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update_roi' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
+    <a id="edit" href="#" class="btn btn-default" onclick="beginEdit(crystal_control)">Edit Region</a>
+    <a id="save" href="#" class="btn btn-default" onclick="save(crystal_control, &quot;{% url 'grain_update_roi' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</a>
     {% else %}
-    <button id="edit_shift" onclick="beginShiftEdit(crystal_control)">Adjust Shift</button>
-    <button id="save_shift" onclick="saveShift(crystal_control, &quot;{% url 'grain_update_shift' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
+    <a id="edit_shift" href="#" class="btn btn-default" onclick="beginShiftEdit(crystal_control)">Adjust Shift</a>
+    <a id="save_shift" href="#" class="btn btn-default" onclick="saveShift(crystal_control, &quot;{% url 'grain_update_shift' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</a>
     {% endif %}
 </div>
 <div>

@@ -179,6 +179,8 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
     ft_type = 'S'
     def json_latlng(self, lat, lng):
         return '[{0},{1}]'.format(lat, lng)
+    def get_shift(self):
+        return [0, 0]
     def get_context_data(self, **kwargs):
         pk = self.kwargs['pk']
         ctx = super().get_context_data(**kwargs)
@@ -194,12 +196,17 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
             ])
             for region in self.object.region_set.order_by('id').iterator()
         ])
+        shift = self.get_shift()
+        ctx['shift_x'] = shift[0]
+        ctx['shift_y'] = shift[1]
         return ctx
 
 class MicaDetailView(GrainDetailView):
     ft_type = 'I'
     def json_latlng(self, lat, lng):
         return '[{0},{1}]'.format(lat, 1 - lng)
+    def get_shift(self):
+        return [self.object.shift_x, self.object.shift_y]
 
 
 class GrainDetailUpdateView(CreatorOrSuperuserMixin, UpdateView):
@@ -526,8 +533,8 @@ def grain_update_shift(request, pk):
     grain = Grain.objects.get(pk=pk)
     if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
         return HttpResponse("Grain update forbidden", status=403)
-    grain.shift_x = request.POST['x']
-    grain.shift_y = request.POST['y']
+    grain.shift_x = int(request.POST['x'])
+    grain.shift_y = int(request.POST['y'])
     grain.save()
     return redirect('mica', pk=pk)
 

@@ -242,6 +242,30 @@ function moveMarker(ev, crystal, v, i, region, region_index) {
     return new_regions;
 }
 
+function moveShift(ev, crystal) {
+    var dlat = ev.latlng.lat - ev.oldLatLng.lat - crystal.shift_y / crystal.image_width;
+    var dlng = ev.latlng.lng - ev.oldLatLng.lng + crystal.shift_x / crystal.image_width;
+    var new_regions = [];
+    forEach(crystal.region_points, function(region) {
+        var new_region = [];
+        forEach(region, function(v) {
+            new_region.push([v[0] + dlat, v[1] + dlng]);
+        });
+        new_regions.push(new_region);
+    });
+    crystal.region_layer.setLatLngs(new_regions);
+    return [dlat, dlng];
+}
+
+/**
+ * Returns normalized array of regions. This will remove repeated vertices
+ * within the same region, exclude regions with fewer than three (unique)
+ * vertices and reverse all anticlockwise regions. If no regions remain,
+ * will return a single region with a single vertex at (0.5, 0.5).
+ * @param {Array<Array<Array<number>>>} regions Array of regions, each of
+ * which is an array of vertices, each of which is [lat,lng]
+ * @returns 
+ */
 function normalizeRegions(regions) {
     var count = 0;
     forEach(regions, function(region, i) {
@@ -273,6 +297,29 @@ function normalizeRegions(regions) {
         regions = [[[0.5,0.5]]];
     }
     return regions;
+}
+
+/**
+ * Finds the (collective) centroid of an array of polygons
+ * @param {number[][][]} regions Regions to
+ * find the collective centroid of
+ * @returns LatLng representing the centroid
+ */
+function getCentroid(regions) {
+    var lat = 0;
+    var lng = 0;
+    var total_area = 0;
+    forEach(regions, function(region) {
+        var last = region[region.length - 1];
+        forEach(region, function(v) {
+            var area = v[0] * last[1] - last[0] * v[1];
+            lat += area * (v[0] + last[0]) / 3;
+            lng += area * (v[1] + last[1]) / 3;
+            total_area += area;
+            last = v;
+        });
+    });
+    return L.latLng(lat / total_area, lng / total_area);
 }
 
 function removeRegionMarkers(crystal) {
@@ -370,9 +417,53 @@ function save(crystal, url, form, error_callback) {
 }
 
 function beginShiftEdit(crystal) {
-    console.warn('not implemented');
+    var vertexIcon = L.icon({
+        iconUrl: static_pin_url,
+        iconRetinaUrl: static_pin_url_2x,
+        iconSize: [25, 41],
+        iconAnchor: [13, 41],
+        className: 'region-vertex-marker',
+    });
+    crystal.region_points = normalizeRegions(crystal.region_points);
+    var centroid = getCentroid(crystal.region_points);
+    centroid.lat -= crystal.shift_y / crystal.image_width;
+    centroid.lng += crystal.shift_x / crystal.image_width;
+    var v = L.marker(centroid, {
+        draggable: true,
+        icon: vertexIcon,
+    }).addTo(crystal.marker_layer);
+    var shift_to;
+    L.DomEvent.on(v, 'drag', function(ev) {
+        shift_to = moveShift(ev, crystal);
+    });
+    L.DomEvent.on(v, 'dragend', function() {
+        crystal.shift_x = shift_to[1] * crystal.image_width;
+        crystal.shift_y = -shift_to[0] * crystal.image_width;
+    });
+    var edit = document.getElementById("edit_shift");
+    var save = document.getElementById("save_shift");
+    edit.setAttribute('disabled', true);
+    save.removeAttribute('disabled');
 }
 
-function saveShift(crystal, url, form) {
-    console.warn('not implemented');
+function saveShift(crystal, url, form, error_callback) {
+    const xhr = new XMLHttpRequest();
+    const fd = new FormData(form);
+    fd.append('x', Math.floor(crystal.shift_x + 0.5));
+    fd.append('y', Math.floor(crystal.shift_y + 0.5));
+    xhr.addEventListener("load", function() {
+        removeRegionMarkers(crystal);
+        var edit = document.getElementById("edit_shift");
+        var save = document.getElementById("save_shift");
+        edit.removeAttribute('disabled');
+        save.setAttribute('disabled', true);
+        crystal.marker_layer.clearLayers();
+    });
+    if (error_callback) {
+        xhr.addEventListener("error", function() {
+            error_callback();
+        });
+    }
+    xhr.open("POST", url);
+    xhr.send(fd);
 }

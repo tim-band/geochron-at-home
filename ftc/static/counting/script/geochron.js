@@ -364,38 +364,30 @@ function grain_view(options) {
     };
 
     function makeZStack(
-        map, imagesCrystal, imageCount,
-        yOverX, shiftXRelative, shiftYRelative, rois
+        map, images, imageCount, yOverX, rois
     ) {
         // Bounds elements are LatLng values, i.e. [y, x]
-        var boundsCrystal = [
+        var bounds = [
             [0.0, 0.0],
             [yOverX, 1.0]
         ];
-        var boundsMica = [
-            [shiftYRelative, shiftXRelative],
-            [yOverX + shiftYRelative, 1.0 + shiftXRelative]
-        ];
-        var imageOverlayersCrystal = new Array();
-        var imageOverlayersMica = new Array();
-        for (var i = 0; i < imageCount; i++) {
-            imageOverlayersCrystal[i] = new L.imageOverlay(
-                imagesCrystal[i], boundsCrystal
+        var imageOverlayers = new Array();
+        for (var i = 0; i < images.length; i++) {
+            imageOverlayers[i] = new L.imageOverlay(
+                images[i], bounds
             ).addTo(map);
-            imageOverlayersCrystal[i].getElement().classList.add("image-crystal");
+            imageOverlayers[i].getElement().classList.add("image-crystal");
         }
         var layerCurrent = 0;
         var layerRendered = 0;
         // Try to ensure images are in the cache so appear instantly, unsure of a better solution
         setTimeout(function() {
-            [imageOverlayersCrystal, imageOverlayersMica].forEach(function(imageOverlayer) {
-                imageOverlayer.forEach(function(imageOverlay, i) {
-                    if (imageOverlay && i !== layerRendered) {
-                        imageOverlay.removeFrom(map);
-                    }
-                });
+            imageOverlayers.forEach(function(imageOverlay, i) {
+                if (imageOverlay && i !== layerRendered) {
+                    imageOverlay.removeFrom(map);
+                }
             });
-    }, 1000);
+        }, 1000);
         var rois_layer = L.polygon(rois, {
             color: 'white',
             opacity: 1.0,
@@ -429,13 +421,20 @@ function grain_view(options) {
             }
             return false;
         }
-        function refresh() {
-            imageOverlayersCrystal[layerRendered].removeFrom(map);
-            if (imageOverlayersMica[layerRendered]) {
-                imageOverlayersMica[layerRendered].removeFrom(map);
+        function add_current_layer() {
+            if (layerRendered < imageOverlayers.length) {
+                imageOverlayers[layerRendered].addTo(map);
             }
+        }
+        function remove_current_layer() {
+            if (layerRendered < imageOverlayers.length) {
+                imageOverlayers[layerRendered].removeFrom(map);
+            }
+        }
+        function refresh() {
+            remove_current_layer();
             layerRendered = layerCurrent;
-            imageOverlayersCrystal[layerRendered].addTo(map);
+            add_current_layer();
         }
         refresh();
         return {
@@ -633,12 +632,8 @@ function grain_view(options) {
         }
     }, true);
     var yOverX = grain_info.image_height / grain_info.image_width;
-    var shiftXRelative = (grain_info.shift_x || 0) / grain_info.image_width;
-    var shiftYRelative = (grain_info.shift_y || 0) / grain_info.image_width; // TODO check calculations
     zStack = makeZStack(
-        map, grain_info.images,
-        sliderNum, yOverX, shiftXRelative, shiftYRelative,
-        grain_info.rois
+        map, grain_info.images, sliderNum, yOverX, grain_info.rois
     );
     markers = makeMarkers(map);
     deleter = markers.makeDeleter();
