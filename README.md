@@ -342,6 +342,25 @@ only the selenium test by adding the option `--tag selenium`.
 
 At present there are only these two types of test.
 
+### Running the tests with a different browser
+
+The default browser is Chromium, but you can choose Chrome or Firefox
+instead as follows:
+
+```sh
+(geochron-at-home) $ BROWSER=chrome ./manage.py test
+```
+
+...for Chrome (make sure you have `chromedriver` installed and it has the
+same version number as Chrome), or
+
+```sh
+(geochron-at-home) $ BROWSER=firefox ./manage.py test
+```
+
+...for Firefox (make sure you have `geckodriver` installed on your path, at
+least version 0.32)
+
 ### Troubleshooting image upload
 
 If the web server returns a 403 (forbidden) when attempting to access

@@ -8,7 +8,7 @@
 
 <a id="create-project" href="{% url 'project_create' %}">Create new project</a>
 
-<ul>
+<ul id="project-list">
     {% for p in projects %}
     <li><a href="{% url 'project' p.pk %}">{{ p.project_name }}</a></li>
     {% endfor %}

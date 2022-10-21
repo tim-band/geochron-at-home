@@ -382,12 +382,25 @@ function addRegionMarkers(crystal) {
     });
 }
 
+function cancelEdit(crystal) {
+    removeRegionMarkers(crystal);
+    var edit = document.getElementById("edit");
+    var save = document.getElementById("save");
+    var cancel = document.getElementById("cancel_edit");
+    edit.removeAttribute('disabled');
+    save.setAttribute('disabled', true);
+    cancel.setAttribute('disabled', true);
+    crystal.marker_layer.clearLayers();
+}
+
 function beginEdit(crystal) {
     addRegionMarkers(crystal);
     var edit = document.getElementById("edit");
     var save = document.getElementById("save");
+    var cancel = document.getElementById("cancel_edit");
     edit.setAttribute('disabled', true);
     save.removeAttribute('disabled');
+    cancel.removeAttribute('disabled');
 }
 
 function save(crystal, url, form, error_callback) {
@@ -400,12 +413,7 @@ function save(crystal, url, form, error_callback) {
         });
     });
     xhr.addEventListener("load", function() {
-        removeRegionMarkers(crystal);
-        var edit = document.getElementById("edit");
-        var save = document.getElementById("save");
-        edit.removeAttribute('disabled');
-        save.setAttribute('disabled', true);
-        crystal.marker_layer.clearLayers();
+        cancelEdit(crystal);
     });
     if (error_callback) {
         xhr.addEventListener("error", function() {
@@ -442,8 +450,10 @@ function beginShiftEdit(crystal) {
     });
     var edit = document.getElementById("edit_shift");
     var save = document.getElementById("save_shift");
+    var cancel = document.getElementById("cancel_edit");
     edit.setAttribute('disabled', true);
     save.removeAttribute('disabled');
+    cancel.removeAttribute('disabled');
 }
 
 function saveShift(crystal, url, form, error_callback) {
@@ -452,12 +462,7 @@ function saveShift(crystal, url, form, error_callback) {
     fd.append('x', Math.floor(crystal.shift_x + 0.5));
     fd.append('y', Math.floor(crystal.shift_y + 0.5));
     xhr.addEventListener("load", function() {
-        removeRegionMarkers(crystal);
-        var edit = document.getElementById("edit_shift");
-        var save = document.getElementById("save_shift");
-        edit.removeAttribute('disabled');
-        save.setAttribute('disabled', true);
-        crystal.marker_layer.clearLayers();
+        cancelEdit(crystal);
     });
     if (error_callback) {
         xhr.addEventListener("error", function() {

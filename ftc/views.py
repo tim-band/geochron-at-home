@@ -261,8 +261,8 @@ class GrainForm(ModelForm):
             regions = rois_json['regions']
             region = regions[0]
             self.rois = {
-                'shift_x': region['shift'][0] if region else 0,
-                'shift_y': region['shift'][1] if region else 0,
+                'shift_x': region['shift'][0] if region else None,
+                'shift_y': region['shift'][1] if region else None,
                 'image_width': rois_json['image_width'],
                 'image_height': rois_json['image_height'],
                 'scale_x': rois_json.get('scale_x'),
@@ -378,6 +378,18 @@ class GrainForm(ModelForm):
                 self.cleaned_data['image_width'] = self.max_width
             if 0 < self.max_height:
                 self.cleaned_data['image_height'] = self.max_height
+        if self.rois is not None:
+            for (k,v) in self.rois.items():
+                if v is not None:
+                    self.cleaned_data[k] = v
+        if 'grain_index' in self.data:
+            index = self.data['grain_index']
+            if type(index) is list and 0 < len(index):
+                index = index[0]
+            try:
+                self.grain_index = int(index)
+            except Exception:
+                pass
         return self.cleaned_data
 
     def next_grain_number(self, sample):
@@ -385,6 +397,8 @@ class GrainForm(ModelForm):
         Set the grain number to the next available number
         """
         self.sample = sample
+        if hasattr(self, 'grain_index'):
+            return
         max_index = sample.grain_set.aggregate(Max('index'))['index__max']
         if not max_index:
             max_index = 0
@@ -459,7 +473,7 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
             margin_x = width / 20
             margin_y = height / 20
             form.save_region([
-                [margin_x,margin_y],
+                [margin_x, margin_y],
                 [width - margin_x, margin_y],
                 [width - margin_x, height - margin_y],
                 [margin_x, height - margin_y]
@@ -467,7 +481,7 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
         return rtn
 
     def get_success_url(self):
-        return reverse('grain', kwargs={'pk': self.object.pk})
+        return reverse('grain_images', kwargs={'pk': self.object.pk})
 
 
 class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
@@ -807,7 +821,7 @@ def updateTFNResult(request):
             myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
             return HttpResponse(myjson, content_type='application/json')
     else:
-        return HttpResponseForbidden("Sorry, You have to active your account first.")
+        return HttpResponseForbidden("Sorry, you have to active your account first.")
 
 @login_required
 @transaction.atomic
@@ -838,7 +852,7 @@ def saveWorkingGrain(request):
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
         return HttpResponse(myjson, content_type='application/json')
     else:
-        return HttpResponse("Sorry, You have to active your account first.")
+        return HttpResponse("Sorry, you have to active your account first.")
 
 @login_required
 def saveTutorialResult(request):

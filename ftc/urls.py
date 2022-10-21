@@ -26,12 +26,19 @@ urlpatterns = [
     path('project/<pk>/create_sample', SampleCreateView.as_view(), name='sample_create'),
     path('sample/<pk>/', SampleDetailView.as_view(), name='sample'),
     path('sample/<pk>/update', SampleUpdateView.as_view(), name='sample_update'),
+    # Small form that lets you upload grain images, metadata or rois.json to create a new grain
     path('sample/<pk>/create_grain', GrainCreateView.as_view(), name='grain_create'),
+    # Z-stack microscope view of grain (with option to adjust ROI)
     path('grain/<pk>/', GrainDetailView.as_view(), name='grain'),
+    # Z-stack microscope view of mica (with option to adjust shift)
     path('grain/<pk>/mica', MicaDetailView.as_view(), name='mica'),
+    # Form for updating grain
     path('grain/<pk>/update_meta', GrainDetailUpdateView.as_view(), name='grain_update_meta'),
+    # Post endpoint for updating the ROI
     path('grain/<pk>/update_roi', grain_update_roi, name='grain_update_roi'),
+    # Post endpoint for updating the Mica
     path('grain/<pk>/update_shift', grain_update_shift, name='grain_update_shift'),
+    # Table of metadata + table of images + upload form to upload metadata, grain images or rois.json
     path('grain/<pk>/images', GrainImagesView.as_view(), name='grain_images'),
     path('projects/', projects, name='projects'),
     path('create_project/', ProjectCreateView.as_view(), name='project_create'),

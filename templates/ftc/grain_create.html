@@ -7,8 +7,14 @@
     enctype="multipart/form-data"
     action="{% url 'grain_create' parent.pk %}"
     method="POST">
+    <table>
+        <tr>
+            <th><label for="id_grain_index">Desired grain index if known:</label></th>
+            <td><input id="id_grain_index" type="text" name="grain_index"></td>
+        </tr>
+        {{ form.as_table }}
+    </table>
     {% csrf_token %}
-    {{ form }}
     <input type="submit" value="Create Grain">
 </form>
 {% endblock %}

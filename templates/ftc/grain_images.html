@@ -5,21 +5,29 @@
 {% load si_mag %}
 
 {% block content %}
-<h2>
-    <a href="{% url 'grain' object.pk %}">Grain {{ object.index }}</a>
+<h2 id="title">
+    Grain {{ object.index }}
     of sample <a href="{% url 'sample' object.sample.pk %}">{{ object.sample.sample_name }}</a>
     in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
 </h2>
+<p>View <a id="zstack" href="{% url 'grain' object.pk %}">Z-stack</a></p>
 <h3>Metadata</h3>
 <table class="metadata">
-    <tr><td>Image size:</td><td>{{ object.image_width }}&#x00D7;{{ object.image_height }}</td></tr>
-    <tr><td>Pixel size:</td><td>
+    <tr><td>Image size:</td><td id="image-size">
+        {{ object.image_width }}&#x00D7;{{ object.image_height }}
+    </td></tr>
+    <tr><td>Pixel size:</td><td id="pixel-size">
         {% si_mag object.scale_x unit='m' none='?' %}&#x00D7;{% si_mag object.scale_y unit='m' none='?' %}
     </td></tr>
-    <tr><td>Stage position:</td><td>{{ object.stage_x }}&#x00D7;{{ object.stage_y }}</td></tr>
+    <tr><td>Stage position:</td><td id="stage-position">
+        {{ object.stage_x }}&#x00D7;{{ object.stage_y }}
+    </td></tr>
+    <tr><td>Mica shift:</td><td id="mica-shift">
+        {{ object.shift_x }},{{ object.shift_y }}
+    </td></tr>
 </table>
 <h3>Images</h3>
-<table class="table">
+<table id="image-list" class="table">
     <thead>
         <tr>
             <th>format</th>

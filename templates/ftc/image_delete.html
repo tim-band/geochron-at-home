@@ -10,12 +10,19 @@
 </style>
 {% endblock %}
 {% block content %}
-<form
-    action="{% url 'image_delete' object.pk %}"
-    method="POST">
-    {% csrf_token %}
-    <!-- {{ form }} -->
-    <input type="submit" value="Delete This Image">
-</form>
+<table class="table table-sm"><tbody><tr>
+    <td>
+        <a id="back" href="{% url 'grain_images' object.grain.pk %}">back to grain {{ object.grain.index }}</a>
+    </td>
+    <td>
+        <form
+            action="{% url 'image_delete' object.pk %}"
+            method="POST">
+            {% csrf_token %}
+            <!-- {{ form }} -->
+            <input type="submit" value="Delete This Image">
+        </form>
+    </td>
+</tr></tbody></table>
 <div><img id="image" src="{% url 'get_image' object.pk %}"></div>
 {% endblock %}

@@ -10,6 +10,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 import base64
 import glob
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -60,20 +61,14 @@ class BasePage:
         self.driver = driver
 
     def check(self):
-        return True
-
-    def wait(self):
-        """
-        Wait until check() passes
-        """
-        WebDriverWait(self.driver, timeout=3).until(
-            lambda d: self.check()
-        )
+        return self
 
     def fill_form(self, fields):
         for k,v in fields.items():
             elt = self.driver.find_element(By.CSS_SELECTOR,  '*[name="{0}"]'.format(k))
-            if type(v) is bool:
+            if v is None:
+                pass
+            elif type(v) is bool:
                 if v != elt.is_selected():
                     elt.click()
             else:
@@ -84,12 +79,16 @@ class BasePage:
                     opt.click()
                 else:
                     elt.clear()
-                    elt.send_keys(v)
+                    vs = v if type(v) is list else [v]
+                    for v in vs:
+                        elt.send_keys(v)
 
-    def submit(self):
+    def submit(self, until_fn=None):
         url = self.driver.current_url
         self.driver.find_element(By.CSS_SELECTOR,  'input[type="submit"]').click()
-        return url != self.driver.current_url
+        if until_fn is None:
+            until_fn = lambda d: d.current_url != url
+        WebDriverWait(self.driver, timeout=2).until(until_fn)
 
     def element_is_disabled(self, elt):
         if type(elt) is str:
@@ -286,8 +285,12 @@ class ProfilePage(BasePage):
         return self
 
     def go_tutorial(self):
-        self.driver.find_element(By.ID, 'tutorial-link').click()
+        self.click_by_id('tutorial-link')
         return TutorialPage(self.driver)
+
+    def go_manage(self):
+        self.click_by_id('manage-link')
+        return ProjectsPage(self.driver)
 
 
 class CountingPage(BasePage):
@@ -462,8 +465,15 @@ class ReportPage(BasePage):
 
 class ProjectsPage(BasePage):
     def create_project(self):
-        self.driver.find_element(By.ID, 'create-project').click()
+        self.click_by_id('create-project')
         return ProjectCreatePage(self.driver)
+
+    def go_project(self, name):
+        self.click_element(
+            By.XPATH,
+            '//ul[@id="project-list"]/li/a[text()="{0}"]'.format(name)
+        )
+        return ProjectPage(self.driver)
 
 
 class ProjectCreatePage(BasePage):
@@ -474,7 +484,7 @@ class ProjectCreatePage(BasePage):
             'priority': priority,
             'closed': closed
         })
-        assert self.submit()
+        self.submit()
         return ProjectPage(self.driver)
 
 
@@ -493,23 +503,131 @@ class SampleCreatePage(BasePage):
             'min_contributor_num': min_contributor_num,
             'completed': completed
         })
-        assert self.submit()
+        self.submit()
         return SamplePage(self.driver)
 
 
 class SamplePage(BasePage):
     def create_grain(self):
-        self.driver.find_element(By.ID, 'create-grain').click()
+        self.click_by_id('create-grain')
         return GrainCreatePage(self.driver)
+
+    def go_grain(self, index):
+        self.click_element(
+            By.XPATH,
+            '//table[@id="grain-set"]/tbody/tr/td/a[text()="{0}"]'.format(index)
+        )
+        return GrainDetailsPage(self.driver)
+
+    def edit(self):
+        self.click_by_id('edit-sample')
+        return SampleEditPage(self.driver)
+
+
+class SampleEditPage(BasePage):
+    def cancel(self):
+        self.click_by_id('cancel')
+        return SamplePage(self.driver)
+
+    def update(self, name, property_, priority, contributor, completed):
+        self.fill_form({
+            'sample_name': name,
+            'sample_property': property_,
+            'min_contributor_num': contributor,
+            'completed': completed
+        })
+        self.submit()
+        return SamplePage(self.driver)
+
+
+class GrainDetailPage(BasePage):
+    def check(self):
+        self.driver.find_element(By.CSS_SELECTOR, 'table#image-list')
+        self.driver.find_element(By.ID, 'id_uploads')
+        return self
+
+    def go_zstack(self):
+        self.click_by_id('zstack')
+        return GrainPage(self.driver)
+
+    def go_image(self, ft_type, index):
+        self.click_element(
+            By.XPATH,
+            '//table[@id="image-list"]/tbody/tr[td[text()="{0}"]][td[text()="{1}"]]/td/a'.format(ft_type, index)
+        )
+        return ImagePage(self.driver)
+
+    def get_grain_index(self):
+        title = self.driver.find_element(By.ID, "title").text
+        m = re.search(r'Grain (\d+) ', title)
+        if m is None:
+            return None
+        return int(m.group(1))
+
+    def get_image_rows(self):
+        headers = [
+            th.text
+            for th in self.driver.find_elements(
+                By.CSS_SELECTOR,
+                '#image-list thead th'
+            )
+        ]
+        rows = [[
+                td.text
+                for td in tr.find_elements(By.CSS_SELECTOR, 'td')
+            ] for tr in self.driver.find_elements(
+                By.CSS_SELECTOR,
+                '#image-list tbody tr'
+            )
+        ]
+        images = []
+        for row in rows:
+            image = {}
+            for i in range(len(headers)):
+                image[headers[i]] = row[i]
+            images.append(image)
+        return images
+
+    def get_pair_element_text(self, id, sep=','):
+        t = self.driver.find_element(By.ID, id).text
+        return t.split(sep)
+
+    def get_size_element_text(self, id):
+        return self.get_pair_element_text(id, sep='\xd7')
+
+    def get_image_size(self):
+        return self.get_size_element_text('image-size')
+
+    def get_pixel_size(self):
+        return self.get_size_element_text('pixel-size')
+
+    def get_stage_position(self):
+        return self.get_size_element_text('stage-position')
+
+    def get_mica_shift(self):
+        return self.get_pair_element_text('mica-shift')
+
+    def update(self, paths, fn_detect_update):
+        """
+        Update with the files given in `paths`, the submission
+        will be verified by waiting for `fn_detect_update` (called
+        with the driver) to return True.
+        """
+        self.fill_form({
+            'uploads': paths
+        })
+        self.submit(fn_detect_update)
+        return self
 
 
 class GrainCreatePage(BasePage):
-    def create(self, paths):
-        browse = self.driver.find_element(By.ID, 'id_uploads')
-        for p in paths:
-            browse.send_keys(p)
-        assert self.submit()
-        return GrainPage(self.driver)
+    def create(self, paths, index=None):
+        self.fill_form({
+            'grain_index': index,
+            'uploads': paths
+        })
+        self.submit()
+        return GrainDetailPage(self.driver)
 
 
 def find_best(a, f):
@@ -556,18 +674,52 @@ class GrainPage(BasePage):
             ).rect['width']
         )
 
-    def edit(self):
-        zoom_outs = self.driver.find_elements(By.CLASS_NAME, 'leaflet-control-zoom-out')
+    def go_mica(self):
+        self.click_by_id('go_mica')
+        return self
+
+    def go_grain(self):
+        self.click_by_id('go_grain')
+        return self
+
+    #def go_update_metadata(self):
+    #    self.click_by_id('meta')
+    #    return GrainUpdateMetadataPage(self.driver)
+
+    def go_grain_images(self):
+        self.click_by_id('images')
+        return GrainDetailPage(self.driver)
+
+    def zoom_out(self, max_width=600):
+        zoom_outs = self.driver.find_elements(
+            By.CLASS_NAME, 'leaflet-control-zoom-out'
+        )
         assert len(zoom_outs) == 1
         zoom_out = zoom_outs[0]
-        while (600 < self.get_image_width()
+        while (max_width < self.get_image_width()
                 and not self.element_is_disabled(zoom_out)):
             zoom_out.click()
-        self.driver.find_element(By.ID, 'edit').click()
+
+    def edit(self):
+        self.zoom_out()
+        self.click_by_id('edit')
+        return self
+
+    def edit_shift(self):
+        self.zoom_out()
+        self.click_by_id('edit_shift')
+        return self
+
+    def cancel(self):
+        self.click_by_id('cancel_edit')
         return self
 
     def save(self):
-        self.driver.find_element(By.ID, 'save').click()
+        self.click_by_id('save')
+        return self
+
+    def save_shift(self):
+        self.click_by_id('save_shift')
         return self
 
     def do_partial_drag(self, dragee, dest_x, dest_y):
@@ -575,7 +727,7 @@ class GrainPage(BasePage):
         drag_y_by = dest_y - pin_y(dragee)
         if -2 < drag_x_by and drag_x_by < 2 and -2 < drag_y_by and drag_y_by < 2:
             return False
-        max_distance = 199
+        max_distance = 99
         drag_x_by = min(max(drag_x_by, -max_distance), max_distance)
         drag_y_by = min(max(drag_y_by, -max_distance), max_distance)
         ActionChains(self.driver).move_by_offset(drag_x_by, drag_y_by).perform()
@@ -587,13 +739,16 @@ class GrainPage(BasePage):
             pass
         ActionChains(self.driver).release().perform()
 
-    def drag_marker(self, from_x_approx, from_y_approx, to_x, to_y):
-        img = self.driver.find_element(By.CSS_SELECTOR, 'img.leaflet-image-layer')
-        rect = img.rect
-        markers = self.driver.find_elements(
+    def marker_elements(self):
+        return self.driver.find_elements(
             By.CSS_SELECTOR,
             'img.region-vertex-marker'
         )
+
+    def drag_marker(self, from_x_approx, from_y_approx, to_x, to_y):
+        img = self.driver.find_element(By.CSS_SELECTOR, 'img.leaflet-image-layer')
+        rect = img.rect
+        markers = self.marker_elements()
         marker = find_best(markers, lambda m: sum_squares(
             from_x_approx * rect['width'] + rect['x'] - pin_x(m),
             from_y_approx * rect['height'] + rect['y'] - pin_y(m)
@@ -604,6 +759,16 @@ class GrainPage(BasePage):
             to_y * rect['height'] + rect['y']
         )
         return self
+
+
+class ImagePage(BasePage):
+    def delete_image(self):
+        self.submit()
+        return GrainDetailPage(self.driver)
+
+    def back(self):
+        self.click_by_id('back')
+        return GrainDetailPage(self.driver)
 
 
 class ScriptUploader:
@@ -657,8 +822,8 @@ class WebUploader:
         edit_projects = navbar.go_edit_projects()
         project_page = edit_projects.create_project().create('p1', 'description', 1, False)
         sample_page = project_page.create_sample().create('s1', 'T', 1, 1, False)
-        grain_page = sample_page.create_grain().create(files)
-        grain_page.edit()
+        grain_detail_page = sample_page.create_grain().create(files)
+        grain_page = grain_detail_page.go_zstack().edit()
         grain_page.drag_marker(0, 0, 0.01, 0.01)
         grain_page.drag_marker(0, 1, 0.01, 0.99)
         grain_page.drag_marker(1, 0, 0.99, 0.01)
@@ -674,15 +839,27 @@ class WebUploader:
 @tag('selenium')
 class DjangoTests(TestCase):
     def setUp(self):
+        self.project_user = User("john", "john@test.com", "john")
         self.dc = DockerCompose("./docker-compose-test.yml").down().up().init()
         self.tmp = None
-        #self.tmp = tempfile.mkdtemp(prefix='tmp', dir=Path.home())
-        #service = webdriver.firefox.service.Service(service_args=[
-        #    "--profile-root",
-        #    self.tmp
-        #])
-        #self.driver = webdriver.Firefox(service=service)
-        self.driver = webdriver.Chrome()
+        browser = os.environ.get('BROWSER')
+        if browser == 'firefox':
+            self.tmp = tempfile.mkdtemp(prefix='tmp', dir=Path.home())
+            self.service = webdriver.firefox.service.Service(service_args=[
+                "--profile-root",
+                self.tmp,
+            ])
+            self.driver = webdriver.Firefox(service=self.service)
+        elif browser == 'chrome':
+            self.driver = webdriver.Chrome()
+        else:
+            self.driver = webdriver.chromium.webdriver.ChromiumDriver(
+                'gah', 'gah',
+                service=webdriver.chromium.service.ChromiumService(
+                    'chromium.chromedriver',
+                    start_error_message='Failed to start chromedriver for Geochron@Home'
+                )
+            )
 
     def tearDown(self):
         self.driver.close()
@@ -693,9 +870,8 @@ class DjangoTests(TestCase):
     def test_onboard(self):
         # Upload Z-Stack images
         test_user = User("tester", "tester@test.com", "MyPaSsW0rd")
-        project_user = User("john", "john@test.com", "john")
         HomePage(self.driver).go()
-        profile = SignInPage(self.driver).go().sign_in(project_user)
+        profile = SignInPage(self.driver).go().sign_in(self.project_user)
         uploader = WebUploader(self.driver)
         #uploader = new ScriptUploader(self.driver)
         uploader.upload_projects('test/crystals')
@@ -729,8 +905,8 @@ class DjangoTests(TestCase):
         navbar.logout()
 
         # do the same thing with John
-        profile = SignInPage(self.driver).go().sign_in(project_user)
-        profile.check_cannot_count().go_tutorial().get_to_end_and_finish().wait()
+        profile = SignInPage(self.driver).go().sign_in(self.project_user)
+        profile.check_cannot_count().go_tutorial().get_to_end_and_finish().check()
         profile.go().check_can_count()
         navbar.logout()
 
@@ -801,7 +977,7 @@ class DjangoTests(TestCase):
         navbar.logout()
 
         # login, check no results yet
-        profile = SignInPage(self.driver).go().sign_in(project_user)
+        profile = SignInPage(self.driver).go().sign_in(self.project_user)
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
@@ -822,8 +998,191 @@ class DjangoTests(TestCase):
 
         # see this result, as project admin
         navbar.logout()
-        profile = SignInPage(self.driver).go().sign_in(project_user)
+        profile = SignInPage(self.driver).go().sign_in(self.project_user)
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
         self.assertEqual(report.result("1"), "5")
+
+    def grain_file_name(self, index, prefix=''):
+        n = 'test/crystals/john/p1/s1/Grain01/{1}stack-{0:02d}.jpg'.format(index, prefix)
+        return os.path.abspath(n)
+
+    def grain_metadata_file_name(self, index):
+        return self.grain_file_name(index) + '_metadata.xml'
+
+    def mica_file_name(self, index):
+        return self.grain_file_name(index, 'mica')
+
+    def rois_file_name(self):
+        return os.path.abspath('test/crystals/john/p1/s1/Grain01/rois.json')
+
+    def test_manage(self):
+        HomePage(self.driver).go()
+        project = SignInPage(self.driver).go().sign_in(
+            self.project_user
+        ).go_manage().create_project().create(
+            "test_manage",
+            "project created by test_manage",
+            20,
+            False
+        )
+        sample = project.create_sample().create("Sample-1", "T", 20, 99, False)
+        grain = sample.create_grain().create([
+            self.grain_file_name(1),
+            self.mica_file_name(1),
+            self.grain_file_name(3)
+        ]).check()
+        images = grain.get_image_rows()
+        self.assertEqual(len(images), 3)
+        self.assertDictContainsSubset(
+            {
+                'format': 'J',
+                'ft_type': 'S',
+                'index': '1',
+                'light_path': 'None',
+                'focus': 'None',
+            },
+            images[0]
+        )
+        self.assertDictContainsSubset(
+            {
+                'format': 'J',
+                'ft_type': 'S',
+                'index': '3',
+            },
+            images[1]
+        )
+        # Go to the zstack and check the rois is a rectangle
+        zstack = grain.go_zstack().edit()
+        elts = zstack.marker_elements()
+        self.assertEqual(len(elts), 4, msg="not four markers")
+        elt_xs = sorted([pin_x(e) for e in elts])
+        elt_ys = sorted([pin_y(e) for e in elts])
+        self.assertAlmostEqual(elt_xs[0], elt_xs[1], msg="left side not straight")
+        self.assertAlmostEqual(elt_xs[2], elt_xs[3], msg="right side not straight")
+        self.assertAlmostEqual(elt_ys[0], elt_ys[1], msg="top side not straight")
+        self.assertAlmostEqual(elt_ys[2], elt_ys[3], msg="bottom side not straight")
+        zstack.cancel().go_mica().edit_shift()
+        elts = zstack.marker_elements()
+        self.assertEqual(len(elts), 1, msg="should have one marker for mica shift editing")
+        shift1_x = pin_x(elts[0])
+        shift1_y = pin_y(elts[0])
+        zstack.cancel().go_grain_images()
+        # Upload a new load of files
+        grain.check().update([
+            self.grain_file_name(2),
+            self.grain_metadata_file_name(1),
+            self.grain_file_name(3)
+        ], lambda d: d.find_element(
+            By.XPATH,
+            '//table[@id="image-list"]/tbody/tr/td[text()="T"]'
+        ))
+        images = grain.get_image_rows()
+        self.assertEqual(len(images), 4)
+        self.assertListEqual(
+            grain.get_image_size(),
+            ['201', '202']
+        )
+        grain.check().update([
+            self.grain_file_name(4),
+            self.rois_file_name()
+        ], lambda d: d.find_element(
+            By.XPATH,
+            '//table[@id="image-list"]/tbody/tr/td[text()="4"]'
+        ))
+        self.assertListEqual(
+            grain.get_image_size(),
+            ['200', '200']
+        )
+        images = grain.get_image_rows()
+        self.assertEqual(len(images), 5)
+        self.assertDictContainsSubset(
+            {
+                'format': 'J',
+                'ft_type': 'S',
+                'index': '1',
+                'light_path': 'T',
+                'focus': '20102.55',
+            },
+            images[0]
+        )
+        self.assertDictContainsSubset(
+            {
+                'format': 'J',
+                'ft_type': 'S',
+                'index': '2',
+            },
+            images[1]
+        )
+        self.assertDictContainsSubset(
+            {
+                'format': 'J',
+                'ft_type': 'S',
+                'index': '3',
+            },
+            images[2]
+        )
+        self.assertDictContainsSubset(
+            {
+                'format': 'J',
+                'ft_type': 'S',
+                'index': '4',
+            },
+            images[3]
+        )
+        self.assertListEqual(
+            grain.get_pixel_size(),
+            ['90.79nm', '90.79nm']
+        )
+        self.assertListEqual(
+            grain.get_stage_position(),
+            ['30224.66', '11127.77']
+        )
+        # Go to the zstack and check the rois is now a triangle
+        zstack = grain.go_zstack().edit()
+        elts = zstack.marker_elements()
+        self.assertEqual(len(elts), 3, msg="not three markers")
+        elt_xs = sorted([pin_x(e) for e in elts])
+        elt_ys = sorted([pin_y(e) for e in elts])
+        self.assertAlmostEqual(elt_xs[0], elt_xs[1], msg="left side not straight")
+        self.assertNotAlmostEqual(elt_xs[2], elt_xs[1], msg="triangle is flat")
+        self.assertNotAlmostEqual(elt_ys[1], elt_ys[2], msg="triangle is flat")
+        self.assertAlmostEqual(elt_ys[0], elt_ys[1], msg="bottom side not straight")
+        # Check the mica ROI shift
+        zstack.cancel().go_mica().edit_shift()
+        elts = zstack.marker_elements()
+        self.assertEqual(len(elts), 1, msg="should have one marker for mica shift editing")
+        shift2_x = pin_x(elts[0])
+        shift2_y = pin_y(elts[0])
+        self.assertNotAlmostEqual(shift1_x, shift2_x)
+        self.assertNotAlmostEqual(shift1_y, shift2_y)
+        grain_images = zstack.cancel().go_grain_images()
+        [x, y] = grain_images.get_mica_shift()
+        self.assertAlmostEqual(float(x), 40)
+        self.assertAlmostEqual(float(y), 45)
+        # Move the mica shift
+        grain_images.go_zstack().go_mica().edit_shift()
+        zstack.drag_marker(0.5, 0.5, 0.4, 0.6).save_shift().go_grain_images()
+        [x, y] = grain_images.get_mica_shift()
+        self.assertNotAlmostEqual(float(x), 40)
+        self.assertNotAlmostEqual(float(y), 45)
+
+    def test_explicit_grain_index(self):
+        HomePage(self.driver).go()
+        project = SignInPage(self.driver).go().sign_in(
+            self.project_user
+        ).go_manage().create_project().create(
+            "test_explicit_grain_index",
+            "project created by test_explicit_grain_index",
+            20,
+            False
+        )
+        sample = project.create_sample().create("SS2", "T", 20, 99, False)
+        explicit_index = 54
+        grain = sample.create_grain().create([
+            self.grain_file_name(1),
+            self.mica_file_name(1),
+            self.grain_file_name(3)
+        ], index=explicit_index).check()
+        self.assertEqual(grain.get_grain_index(), explicit_index)

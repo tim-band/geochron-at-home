@@ -83,7 +83,7 @@ class Grain(models.Model):
         unique_together = ('sample', 'index',)
 
     def get_absolute_url(self):
-        return reverse('grain', args=[self.pk])
+        return reverse('grain_images', args=[self.pk])
 
     def get_owner(self):
         return self.sample.get_owner()

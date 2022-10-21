@@ -1,6 +1,7 @@
 {% extends "ftc/base.html" %}
 
 {% load static %}
+{% load order_by %}
 
 {% block head %}
 <style>
@@ -28,11 +29,11 @@
         <tr><td>Completed?</td><td>{{object.completed}}</td></tr>
         <tr><td>Project owner</td><td>{{object.get_owner}}</td></tr>
     </table>
-    <a href="{% url 'sample_update' object.pk %}">Edit</a>
+    <a id="edit-sample" href="{% url 'sample_update' object.pk %}">Edit</a>
 </div>
 <div><a id="create-grain" href="{% url 'grain_create' object.pk %}">Create new grain</a></div>
 <h2>Grains</h2>
-<table class="table">
+<table class="table" id="grain-set">
     <tr>
         <th>Grain</th>
         <th>Crystal images</th>
@@ -40,9 +41,9 @@
         <th>Number of results</th>
         <th>Owner's track count</th>
     </tr>
-    {% for g in object.grain_set.all %}
+    {% for g in object.grain_set.all|order_by:"index" %}
     <tr>
-        <td><a href="{% url 'grain' g.pk %}">{{ g.index }}</a></td>
+        <td><a href="{% url 'grain_images' g.pk %}">{{ g.index }}</a></td>
         <td>{{ g.count_images_crystal }}</td>
         <td>{{ g.count_images_mica }}</td>
         <td>{{ g.count_results }}</td>

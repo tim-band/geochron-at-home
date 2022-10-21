@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="{% static 'noUiSlider-14.6.3/nouislider.min.css' %}" />
 <style>
 #heading-row {
-    width: 100%;
+    display: contents;
 }
 
 #heading {
@@ -75,6 +75,10 @@ table.metadata td:nth-child(odd) {
     width: 100%;
     border: none;
     line-height: 140%;
+}
+
+#metadata-bar {
+    float: left
 }
 </style>
 <script type='text/javascript' src="{% static 'Leaflet-1.7.1/leaflet.js' %}"></script>
@@ -145,7 +149,7 @@ window.addEventListener('load', function() {
         in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
     </span>
     <a id="count" class="btn btn-default" href="{% url 'count_my' object.pk %}">Count</a>
-    <a id="images" class="btn btn-default" href="{% url 'grain_images' object.pk %}">Edit Image Stack</a>
+    <a id="images" class="btn btn-default" href="{% url 'grain_images' object.pk %}">View Image Stack Info</a>
     <a id="meta" class="btn btn-default" href="{% url 'grain_update_meta' object.pk %}">Edit Metadata</a>
     {% if ft_type == 'S' %}
     <a id="go_mica" class="btn btn-default" href="{% url 'mica' object.pk %}">View Mica</a>
@@ -159,14 +163,19 @@ window.addEventListener('load', function() {
     <a id="edit_shift" href="#" class="btn btn-default" onclick="beginShiftEdit(crystal_control)">Adjust Shift</a>
     <a id="save_shift" href="#" class="btn btn-default" onclick="saveShift(crystal_control, &quot;{% url 'grain_update_shift' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</a>
     {% endif %}
+    <a id="cancel_edit" href="#" class="btn btn-default" onclick="cancelEdit(crystal_control)" disabled>Cancel Edit</a>
 </div>
-<div>
-    <table class="metadata">
-        <tr><td>Image size:</td><td>{{ object.image_width }}&#x00D7;{{ object.image_height }}</td></tr>
-        <tr><td>Pixel size:</td><td>
+<div id="metadata-bar">
+    <table id="metadata">
+        <tr><td>Image size:</td><td id="image-size">
+            {{ object.image_width }}&#x00D7;{{ object.image_height }}
+        </td></tr>
+        <tr><td>Pixel size:</td><td id="pixel-size">
             {% si_mag object.scale_x unit='m' none='?' %}&#x00D7;{% si_mag object.scale_y unit='m' none='?' %}
         </td></tr>
-        <tr><td>Stage position:</td><td>{{ object.stage_x }}&#x00D7;{{ object.stage_y }}</td></tr>
+        <tr><td>Stage position:</td><td id="stage-position">
+            {{ object.stage_x }}&#x00D7;{{ object.stage_y }}
+        </td></tr>
     </table>
 </div>
 <div id="map"></div>
