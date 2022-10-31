@@ -29,7 +29,7 @@ services:
     env_file:
       - production.env
     environment:
-      - STATIC_ROOT=/code/static
+      - WWW_ROOT=/code
       - DB_HOST=db
       - DB_PORT=5432
       - PROMETHEUS_METRICS_EXPORT_PORT_RANGE=8001-8019

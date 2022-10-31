@@ -128,7 +128,7 @@ directory at the URL `/geochron_at_home/static/`. Ensure the following are set i
 your .env file:
 
 ```
-SCRIPT_NAME=/geochron_at_home
+SCRIPT_NAME=geochron_at_home
 WWW_ROOT=/var/www/html
 SSL_ONLY=false
 DB_HOST=localhost
