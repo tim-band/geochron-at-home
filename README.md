@@ -128,7 +128,7 @@ directory at the URL `/geochron_at_home/static/`. Ensure the following are set i
 your .env file:
 
 ```
-SCRIPT_NAME=geochron_at_home
+SCRIPT_NAME=/geochron_at_home
 WWW_ROOT=/var/www/html
 SSL_ONLY=false
 DB_HOST=localhost
@@ -143,30 +143,38 @@ as if users trying to log in are failing authentication with Geochron@home,
 when what is really happening is that Django is failing to authenticate with
 the email server.
 
-Let's say you wanted to serve your Geochron@home at `/gah/`, using port 3841 for
-your Django instance:
-
-Set the following in the http `server` block of your nginx config:
+Let's say you wanted to serve your Geochron@home at `/geochron_at_home/`,
+using port 3830 for your Django instance and ports 3851 and 3852 for
+prometheus metrics, set the following in the http `server` block of your
+nginx config:
 
 ```
-location /gah/static/ {
-    root /var/www/html/geochron_at_home/static;
+location /geochron@home/static/ {
+        root /var/www/html;
 }
-location /gah/metrics {
-    deny all;
-    access_log off;
-    error_log off;
+location /geochron@home/metrics/1 {
+        access_log off;
+        error_log off;
+        proxy_pass http://127.0.0.1:3851;
 }
-location /gah/ {
-    ###
-    ### Different depending on whether we are redirecting to https or not
+location /geochron@home/metrics/2 {
+        access_log off;
+        error_log off;
+        proxy_pass http://127.0.0.1:3852;
+}
+location /geochron@home/ {
+        proxy_pass http://127.0.0.1:3830;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
 }
 ```
 
 Run 2 workers with:
 
 ```sh
-(geochron-at-home) $ gunicorn -b 127.0.0.1:3841 --workers=2 geochron.wsgi
+(geochron-at-home) $ gunicorn -b 127.0.0.1:3850 --workers=2 geochron.wsgi
 ```
 
 Whenever any static files (anything in the `ftc/static` directory) have changed
@@ -241,11 +249,6 @@ location /geochron@home/ {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_redirect off;
-        location /geochron@home/static/ {
-                # This is necessary because the static files are not
-                # served under /geochron@home within the app
-                proxy_pass http://127.0.0.1:3830/static/;
-        }
 }
 ```
 
