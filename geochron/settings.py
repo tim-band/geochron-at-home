@@ -170,8 +170,15 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
+FORCE_SCRIPT_NAME=os.getenv('SCRIPT_NAME')
 STATIC_URL = os.getenv('STATIC_URL') or 'static/'
-STATIC_ROOT = os.getenv('STATIC_ROOT') or 'static'
+WWW_ROOT = os.getenv('WWW_ROOT') or ''
+static_root = os.getenv('STATIC_ROOT') or os.path.join(WWW_ROOT, 'static')
+STATIC_ROOT = (
+    os.path.join(static_root, FORCE_SCRIPT_NAME)
+    if FORCE_SCRIPT_NAME else
+    static_root
+)
 STATICFILES_DIRS = [
   os.path.join(BASE_DIR, 'vendor'),
 ]

@@ -128,8 +128,8 @@ directory at the URL `/geochron_at_home/static/`. Ensure the following are set i
 your .env file:
 
 ```
-STATIC_ROOT=/var/www/html/geochron_at_home/static/
-STATIC_URL=/geochron_at_home/static/
+SCRIPT_NAME=/geochron_at_home
+WWW_ROOT=/var/www/html
 SSL_ONLY=false
 DB_HOST=localhost
 DB_PORT=5432
