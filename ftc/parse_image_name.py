@@ -39,7 +39,7 @@ def parse_upload_name(name):
     elif r['flat']:
         r['index'] = -1 if r['refl'] else 0
     elif r['refl']:
-        r['index'] = 100 - r['index']
+        r['index'] = r['index'] - 100
     r['ft_type'] = None if r['rois'] else ('I' if r['mica'] else 'S')
     r['is_image'] = not (r['rois'] or r['meta'])
     return r
