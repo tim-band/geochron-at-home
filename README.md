@@ -386,7 +386,7 @@ Before using the API you must initialize the JWT. Also,
 periodically, or if you susupect the JWT might have leaked
 you should also re-initialize the JWT.
 
-Firstly, remove any lines beginning `JWT_` from your
+Firstly, remove any settings beginning `JWT_` from your
 `.env` file (for local development) or `production.env`
 (for production). Then, from the Pipenv shell:
 

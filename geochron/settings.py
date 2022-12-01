@@ -33,13 +33,6 @@ SECURE_SSL_REDIRECT = sslOnly
 SESSION_COOKIE_SECURE = sslOnly
 CSRF_COOKIE_SECURE = sslOnly
 
-def add_newlines_to_pem(x):
-    if x == None:
-        return None
-    return x.replace(
-        'KEY-----', 'KEY-----\n').replace(
-            '-----END', '\n-----END')
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -48,8 +41,8 @@ SIMPLE_JWT = {
     'UPDATE_LAST_LOGIN': False,
 
     'ALGORITHM': 'RS256',
-    'SIGNING_KEY': add_newlines_to_pem(os.getenv('JWT_PRIVATE_KEY')),
-    'VERIFYING_KEY': add_newlines_to_pem(os.getenv('JWT_PUBLIC_KEY')),
+    'SIGNING_KEY': os.getenv('JWT_PRIVATE_KEY'),
+    'VERIFYING_KEY': os.getenv('JWT_PUBLIC_KEY'),
     'AUDIENCE': None,
     'ISSUER': None,
 
@@ -173,7 +166,6 @@ USE_TZ = True
 STATIC_URL = os.getenv('STATIC_URL') or 'static/'
 www_root = os.getenv('WWW_ROOT')
 static_path = [www_root] if www_root else []
-FORCE_SCRIPT_NAME=os.getenv('SCRIPT_NAME')
 static_path.append('static')
 STATIC_ROOT = os.getenv('STATIC_ROOT') or os.path.join(*static_path)
 STATICFILES_DIRS = [

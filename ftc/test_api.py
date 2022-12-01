@@ -1,15 +1,49 @@
-from django.test import Client, TestCase, tag
+from django.test import Client, TestCase, tag, override_settings
+import django
 from ftc.models import (
     Project,
     Sample,
     Grain,
     Image
 )
+from geochron.settings import SIMPLE_JWT
+
+import io
 import json
+import sys
+import unittest
 
 
 testGrain1 = 'test/crystals/john/p1/s1/Grain01/stack-01.jpg'
 
+simple_jwt = SIMPLE_JWT.copy()
+simple_jwt['SIGNING_KEY'] = '''-----BEGIN RSA PRIVATE KEY-----
+MIICYQIBAAKBgQCzuF2wX0QpHcaDtwxC1Z0aOz6FuLJPEqnIsCSfnzKihJ408Z4b
+TJjBjaEnBEh5CnxMJy5dzWlcN0mpVGwGh4ED/ifHz9134mkeZ4ae4P8AvPOBxzw2
+g5gRJpTyb9QmIG0Gt9zBqd7azYN5cssa5serX66ZyRJ+1iYrjtFz+jlI3wIDAQAB
+AoGBAIIiavzOTs2y+M7hWeh/Q03+PiyX681kBzsBiNNodELH4sMVfdXopefpRRq6
+eDvlQtHlwSY9GiCjDBynuzQTBlNpLuBt3fh3KJmgjwH57wrk4L9maTpv5owUw7DP
+2FmEC2Z7FlYnchtVBRkiX4MZR9F1zNNTZvLJYNdm27R0wIKJAkUAvTMSOCJUdeX1
+brfZEBa0d1Am57w5TcdWXLIp9lNUslBCDMZQB5RtekRuJKrMWK1+HFXIG/IpCjdH
+Ab3etP68JN9QSHsCPQDzLIAF+5GUWI3ozNvUkKEQJSyhitCprdtoxOiQKEqDl/XM
+RmLYBfqJUyu4hplUYLHaeUo2o3wyvty83e0CRE9WjTtQ2g4egk8NdU6T1tV5nPbs
+LTN6dbKlW4dZ5lhn42qr9n9XNJli/LUPkmVVS17icemWILOR/oqybiOD9q2Xn3jl
+Aj0AylBirxePFina3y3ZU2+E4QbcrAXu9syzt+XjS1SKMhOyp2KECBBpUelFfb9W
+QBI2xnqU2QKJaTrMMcI9AkQwuNDlURgItDV/tS/WivvgmQaBqgYGQYx0IBH56/+K
+eqPoe/0degy2bSamoFrli2qAd5JLMnQDVeOTxXZ40npOuGi+xQ==
+-----END RSA PRIVATE KEY-----'''
+simple_jwt['VERIFYING_KEY'] = '''-----BEGIN RSA PUBLIC KEY-----
+MIGJAoGBALO4XbBfRCkdxoO3DELVnRo7PoW4sk8SqciwJJ+fMqKEnjTxnhtMmMGN
+oScESHkKfEwnLl3NaVw3SalUbAaHgQP+J8fP3XfiaR5nhp7g/wC884HHPDaDmBEm
+lPJv1CYgbQa33MGp3trNg3lyyxrmx6tfrpnJEn7WJiuO0XP6OUjfAgMBAAE=
+-----END RSA PUBLIC KEY-----'''
+@override_settings(SIMPLE_JWT=simple_jwt)
+class JwtTestCase(TestCase):
+    """
+    Test code with JWT keys set so you can run the test code without setting
+    JWT_PRIVATE_KEY and JWT_PUBLIC_KEY in the environment.
+    """
+    pass
 
 def log_in_headers(client, username, password):
     r = client.post('/ftc/api/get-token', {
@@ -30,7 +64,7 @@ class ApiTestMixin:
 
 
 @tag('api')
-class ApiJwt(TestCase):
+class ApiJwt(JwtTestCase):
     fixtures = ['users.json']
 
     def test_api_login_failure(self):
@@ -64,7 +98,7 @@ class ApiJwt(TestCase):
 
 
 @tag('api')
-class ApiProjectCreate(TestCase):
+class ApiProjectCreate(JwtTestCase):
     fixtures = ['users.json']
 
     def setUp(self):
@@ -106,7 +140,7 @@ class ApiProjectCreate(TestCase):
         self.assertEqual(ps[0]['creator'], user)
 
 
-class ApiProjectUpdate(ApiTestMixin, TestCase):
+class ApiProjectUpdate(ApiTestMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json']
 
     def test_update(self):
@@ -174,7 +208,7 @@ class DeleteTestBaseMixin:
         self.assertListEqual(actual_ids, expected_ids)
 
 
-class ApiProjectDelete(DeleteTestBaseMixin, TestCase):
+class ApiProjectDelete(DeleteTestBaseMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json']
     path = 'project/'
     ids = [1,2]
@@ -182,7 +216,7 @@ class ApiProjectDelete(DeleteTestBaseMixin, TestCase):
     admin_id = 1
 
 
-class ApiSampleDelete(DeleteTestBaseMixin, TestCase):
+class ApiSampleDelete(DeleteTestBaseMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json']
     path = 'sample/'
     ids = [1,2]
@@ -190,7 +224,7 @@ class ApiSampleDelete(DeleteTestBaseMixin, TestCase):
     admin_id = 1
 
 
-class ApiGrainDelete(DeleteTestBaseMixin, TestCase):
+class ApiGrainDelete(DeleteTestBaseMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
     path = 'grain/'
     ids = [1,2]
@@ -198,7 +232,7 @@ class ApiGrainDelete(DeleteTestBaseMixin, TestCase):
     admin_id = 1
 
 
-class ApiImageDelete(DeleteTestBaseMixin, TestCase):
+class ApiImageDelete(DeleteTestBaseMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
     path = 'image/'
     ids = [1,2]
@@ -206,7 +240,7 @@ class ApiImageDelete(DeleteTestBaseMixin, TestCase):
     admin_id = 1
 
 
-class ApiSampleCreate(ApiTestMixin, TestCase):
+class ApiSampleCreate(ApiTestMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json']
 
     def setUp(self):
@@ -245,7 +279,7 @@ class ApiSampleCreate(ApiTestMixin, TestCase):
         self.assertEqual(j['sample_name'], self.admin_sample_fields['sample_name'])
 
 
-class ApiSampleUpdate(ApiTestMixin, TestCase):
+class ApiSampleUpdate(ApiTestMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json']
 
     def test_sample_update(self):
@@ -289,7 +323,7 @@ class ApiSampleUpdate(ApiTestMixin, TestCase):
         self.assertEqual(j['in_project'], 2)
 
 
-class ApiGrainCreate(ApiTestMixin, TestCase):
+class ApiGrainCreate(ApiTestMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json']
 
     def upload_rois(self, sample_id, rois, headers):
@@ -329,7 +363,7 @@ class ApiGrainCreate(ApiTestMixin, TestCase):
         self.assertEqual(j['index'], 1)
 
 
-class ApiGrainUpdate(ApiTestMixin, TestCase):
+class ApiGrainUpdate(ApiTestMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
 
     def test_grain_update_roi(self):
@@ -376,7 +410,7 @@ class ApiGrainUpdate(ApiTestMixin, TestCase):
         self.assertEqual(j['sample'], 1)
 
 
-class ApiImageCreate(ApiTestMixin, TestCase):
+class ApiImageCreate(ApiTestMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
 
     def upload_image(self, grain_id, image, headers):
@@ -426,8 +460,7 @@ class ApiImageCreate(ApiTestMixin, TestCase):
         ids = [x['id'] for x in j2]
         self.assertIn(id, ids)
 
-
-class ApiImageUpdate(ApiTestMixin, TestCase):
+class ApiImageUpdate(ApiTestMixin, JwtTestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
 
     def setUp(self):
@@ -466,22 +499,29 @@ class ApiImageUpdate(ApiTestMixin, TestCase):
 
     def test_superuser_can_change_image_ownership(self):
         r = self.client.patch('/ftc/api/image/2/', {
-            'grain': 1
+            'grain': 1,
+            'index': 2
         }, content_type='application/json', **self.super_headers)
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content)
         self.assertEqual(j['grain'], 1)
 
+    def test_superuser_cannot_change_image_ownership_if_target_already_exists(self):
+        with self.assertRaises(django.db.utils.IntegrityError) as cm:
+            self.client.patch('/ftc/api/image/2/', {
+                'grain': 1
+            }, content_type='application/json', **self.super_headers)
+    
 
 @tag('api')
-class ApiCount(TestCase):
+class ApiCount(JwtTestCase):
     fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
 
     def setUp(self):
         self.latlngs = [
             [0.1, 0.2],
-            [0.2,0.4],
-            [0.5,0.3]
+            [0.2, 0.4],
+            [0.5, 0.3]
         ]
         logged_in = self.client.login(username='counter', password='counter_password')
         self.assertTrue(logged_in, 'failed to log in')
