@@ -368,7 +368,12 @@ def sample_new(opts, config):
         'priority',
         'min_contributor_num'
     ])) as response:
-        print(response.read())
+        result = json.loads(response.read())
+        if 'id' in result:
+            id = result['id']
+            print('Created new sample with ID: {0}'.format(id))
+            return id
+        return None
 
 
 @token_refresh
@@ -376,6 +381,19 @@ def sample_info(opts, config):
     with api_get(config, 'sample', opts.id) as response:
         body = response.read()
         print(body)
+
+
+@token_refresh
+def sample_upload(opts, config):
+    if opts.sample_name == None:
+        (dir0, name) = os.path.split(opts.dir)
+        if name == '':
+            (dir1, name) = os.path.split(dir0)
+        bad_char = re.compile(r'[^0-9a-zA-Z_\- #/\(\):@]')
+        opts.sample_name = re.sub(bad_char, '_', name)
+    id = sample_new(opts, config)
+    opts.sample = id
+    grain_upload(opts, config)
 
 
 def add_sample_subparser(subparsers):
@@ -418,6 +436,48 @@ def add_sample_subparser(subparsers):
         help='Number of user contributions required',
         default=1,
         type=int
+    )
+    upload = verbs.add_parser('upload', help='create a new sample (uploading grains from a directory)')
+    upload.set_defaults(func=sample_upload)
+    upload.add_argument(
+        '-k',
+        '--keep-going',
+        dest='keepgoing',
+        action='store_true',
+        help='keep going if some grains cannot be uploaded'
+    )
+    upload.add_argument(
+        '--sample_name',
+        dest='sample_name',
+        metavar='name',
+        help='Sample name (default is to use the directory name)',
+    )
+    upload.add_argument(
+        'in_project',
+        metavar='project_id',
+        help='Numeric project ID the sample is part of'
+    )
+    upload.add_argument(
+        'sample_property',
+        metavar='property',
+        help='[T]est Sample, [A]ge Standard Sample, or [D]osimeter Sample',
+        choices=['T', 'A', 'D'],
+    )
+    upload.add_argument(
+        'priority',
+        help='Priority in showing the sample to the user (higher number means users will see it earlier)',
+        default=0,
+        type=int
+    )
+    upload.add_argument(
+        'min_contributor_num',
+        help='Number of user contributions required',
+        default=1,
+        type=int
+    )
+    upload.add_argument(
+        'dir',
+        help='Directory containing the grains'
     )
 
 
@@ -514,7 +574,7 @@ def add_grain_subparser(subparsers):
     rois.add_argument('id', help='grain ID', type=int)
     rois.add_argument(
         '--file',
-        help='o,utput file (default standard out)',
+        help='output file (default standard out)',
         type=argparse.FileType('w', encoding='utf-8'),
         default=sys.stdout
     )
