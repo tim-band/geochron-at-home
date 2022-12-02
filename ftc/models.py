@@ -35,13 +35,13 @@ class Project(models.Model):
 
 #
 class Sample(models.Model):
-    alphanumeric = RegexValidator(r'^[0-9a-zA-Z_-]+$', 'Only alphanumeric, "-" and "_" are allowed.')
+    not_too_mad = RegexValidator(r'^[0-9a-zA-Z_\- #/\(\):@]+$', 'Only alphanumeric, space and "_-#():@" are allowed.')
     SAMPLE_PROPERTY = (
         ('T', 'Test Sample'),
         ('A', 'Age Standard Sample'),
         ('D', 'Dosimeter Sample'),
     )
-    sample_name = models.CharField(max_length=36, validators=[alphanumeric])
+    sample_name = models.CharField(max_length=36, validators=[not_too_mad])
     in_project = models.ForeignKey(Project, on_delete=models.CASCADE)
     sample_property = models.CharField(max_length=1, choices=SAMPLE_PROPERTY, default='T')
     total_grains = models.IntegerField()

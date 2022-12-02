@@ -255,7 +255,7 @@ class ApiSampleCreate(ApiTestMixin, JwtTestCase):
         }
 
         self.counter_sample_fields = {
-            'sample_name': 'another_sample',
+            'sample_name': '#4 tricky 43-sample/name(8)',
             'in_project': 1,
             'sample_property': 'T',
             'priority': 5,
