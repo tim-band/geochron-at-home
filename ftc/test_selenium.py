@@ -718,8 +718,20 @@ class GrainPage(BasePage):
         self.click_by_id('save')
         return self
 
+    def check_saved(self):
+        self.find_by_css('#edit:not([disabled])')
+        self.find_by_css('#save[disabled]')
+        self.find_by_css('#cancel_edit[disabled]')
+        return self
+
     def save_shift(self):
         self.click_by_id('save_shift')
+        return self
+
+    def check_shift_saved(self):
+        self.find_by_css('#edit_shift:not([disabled])')
+        self.find_by_css('#save_shift[disabled]')
+        self.find_by_css('#cancel_edit[disabled]')
         return self
 
     def do_partial_drag(self, dragee, dest_x, dest_y):
@@ -828,7 +840,7 @@ class WebUploader:
         grain_page.drag_marker(0, 1, 0.01, 0.99)
         grain_page.drag_marker(1, 0, 0.99, 0.01)
         grain_page.drag_marker(1, 1, 0.01, 0.99) # delete by dragging onto 2nd
-        grain_page.save()
+        grain_page.save().check_saved()
 
     def get_index(self, file_url):
         ba = self.driver.execute_async_script(self.script, file_url)
@@ -1163,7 +1175,7 @@ class DjangoTests(TestCase):
         self.assertAlmostEqual(float(y), 45)
         # Move the mica shift
         grain_images.go_zstack().go_mica().edit_shift()
-        zstack.drag_marker(0.5, 0.5, 0.4, 0.6).save_shift().go_grain_images()
+        zstack.drag_marker(0.5, 0.5, 0.4, 0.6).save_shift().check_shift_saved().go_grain_images()
         [x, y] = grain_images.get_mica_shift()
         self.assertNotAlmostEqual(float(x), 40)
         self.assertNotAlmostEqual(float(y), 45)

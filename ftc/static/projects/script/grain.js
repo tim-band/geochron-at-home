@@ -382,11 +382,11 @@ function addRegionMarkers(crystal) {
     });
 }
 
-function cancelEdit(crystal) {
+function cancelEdit(crystal, edit_id, save_id) {
     removeRegionMarkers(crystal);
-    var edit = document.getElementById("edit");
-    var save = document.getElementById("save");
-    var cancel = document.getElementById("cancel_edit");
+    var edit = document.getElementById(edit_id);
+    var save = document.getElementById(save_id);
+    var cancel = document.getElementById('cancel_edit');
     edit.removeAttribute('disabled');
     save.setAttribute('disabled', true);
     cancel.setAttribute('disabled', true);
@@ -413,7 +413,7 @@ function save(crystal, url, form, error_callback) {
         });
     });
     xhr.addEventListener("load", function() {
-        cancelEdit(crystal);
+        cancelEdit(crystal, 'edit', 'save');
     });
     if (error_callback) {
         xhr.addEventListener("error", function() {
@@ -462,7 +462,7 @@ function saveShift(crystal, url, form, error_callback) {
     fd.append('x', Math.floor(crystal.shift_x + 0.5));
     fd.append('y', Math.floor(crystal.shift_y + 0.5));
     xhr.addEventListener("load", function() {
-        cancelEdit(crystal);
+        cancelEdit(crystal, 'edit_shift', 'save_shift');
     });
     if (error_callback) {
         xhr.addEventListener("error", function() {
