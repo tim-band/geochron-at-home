@@ -22,3 +22,6 @@ selenium = ">=4.4.0"
 
 [requires]
 python_version = "3.9"
+
+[scripts]
+gah = "./geochron/gah.py"

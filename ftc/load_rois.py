@@ -55,12 +55,22 @@ def get_rois(grain):
     """
     regions = Region.objects.filter(grain=grain)
     rjs = map(lambda region : rois_region(region, grain), regions)
-    return {
+    r = {
         "image_width": grain.image_width,
         "image_height": grain.image_height,
         "scale_x": grain.scale_x,
         "scale_y": grain.scale_y,
         "stage_x": grain.stage_x,
         "stage_y": grain.stage_y,
-        "regions": rjs
+        "mica_stage_x": grain.mica_stage_x,
+        "mica_stage_y": grain.mica_stage_y,
+        "regions": rjs,
+        "mica_transform_matrix": None
     }
+    transform = grain.mica_transform_matrix
+    if transform:
+        r["mica_transform_matrix"] = [
+            [ transform.x0, transform.y0, transform.t0 ],
+            [ transform.x1, transform.y1, transform.t1 ]
+        ]
+    return r

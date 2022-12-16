@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import base64
+import csv
 from getpass import getpass
 from html.parser import HTMLParser
 import json
@@ -48,6 +49,21 @@ def parse_metadata_grain(metadata):
     return parse_metadata_file(metadata, xpaths_float)
 
 
+def parse_mica_metadata_grain(metadata):
+    """
+    Loads and parses a Zeiss metadata file for a mica image
+    'stage_x': stage X position in millimeters.
+    'stage_y': stage Y position in millimeters.
+
+    `metadata` is a filename or file object.
+    """
+    xpaths_float = {
+        'mica_stage_x': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisX']/Position",
+        'mica_stage_y': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisY']/Position",
+    }
+    return parse_metadata_file(metadata, xpaths_float)
+
+
 def rlTlSwitchTranslate(lp):
     if lp == 'RLTLSwitch.RL':
         return 'R'
@@ -79,8 +95,33 @@ def parse_metadata_image(metadata):
     return out
 
 
-def generate_rois_file(dir, metadata):
+def parse_transformation(transformation):
+    r = []
+    with open(transformation, encoding='utf-8-sig') as h:
+        rows = csv.DictReader(h)
+        xh = 'x' if 'x' in rows.fieldnames else 'x::x'
+        yh = 'y' if 'y' in rows.fieldnames else 'y::y'
+        th = 't' if 't' in rows.fieldnames else 't::t'
+        for row in rows:
+            x = row[xh]
+            if x != '':
+                r.append([float(x), float(row[yh]), float(row[th])])
+    if len(r) == 2:
+        return r
+    raise Exception(
+        "File {0} does not seem to be a transformation file".format(
+            transformation
+        )
+    )
+
+
+def generate_rois_file(dir, metadata, mica_metadata, transformation):
     vs = parse_metadata_grain(metadata)
+    if mica_metadata:
+        mmd = parse_mica_metadata_grain(mica_metadata)
+        vs.update(mmd)
+    if transformation:
+        vs['mica_transform'] = parse_transformation(transformation)
     w = vs['image_width']
     h = vs['image_height']
     fname = os.path.join(dir, 'rois.json')
@@ -100,6 +141,8 @@ def generate_rois_file(dir, metadata):
 def generate_roiss(opts, config):
     # Find all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files
     meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
+    mica_meta_re = re.compile(r'Mica(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
+    matrix_name = 'mica_matrix.csv'
     metadata_by_dir = {}
     for root, dirs, files in os.walk(opts.path):
         metas = [
@@ -107,10 +150,28 @@ def generate_roiss(opts, config):
             for f in files
             if meta_re.fullmatch(f)
         ]
-        if metas and (opts.overwrite or 'rois.json' not in files):
-            metadata_by_dir[root] = metas[0]
+        mica_metas = [
+            os.path.join(root, f)
+            for f in files
+            if mica_meta_re.fullmatch(f)
+        ]
+        trans = os.path.join(root, matrix_name) if matrix_name in files else None
+        if (opts.overwrite or 'rois.json' not in files):
+            available = {
+                'mica_transformation': trans
+            }
+            if metas:
+                available['metadata'] = metas[0]
+            if mica_metas:
+                available['mica_metadata']: mica_metas[0]
+            metadata_by_dir[root] = available
     for d,m in metadata_by_dir.items():
-        r = generate_rois_file(d, m)
+        r = generate_rois_file(
+            d,
+            m['metadata'],
+            m['mica_metadata'],
+            m['transformation']
+        )
         print('wrote {0}'.format(r))
 
 

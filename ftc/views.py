@@ -181,9 +181,9 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
         return '[{0},{1}]'.format(lat, lng)
     def get_shift(self):
         return [0, 0]
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, *args, **kwargs):
         pk = self.kwargs['pk']
-        ctx = super().get_context_data(**kwargs)
+        ctx = super().get_context_data(*args, **kwargs)
         ctx['images'] = self.object.image_set.filter(ft_type=self.ft_type).order_by('index')
         ctx['ft_type'] = self.ft_type
         regions = ''
@@ -204,7 +204,19 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
 class MicaDetailView(GrainDetailView):
     ft_type = 'I'
     def json_latlng(self, lat, lng):
-        return '[{0},{1}]'.format(lat, 1 - lng)
+        m = self.mica_matrix
+        if m:
+            x = lng - 0.5
+            y = lat - 0.5
+            lng = 0.5 + x * m.x0 + y * m.y0
+            lat = 0.5 + x * m.x1 + y * m.y1
+        else:
+            lng = 1 - lng
+        print(lat, lng)
+        return '[{0},{1}]'.format(lat, lng)
+    def get_context_data(self, *args, **kwargs):
+        self.mica_matrix = self.object.mica_transform_matrix
+        return super().get_context_data(*args, **kwargs)
     def get_shift(self):
         return [self.object.shift_x, self.object.shift_y]
 
@@ -214,7 +226,8 @@ class GrainDetailUpdateView(CreatorOrSuperuserMixin, UpdateView):
     template_name = "ftc/grain_update_meta.html"
     fields = [
         'index', 'image_width', 'image_height',
-        'scale_x', 'scale_y', 'stage_x', 'stage_y', 'shift_x', 'shift_y'
+        'scale_x', 'scale_y', 'stage_x', 'stage_y', 'shift_x', 'shift_y',
+        'mica_stage_x', 'mica_stage_y'
     ]
 
 
@@ -269,6 +282,8 @@ class GrainForm(ModelForm):
                 'scale_y': rois_json.get('scale_y'),
                 'stage_x': rois_json.get('stage_x'),
                 'stage_y': rois_json.get('stage_y'),
+                'mica_stage_x': rois_json.get('mica_stage_x'),
+                'mica_stage_y': rois_json.get('mica_stage_y'),
                 'regions': regions
             }
         except Exception as e:
@@ -488,7 +503,6 @@ class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
     model = Grain
     template_name = "ftc/grain_images.html"
     form_class = GrainForm
-    #fields = ["index", "image_width", "image_height", "scale_x", "scale_y", "stage_x", "stage_y"]
     def post(self, request, *args, **kwargs):
         form_class = self.get_form_class()
         form = self.get_form(form_class)

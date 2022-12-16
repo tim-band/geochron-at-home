@@ -150,41 +150,89 @@ nginx config:
 
 ```
 location /geochron@home/static/ {
-        root /var/www/html;
+  root /home/wwwrunner/html;
 }
 location /geochron@home/metrics/1 {
-        access_log off;
-        error_log off;
-        proxy_pass http://127.0.0.1:3851;
+  access_log off;
+  error_log off;
+  proxy_pass http://127.0.0.1:34982/;
 }
 location /geochron@home/metrics/2 {
-        access_log off;
-        error_log off;
-        proxy_pass http://127.0.0.1:3852;
+  access_log off;
+  error_log off;
+  proxy_pass http://127.0.0.1:39481/;
 }
 location /geochron@home/ {
-        proxy_pass http://127.0.0.1:3830;
-        proxy_http_version 1.1;
-        proxy_set_header Host $http_host;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+  proxy_pass http://127.0.0.1:39401/;
+  proxy_http_version 1.1;
+  proxy_set_header Host $http_host;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
 }
 ```
 
-Run 2 workers with:
+Let's clone the database into directory `/var/www/repos/geochron-at-home`.
+You need to install the pip environment as the user you want to run as:
 
-```sh
-(geochron-at-home) $ gunicorn -b 127.0.0.1:3850 --workers=2 geochron.wsgi
+```
+cd /var/www/repos/geochron-at-home
+sudo find . -exec chown wwwrunner:wwwrunner {} +
+sudo -u wwwrunner python3 -m pipenv --python 3.9
+sudo -u wwwrunner python3 -m pipenv install
 ```
 
-Whenever any static files (anything in the `ftc/static` directory) have changed
-you will need to run:
+Then you can make a systemd configuration file `/etc/systemd/system/geochron-at-home.service`:
 
-```sh
-(gechron-at-home) $ python manage.py collectstatic
+```
+[Unit]
+Description=Geochron@Home
+After=network.target
+
+[Service]
+Type=simple
+User=wwwrunner
+WorkingDirectory=/var/www/repos/geochron-at-home
+ExecStart=/usr/bin/python3 -m pipenv run gunicorn --log-level info --bind 127.0.0.1:39401 --workers=2 geochron.wsgi
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-so that these changes are reflected when running behind nginx.
+Then do the set up. Firstly copy the file `production_env` to `.env`
+and edit it as required. Ensure that you add:
+
+```
+STATIC_ROOT=/home/wwwrunner/html/geochron@home/static
+DB_HOST=127.0.0.1
+DB_PORT=5432
+PROMETHEUS_METRICS_EXPORT_PORT_RANGE=39480-39499
+SCRIPT_NAME=/geochron@home
+SITE_NAME=geochron@home
+```
+
+Make sure you have set the postgres password and know what it is
+(`sudo -u postgres psql` then `ALTER USER postgres PASSWORD 'mysupersecurepassword';`)
+
+Then:
+
+```
+sudo -u wwwrunner pipenv --python 3.9
+sudo -u wwwrunner pipenv shell
+mkdir ~/html
+exit
+sudo systemctl start geochron-at-home.service
+pipenv --python 3.9
+pipenv shell
+sudo -Eu postgres ./init_db.sh
+exit
+sudo -u wwwrunner pipenv run ./site_init.sh
+```
+
+and start with `sudo systemctl start geochron-at-home`.
+
+And you can look at the logs with `journalctl -eu geochron-at-home`.
+
 
 ## Running in production with docker-compose
 
@@ -426,6 +474,13 @@ directory):
 
 ```sh
 (geochron-at-home) $ ./gah.py set url https://my.domain.com/geochron@home
+```
+
+Alternatively, from the root of the project you can use `pipenv run gah`
+(anytime you see `./gah.py` you can use this formulation instead):
+
+```sh
+$ pipenv run gah set url https://my.domain.com/geochron@home
 ```
 
 Do not include any `/ftc` or `/api`. This produces a file

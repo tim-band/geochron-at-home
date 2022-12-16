@@ -29,6 +29,18 @@ def creategrain(src, sample, grain_nth):
         print(p)
         rois = json.load(j)
     region_first = rois['regions'][0]
+    transform = None
+    rois_transform = rois.get('mica_transform')
+    if rois_transform and type(rois_transform) is list and len(rois_transform) == 2:
+        tranform = Transform2D(
+            x0=rois_transform[0][0],
+            y0=rois_transform[0][1],
+            t0=rois_transform[0][2],
+            x1=rois_transform[1][0],
+            y1=rois_transform[1][1],
+            t1=rois_transform[1][2]
+        )
+        transform.save()
     g = Grain(
         sample=sample,
         index=grain_nth,
@@ -38,8 +50,11 @@ def creategrain(src, sample, grain_nth):
         scale_y=rois.get('scale_y'),
         stage_x=rois.get('stage_x'),
         stage_y=rois.get('stage_y'),
+        mica_stage_x=rois.get('stage_x'),
+        mica_stage_y=rois.get('stage_y'),
         shift_x=region_first['shift'][0] if region_first else 0,
         shift_y=region_first['shift'][1] if region_first else 0,
+        mica_transform_matrix=transform
     )
     g.save()
     save_rois_regions(rois, g)
@@ -107,7 +122,7 @@ import django
 django.setup()
 
 from django.contrib.auth.models import User
-from ftc.models import Project, Sample, Grain, Image
+from ftc.models import Project, Sample, Grain, Image, Transform2D
 
 # get user id based on username
 input_source_path = options.input or '/code/user_upload/'

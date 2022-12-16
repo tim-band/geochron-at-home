@@ -174,7 +174,11 @@ window.addEventListener('load', function() {
             {% si_mag object.scale_x unit='m' none='?' %}&#x00D7;{% si_mag object.scale_y unit='m' none='?' %}
         </td></tr>
         <tr><td>Stage position:</td><td id="stage-position">
+            {% if ft_type == 'S' %}
             {{ object.stage_x }}&#x00D7;{{ object.stage_y }}
+            {% else %}
+            {{ object.mica_stage_x }}&#x00D7;{{ object.mica_stage_y }}
+            {% endif %}
         </td></tr>
     </table>
 </div>

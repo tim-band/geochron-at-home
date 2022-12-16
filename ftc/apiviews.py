@@ -13,7 +13,7 @@ from rest_framework.response import Response
 
 from ftc.get_image_size import get_image_size_from_handle
 from ftc.load_rois import get_rois
-from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering
+from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering, Transform2D
 from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
 
@@ -127,7 +127,8 @@ class GrainSerializer(serializers.ModelSerializer):
         model = Grain
         fields = [
             'id', 'sample', 'index', 'image_width', 'image_height',
-            'scale_x', 'scale_y', 'stage_x', 'stage_y', 'shift_x', 'shift_y'
+            'scale_x', 'scale_y', 'stage_x', 'stage_y', 'shift_x', 'shift_y',
+            'mica_stage_x', 'mica_stage_y'
         ]
 
     index = serializers.IntegerField(required=False, read_only=False)
@@ -148,6 +149,18 @@ class GrainSerializer(serializers.ModelSerializer):
             max_index = sample.grain_set.aggregate(Max('index'))['index__max'] or 0
             index = max_index + 1
         region_first = rois['regions'][0]
+        transform = None
+        rois_transform = rois.get('mica_transform')
+        if rois_transform and type(rois_transform) is list and len(rois_transform) == 2:
+            transform = Transform2D(
+                x0=rois_transform[0][0],
+                y0=rois_transform[0][1],
+                t0=rois_transform[0][2],
+                x1=rois_transform[1][0],
+                y1=rois_transform[1][1],
+                t1=rois_transform[1][2]
+            )
+            transform.save()
         grain = self.save(
             index = index,
             sample = sample,
@@ -157,8 +170,11 @@ class GrainSerializer(serializers.ModelSerializer):
             scale_y=rois.get('scale_y'),
             stage_x=rois.get('stage_x'),
             stage_y=rois.get('stage_y'),
+            mica_stage_x=rois.get('mica_stage_x'),
+            mica_stage_y=rois.get('mica_stage_y'),
             shift_x=region_first['shift'][0] if region_first else 0,
             shift_y=region_first['shift'][1] if region_first else 0,
+            mica_transform_matrix=transform
         )
         save_rois_regions(rois, grain)
 

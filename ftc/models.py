@@ -67,6 +67,15 @@ class Sample(models.Model):
         return qs.filter(in_project__creator=user)
 
 #
+class Transform2D(models.Model):
+    x0 = models.FloatField()
+    y0 = models.FloatField()
+    t0 = models.FloatField()
+    x1 = models.FloatField()
+    y1 = models.FloatField()
+    t1 = models.FloatField()
+
+#
 class Grain(models.Model):
     sample = models.ForeignKey(Sample, on_delete=models.CASCADE)
     index = models.IntegerField()
@@ -76,8 +85,11 @@ class Grain(models.Model):
     scale_y = models.FloatField(null=True, blank=True)
     stage_x = models.FloatField(null=True, blank=True)
     stage_y = models.FloatField(null=True, blank=True)
+    mica_stage_x = models.FloatField(null=True, blank=True)
+    mica_stage_y = models.FloatField(null=True, blank=True)
     shift_x = models.IntegerField(default=0, blank=True)
     shift_y = models.IntegerField(default=0, blank=True)
+    mica_transform_matrix = models.ForeignKey(Transform2D, on_delete=models.CASCADE, null=True)
 
     class Meta:
         unique_together = ('sample', 'index',)
