@@ -160,17 +160,19 @@ def generate_roiss(opts, config):
             available = {
                 'mica_transformation': trans
             }
-            if metas:
-                available['metadata'] = metas[0]
             if mica_metas:
                 available['mica_metadata']: mica_metas[0]
-            metadata_by_dir[root] = available
+            if metas:
+                available['metadata'] = metas[0]
+                metadata_by_dir[root] = available
     for d,m in metadata_by_dir.items():
+        print(d)
+        print(m)
         r = generate_rois_file(
             d,
-            m['metadata'],
-            m['mica_metadata'],
-            m['transformation']
+            m.get('metadata'),
+            m.get('mica_metadata'),
+            m.get('transformation')
         )
         print('wrote {0}'.format(r))
 
