@@ -2,6 +2,7 @@ from django.conf.urls import include
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path
+from django.views.generic.base import RedirectView
 
 from ftc.views import profile
 
@@ -15,4 +16,5 @@ urlpatterns = [
     path('accounts/', include('allauth.urls')),
     path('admin/', admin.site.urls),
     path('ftc/', include('ftc.urls')),
+    path('', RedirectView.as_view(pattern_name='home'))
 ]
