@@ -529,7 +529,6 @@ class ApiCount(JwtTestCase):
             'counting_res': {
                 'track_num': len(self.latlngs),
                 'marker_latlngs': self.latlngs,
-                'proj_id': 1,
                 'sample_id': 1,
                 'grain_num': 1,
                 'ft_type': 'T'

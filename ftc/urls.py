@@ -52,7 +52,7 @@ urlpatterns = [
     path('image/<pk>/', get_image, name="get_image"),
     path('image/<pk>/delete', ImageDeleteView.as_view(), name='image_delete'),
     path('tutorial/', tutorial, name='tutorial'),
-    path('tutorial_result/', saveTutorialResult, name='tutorialResult'),
+    path('tutorial_result/', saveTutorialResult, name='tutorial_result'),
 
     path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get_jwt_token'),
     path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh_jwt_token'),

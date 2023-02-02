@@ -258,7 +258,6 @@ footer {
                   </div>
                   <div>
                     <div class="form-group">
-                      <input type="hidden" name="proj_id" id="proj_id" value="">
                       <input type="hidden" name="sample_id" id="sample_id" value="">
                     </div>
                   </div>
@@ -328,7 +327,6 @@ footer {
            if((leaf_node.length != 0) && !(leaf_node.children().hasClass('label-as-badge')) ) {
                var btn_html = '<span class="label label-primary label-as-badge" data-toggle="modal"'
                             + ' data-proj=' + node.parent.title
-                            + ' data-proj_id=' + node.parent.key
                             + ' data-sample=' + node.title
                             + ' data-sample_id=' + node.key
                             + ' data-toggle="modal" data-target="#exampleModal">count</span>'
@@ -387,7 +385,6 @@ footer {
     $('#exampleModal').on('show.bs.modal', function (event) {
       var button = $(event.relatedTarget); // Button that triggered the modal
       var proj = button.data('proj'); // Extract info from data-* attributes
-      var proj_id = button.data('proj_id');
       var sample = button.data('sample');
       var sample_info = button.data('sample_id').split("_");
       var modal = $(this);
@@ -396,7 +393,6 @@ footer {
       modal.find('.modal-body #grain_no').attr('placeholder','max: ' + sample_info[1]);
       modal.find('.modal-body #grain_no').attr('min', 1);
       modal.find('.modal-body #grain_no').attr('max', sample_info[1]);
-      modal.find('.modal-body #proj_id').val(proj_id.substring(1))
       modal.find('.modal-body #sample_id').val(sample_info[0])
       if(sample_info[2].charAt(0).toUpperCase() == 'D') {
           modal.find('.modal-body #spontaneous').attr("disabled",true);

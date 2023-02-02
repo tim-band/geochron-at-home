@@ -20,7 +20,7 @@ div#results {width: 400px;}
 <script>
 var tutorialDir = "{% static 'tutorial' %}";
 var return_url = "{% url 'counting' %}";
-var tutorialResult_url = "{% url 'tutorialResult' %}";
+var tutorialResult_url = "{% url 'tutorial_result' %}";
 var atoken = '{{ csrf_token }}';
 </script>
 <script type='text/javascript' src="{% static 'counting/script/tutorial.js' %}"></script>

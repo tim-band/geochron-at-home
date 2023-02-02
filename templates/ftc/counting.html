@@ -120,10 +120,14 @@ function setup() {
         var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
         map.submitTrackCount("{% url 'updateTFNResult'%}", submit_url);
     };
-    document.getElementById('tracknum-save').onclick = function() {
-        map.saveTrackCount("{% url 'saveWorkingGrain'%}");
-    };
     document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
+    var save = document.getElementById('tracknum-save');
+//    if (save) {
+        // The save doesn't exist if you are a guest
+        save.onclick = function() {
+            map.saveTrackCount("{% url 'saveWorkingGrain'%}");
+        };
+//    }
     map.enableEditing();
 }
 </script>

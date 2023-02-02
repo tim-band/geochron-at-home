@@ -676,7 +676,6 @@ function grain_view(options) {
                 xhr.setRequestHeader('Content-Type', 'application/json');
                 xhr.send(JSON.stringify({
                     'counting_res': {
-                        'proj_id': grain_info.proj_id,
                         'sample_id': grain_info.sample_id,
                         'grain_num': grain_info.grain_num,
                         'ft_type': grain_info.ft_type,
@@ -706,7 +705,6 @@ function grain_view(options) {
                 xhr.setRequestHeader('Content-Type', 'application/json');
                 xhr.send(JSON.stringify({
                     'intermedia_res': {
-                        'proj_id': grain_info.proj_id,
                         'sample_id': grain_info.sample_id,
                         'grain_num': grain_info.grain_num,
                         'ft_type': grain_info.ft_type,

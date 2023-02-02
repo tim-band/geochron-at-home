@@ -681,7 +681,6 @@ def get_grain_info(request, pk, **kwargs):
     except UnknownImageFormat:
         width, height = 1, 1
     info = {
-        'proj_id': the_project.id,
         'sample_id': the_sample.id,
         'grain_num': the_grain,
         'ft_type': ft_type,
@@ -809,34 +808,29 @@ def updateTFNResult(request):
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     sep = '~'
     if request.user.is_active:
-        try:
-            json_str = request.body.decode(encoding='UTF-8')
-            json_obj = json.loads(json_str)
-            res_dic = json_obj['counting_res']
-            grain = Grain.objects.get(
-                sample__id=res_dic['sample_id'],
-                index=res_dic['grain_num']
-            )
-            latlng_json_str = json.dumps(res_dic['marker_latlngs'])
-            if request.user.username != 'guest':
-                # Remove any previous or partial save state
-                FissionTrackNumbering.objects.filter(
-                    grain=grain,
-                    worker=request.user,
-                ).delete()
-            fts = FissionTrackNumbering(grain=grain,
-                                        ft_type=res_dic['ft_type'],
-                                        worker=request.user,
-                                        result=res_dic['track_num'],
-                                        latlngs=latlng_json_str,
-            )
-            fts.save()
-            project = Project.objects.get(id=res_dic['proj_id'])
-        except (KeyError, Project.DoesNotExist):
-            return HttpResponseNotFound("you have no project currrently.")
-        else:
-            myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
-            return HttpResponse(myjson, content_type='application/json')
+        json_str = request.body.decode(encoding='UTF-8')
+        json_obj = json.loads(json_str)
+        res_dic = json_obj['counting_res']
+        grain = Grain.objects.get(
+            sample__id=res_dic['sample_id'],
+            index=res_dic['grain_num']
+        )
+        latlng_json_str = json.dumps(res_dic['marker_latlngs'])
+        if request.user.username != 'guest':
+            # Remove any previous or partial save state
+            FissionTrackNumbering.objects.filter(
+                grain=grain,
+                worker=request.user,
+            ).delete()
+        fts = FissionTrackNumbering(grain=grain,
+                                    ft_type=res_dic['ft_type'],
+                                    worker=request.user,
+                                    result=res_dic['track_num'],
+                                    latlngs=latlng_json_str,
+        )
+        fts.save()
+        myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
+        return HttpResponse(myjson, content_type='application/json')
     else:
         return HttpResponseForbidden("Sorry, you have to active your account first.")
 
@@ -850,11 +844,12 @@ def saveWorkingGrain(request):
             res_json = json.loads(json_str)
             res = res_json['intermedia_res']
             grain = Grain.objects.get(sample__id=res['sample_id'], index=res['grain_num'])
-            # Remove any previous or partial save state
-            FissionTrackNumbering.objects.filter(
-                grain=grain,
-                worker=user,
-            ).delete()
+            if user.username != 'guest':
+                # Remove any previous or partial save state
+                FissionTrackNumbering.objects.filter(
+                    grain=grain,
+                    worker=user,
+                ).delete()
             # Save the new state
             ftn = FissionTrackNumbering(
                 grain=grain,
