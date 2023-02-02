@@ -1,4 +1,4 @@
-from django.db.models import Count, Exists, F, OuterRef, Subquery
+from django.db.models import Count, Exists, F, OuterRef, Subquery, Q
 
 from ftc.models import Project, Sample, Grain, FissionTrackNumbering
 import os, random, itertools, json
@@ -25,35 +25,37 @@ def choose_working_grain(request):
     project (breaking ties at random).
     """
     # Result objects not produced by guests
-    count_backrefs = Subquery(FissionTrackNumbering.objects.filter(
-        in_sample=OuterRef('sample'),
-        grain=OuterRef('index')
-    ).exclude(
-        worker__username='guest'
-    ).values('id'))
+    backref_count = Count('fissiontracknumbering', filter=
+        Q(fissiontracknumbering__result__gte=0)
+        & ~Q(fissiontracknumbering__worker__username='guest')
+    )
     # Result objects produced by this user
-    count_backref_user = Subquery(FissionTrackNumbering.objects.filter(
+    has_backref_user = FissionTrackNumbering.objects.filter(
+        grain=OuterRef('pk'),
         worker=request.user,
-        in_sample=OuterRef('sample'),
-        grain=OuterRef('index')
-    ).values('id'))
+        result__gte=0
+    )
     # Grains without results from this user, and with more results needed
     # Ordered by priority of project then priority of sample
     # A random one of these top priority samples will be first
-    return Grain.objects.annotate(
-        counts=Count(count_backrefs)
-    ).annotate(
-        done=Exists(count_backref_user)
+    available_to_count = Grain.objects.values('id').annotate(
+        backref_count=backref_count
     ).filter(
-        done=False,
+        ~Q(Exists(has_backref_user)),
         sample__in_project__closed=False,
         sample__completed=False,
-        sample__min_contributor_num__gte=F('counts')
+        sample__min_contributor_num__gte=F('backref_count')
     ).order_by(
         '-sample__in_project__priority',
         '-sample__priority',
         '?'
-    ).first()
+    )
+    s = str(available_to_count.query)
+    chosen = available_to_count.first()
+    if chosen is None:
+        return None
+    chosen_id = chosen['id']
+    return Grain(pk=chosen_id)
 
 def restore_grain_uinfo(username):
     grain_uinfo = {}
@@ -65,10 +67,10 @@ def restore_grain_uinfo(username):
         return grain_uinfo, None
     ftn = ftns[0]
     latlngs = json.loads(ftn.latlngs)
-    grain_uinfo['project'] = ftn.in_sample.in_project
-    grain_uinfo['sample'] =  ftn.in_sample
+    grain_uinfo['project'] = ftn.grain.sample.in_project
+    grain_uinfo['sample'] =  ftn.sample
     grain_uinfo['num_markers'] = len(latlngs)
     grain_uinfo['marker_latlngs'] = latlngs
-    grain_uinfo['grain_index'] =  ftn.grain
+    grain_uinfo['grain_index'] =  ftn.grain.index
     grain_uinfo['ft_type'] = 'S'
     return grain_uinfo, ftn

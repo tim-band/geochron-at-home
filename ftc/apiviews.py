@@ -312,8 +312,8 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FissionTrackNumbering
-        fields = ['id', 'in_sample', 'grain', 'ft_type',
-            'worker', 'result', 'create_date', 'latlngs']
+        fields = ['id', 'grain', 'ft_type', 'worker',
+            'result', 'create_date', 'latlngs']
 
 
 class FissionTrackNumberingView(generics.ListAPIView):
@@ -326,7 +326,7 @@ class FissionTrackNumberingView(generics.ListAPIView):
         if 'all' not in params:
             qs = qs.filter(result__gte=0)
         if 'sample' in params:
-            qs = qs.filter(in_sample=params['in_sample'])
+            qs = qs.filter(grain__sample=params['in_sample'])
         if 'grain' in params:
-            qs = qs.filter(grain=params['grain'])
-        return qs.order_by('in_sample', 'grain')
+            qs = qs.filter(grain__index=params['grain'])
+        return qs.order_by('grain__sample', 'grain__index')

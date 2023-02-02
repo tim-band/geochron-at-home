@@ -212,7 +212,6 @@ class MicaDetailView(GrainDetailView):
             lat = 0.5 + x * m.x1 + y * m.y1
         else:
             lng = 1 - lng
-        print(lat, lng)
         return '[{0},{1}]'.format(lat, lng)
     def get_context_data(self, *args, **kwargs):
         self.mica_matrix = self.object.mica_transform_matrix
@@ -581,13 +580,16 @@ def getTableData(request):
             res = []
             if sample_list:
                 for sample_id in sample_list:
-                    fts = FissionTrackNumbering.objects.select_related('in_sample__in_project').filter(
-                        Q(in_sample=sample_id) & ~Q(result=-1)
+                    fts = FissionTrackNumbering.objects.filter(
+                        result__gte=0,
+                        grain__sample=sample_id
+                    ).select_related(
+                        'grain__sample__in_project'
                     )
                     for ft in fts:
-                        if request.user.is_superuser or ft.in_sample.in_project.creator == request.user:
-                            a = [ft.in_sample.in_project.project_name, ft.in_sample.sample_name, 
-                                 ft.grain, ft.ft_type, ft.result, ft.worker.username, ft.create_date]
+                        if request.user.is_superuser or ft.grain.sample.in_project.creator == request.user:
+                            a = [ft.grain.sample.in_project.project_name, ft.grain.sample.sample_name,
+                                 ft.grain.index, ft.ft_type, ft.result, ft.worker.username, ft.create_date]
                             res.append(a)
             myjson = json.dumps({ 'aaData' : res }, cls=DjangoJSONEncoder)
         except (KeyError, Project.DoesNotExist):
@@ -621,8 +623,8 @@ def redirect_to_count(request):
         ).first()
         if partial_save != None:
             grain = Grain.objects.filter(
-                sample=partial_save.in_sample,
-                index=partial_save.grain
+                sample=partial_save.grain.sample,
+                index=partial_save.grain.index
             ).first()
     if grain == None:
         grain = choose_working_grain(request)
@@ -639,8 +641,8 @@ def get_grain_info(request, pk, **kwargs):
     grain = Grain.objects.get(pk=pk)
     save = FissionTrackNumbering.objects.filter(
         worker=request.user,
-        grain=grain.index,
-        in_sample=grain.sample
+        grain__index=grain.index,
+        grain__sample=grain.sample
     ).order_by('result').first()
     the_project = grain.sample.in_project
     the_sample = grain.sample
@@ -716,8 +718,7 @@ def count_my_grain_extra_links(user, current_id):
     index = current_grain.index
     done_query = Subquery(FissionTrackNumbering.objects.filter(
         worker=user,
-        in_sample=sample,
-        grain=OuterRef('index'),
+        grain=OuterRef('id'),
         result__gte=0
     ))
     next_grain = Grain.objects.annotate(
@@ -812,18 +813,20 @@ def updateTFNResult(request):
             json_str = request.body.decode(encoding='UTF-8')
             json_obj = json.loads(json_str)
             res_dic = json_obj['counting_res']
-            sample = Sample.objects.get(id=res_dic['sample_id'])
+            grain = Grain.objects.get(
+                sample__id=res_dic['sample_id'],
+                index=res_dic['grain_num']
+            )
             latlng_json_str = json.dumps(res_dic['marker_latlngs'])
-            # Remove any previous or partial save state
-            FissionTrackNumbering.objects.filter(
-                in_sample=sample,
-                grain=res_dic['grain_num'],
-                worker=request.user,
-            ).delete()
-            fts = FissionTrackNumbering(in_sample=sample, 
-                                        grain=res_dic['grain_num'], 
-                                        ft_type=res_dic['ft_type'], 
-                                        worker=request.user, 
+            if request.user.username != 'guest':
+                # Remove any previous or partial save state
+                FissionTrackNumbering.objects.filter(
+                    grain=grain,
+                    worker=request.user,
+                ).delete()
+            fts = FissionTrackNumbering(grain=grain,
+                                        ft_type=res_dic['ft_type'],
+                                        worker=request.user,
                                         result=res_dic['track_num'],
                                         latlngs=latlng_json_str,
             )
@@ -846,17 +849,15 @@ def saveWorkingGrain(request):
             json_str = request.body.decode(encoding='UTF-8')
             res_json = json.loads(json_str)
             res = res_json['intermedia_res']
-            sample = Sample.objects.get(id=res['sample_id'])
+            grain = Grain.objects.get(sample__id=res['sample_id'], index=res['grain_num'])
             # Remove any previous or partial save state
             FissionTrackNumbering.objects.filter(
-                in_sample=sample,
-                grain=res['grain_num'],
+                grain=grain,
                 worker=user,
             ).delete()
             # Save the new state
             ftn = FissionTrackNumbering(
-                in_sample=sample,
-                grain=res['grain_num'],
+                grain=grain,
                 ft_type='S',
                 worker=user,
                 result=-1,

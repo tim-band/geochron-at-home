@@ -118,14 +118,14 @@ class Grain(models.Model):
 
     def count_results(self):
         return FissionTrackNumbering.objects.filter(
-            in_sample=self.sample,
-            grain=self.index
+            grain__sample=self.sample,
+            grain__index=self.index
         ).count()
 
     def owners_result(self):
         ftn = FissionTrackNumbering.objects.filter(
-            in_sample=self.sample,
-            grain=self.index,
+            grain__sample=self.sample,
+            grain__index=self.index,
             worker=self.get_owner()
         ).first()
         if ftn == None:
@@ -180,8 +180,7 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         ('S', 'Spontaneous Fission Tracks'),
         ('I', 'Induced Fission Tracks'),
     )
-    in_sample = models.ForeignKey(Sample, on_delete=models.CASCADE)
-    grain = models.IntegerField()
+    grain = models.ForeignKey(Grain, on_delete=models.CASCADE, null=True)
     ft_type = models.CharField(max_length=1, choices=FT_TYPE)
     worker = models.ForeignKey(User, on_delete=models.CASCADE)
     result = models.IntegerField() #-1 means this is a partial save state
@@ -189,14 +188,21 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     latlngs = models.TextField(default='')
 
     def project_name(self):
-        return self.in_sample.in_project
+        return self.grain.sample.in_project
 
     def __unicode__(self):
-        return '%s-%s-%d-%s-%s: %d' %(self.in_sample.in_project, self.in_sample.sample_name, self.grain, self.ft_type, self.worker.username, self.result)
+        return '%s-%s-%d-%s-%s: %d' %(
+            self.grain.sample.in_project,
+            self.grain.sample.sample_name,
+            self.grain.index,
+            self.ft_type,
+            self.worker.username,
+            self.result
+        )
 
     @classmethod
     def objects_owned_by(cls, user):
-        return cls.objects.filter(in_sample__in_project__creator=user)
+        return cls.objects.filter(grain__sample__in_project__creator=user)
 
 #
 class TutorialResult(models.Model):
