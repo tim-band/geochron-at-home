@@ -588,8 +588,16 @@ def getTableData(request):
                     )
                     for ft in fts:
                         if request.user.is_superuser or ft.grain.sample.in_project.creator == request.user:
-                            a = [ft.grain.sample.in_project.project_name, ft.grain.sample.sample_name,
-                                 ft.grain.index, ft.ft_type, ft.result, ft.worker.username, ft.create_date]
+                            a = [
+                                ft.grain.sample.in_project.project_name,
+                                ft.grain.sample.sample_name,
+                                ft.grain.index,
+                                ft.ft_type,
+                                ft.result,
+                                ft.worker.username,
+                                ft.create_date,
+                                ft.roi_area_micron2(),
+                            ]
                             res.append(a)
             myjson = json.dumps({ 'aaData' : res }, cls=DjangoJSONEncoder)
         except (KeyError, Project.DoesNotExist):

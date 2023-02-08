@@ -136,6 +136,19 @@ class Grain(models.Model):
 class Region(models.Model):
     grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
 
+    def area(self):
+        """ Returns the region's area in pixels """
+        vs = list(Vertex.objects.filter(region=self).order_by('pk'))
+        n = len(vs)
+        if n == 0:
+            return 0
+        last_v = vs[n - 1]
+        total = 0
+        for v in vs:
+            total += v.x * last_v.y - last_v.x * v.y
+            last_v = v
+        return abs(total / 2)
+
 #
 class Vertex(models.Model):
     region = models.ForeignKey(Region, on_delete=models.CASCADE)
@@ -203,6 +216,25 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     @classmethod
     def objects_owned_by(cls, user):
         return cls.objects.filter(grain__sample__in_project__creator=user)
+
+    def roi_area_pixels(self):
+        total = 0
+        for r in Region.objects.filter(grain=self.grain):
+            total += r.area()
+        return total
+
+    def roi_area_mm2(self):
+        scale_x = self.grain.scale_x
+        scale_y = self.grain.scale_y
+        if scale_x is None or scale_y is None:
+            return None
+        return scale_x * scale_y * self.roi_area_pixels()
+
+    def roi_area_micron2(self):
+        a = self.roi_area_mm2()
+        if a is None:
+            return None
+        return a * 1e6
 
 #
 class TutorialResult(models.Model):
