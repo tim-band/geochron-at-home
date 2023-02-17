@@ -746,7 +746,27 @@ class GrainPage(BasePage):
         return True
 
     def do_drag(self, dragee, dest_x, dest_y):
-        ActionChains(self.driver).click_and_hold(dragee).perform()
+        def begin_drag(driver):
+            ActionChains(self.driver).click_and_hold(
+                dragee
+            ).move_by_offset(2, 2).move_by_offset(-2, -2).perform()
+            # It seems selenium can grab the image below the marker
+            # which makes it look like the marker is moving, but actually
+            # the whole image is moving bringing the marker with it.
+            # However, if we really have the marker, it will gain this
+            # leaflet-drag-target class.
+            if 'leaflet-drag-target' in dragee.get_attribute('class'):
+                # Success! We have the marker!
+                return True
+            # Failure! Let's drop whatever we did pick up.
+            ActionChains(self.driver).release().perform()
+            return False
+        WebDriverWait(
+            self.driver,
+            timeout=2
+        ).until(
+            begin_drag
+        )
         while self.do_partial_drag(dragee, dest_x, dest_y):
             pass
         ActionChains(self.driver).release().perform()
