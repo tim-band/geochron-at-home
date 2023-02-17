@@ -16,13 +16,8 @@ def gen_latlngs(n):
     r.append(gen_latlng())
   return r
 
-@tag('integration')
-class TestGuestCounts(TestCase):
-  fixtures = [
-    'users.json', 'projects.json', 'samples.json',
-    'grains.json', 'images.json'
-  ]
 
+class CountingCase(TestCase):
   def count_grain(self, sample, grain, count):
     self.client.post(
       reverse('updateTFNResult'),
@@ -39,12 +34,15 @@ class TestGuestCounts(TestCase):
   def logout(self):
     self.client.post(reverse('logout'))
 
-  def perform_guest_count(self):
-    self.client.get(reverse('guest_counting'))
+  def complete_tutorial(self):
     self.client.get(reverse('tutorial'))
     self.client.post(reverse('tutorial_result'))
-    self.count_grain(1, 1, 5)
-    self.count_grain(2, 1, 6)
+
+  def perform_guest_count(self, grain_counts):
+    self.client.get(reverse('guest_counting'))
+    self.complete_tutorial()
+    for ((sample, grain), count) in grain_counts.items():
+      self.count_grain(sample, grain, count)
     self.logout()
 
   def login(self, user, password):
@@ -67,22 +65,97 @@ class TestGuestCounts(TestCase):
     assert(r.status_code == 200)
     j = json.loads(r.content)
     total = 0
-    for [project, sample, index, ft_type, track_count, user, datetime] in j['aaData']:
+    for [project, sample, index, ft_type, track_count, user, datetime, area] in j['aaData']:
       total += track_count
     return total
 
+
+@tag('integration')
+class TestGuestCounts(CountingCase):
+  fixtures = [
+    'users.json', 'projects.json', 'samples.json',
+    'grains.json', 'images.json'
+  ]
+
   def test_guest_counts_are_unlimited(self):
-    self.perform_guest_count()
-    self.perform_guest_count()
-    self.perform_guest_count()
-    self.perform_guest_count()
-    self.perform_guest_count()
+    s1count = 5
+    s2count = 6
+    guest_count = 5
+    for i in range(guest_count):
+      self.perform_guest_count({ (1, 1): s1count, (2, 1): s2count })
     self.login('admin', 'admin_password')
     total = self.get_total_track_count()
-    # should get the results from sample 1 whcih is owned by admin
-    assert(total == 5 * 5)
+    # should get the results from sample 1 which is owned by admin
+    assert(total == guest_count * s1count)
     self.logout()
     self.login('super', 'super_password')
     total = self.get_total_track_count()
-    # should get the results from sample 1 whcih is owned by admin
-    assert(total == 5 * (5 + 6))
+    # should get the results from all samples
+    assert(total == guest_count * (s1count + s2count))
+
+
+@tag('integration')
+class TestCountJsonDownload(CountingCase):
+  fixtures = [
+    'users.json', 'projects.json', 'samples.json',
+    'grains.json', 'grains2.json', 'images.json',
+    'results.json', 'results2.json'
+  ]
+
+  def get_json_results(self, samples=None):
+    if samples is None:
+      r = self.client.get(reverse('getJsonResults'))
+    else:
+      r = self.client.get(
+        reverse('getJsonResults'),
+        { 'samples[]': samples }
+      )
+    gs = json.loads(r.content)
+    r = {}
+    for g in gs:
+      grain_id = g['grain']
+      assert(grain_id not in r)
+      r[grain_id] = g
+    return r
+
+  def sorted_results_for_grain(self, grain):
+    return sorted([
+      result['result'] for result in grain['results']
+    ])
+
+  def test_superuser_downloads_all_grains(self):
+    self.login('super', 'super_password')
+    grains = self.get_json_results()
+    assert(sorted(grains.keys()) == [1, 2, 3, 4])
+    assert(self.sorted_results_for_grain(grains[1]) == [3, 3])
+    assert(self.sorted_results_for_grain(grains[2]) == [2, 2, 3, 3])
+    assert(self.sorted_results_for_grain(grains[3]) == [2])
+    assert(self.sorted_results_for_grain(grains[4]) == [2])
+
+  def test_admin_downloads_only_her_grains(self):
+    self.login('admin', 'admin_password')
+    grains = self.get_json_results()
+    assert(sorted(grains.keys()) == [1, 3, 4])
+    assert(self.sorted_results_for_grain(grains[1]) == [3, 3])
+    assert(self.sorted_results_for_grain(grains[3]) == [2])
+    assert(self.sorted_results_for_grain(grains[4]) == [2])
+
+  def test_many_samples(self):
+    self.login('super', 'super_password')
+    grains = self.get_json_results(['1', '2'])
+    assert(sorted(grains.keys()) == [1, 2, 3, 4])
+    assert(self.sorted_results_for_grain(grains[1]) == [3, 3])
+    assert(self.sorted_results_for_grain(grains[2]) == [2, 2, 3, 3])
+    assert(self.sorted_results_for_grain(grains[3]) == [2])
+    assert(self.sorted_results_for_grain(grains[4]) == [2])
+
+  def test_superuser_downloads_any_grains(self):
+    self.login('super', 'super_password')
+    grains = self.get_json_results(['2'])
+    assert(sorted(grains.keys()) == [2])
+    assert(self.sorted_results_for_grain(grains[2]) == [2, 2, 3, 3])
+
+  def test_admin_cannot_download_others_results(self):
+    self.login('admin', 'admin_password')
+    grains = self.get_json_results(['2'])
+    assert(sorted(grains.keys()) == [])

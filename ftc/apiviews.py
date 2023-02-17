@@ -7,6 +7,7 @@ import json
 from rest_framework import generics, serializers, status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.negotiation import DefaultContentNegotiation
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -329,4 +330,4 @@ class FissionTrackNumberingView(generics.ListAPIView):
             qs = qs.filter(grain__sample=params['in_sample'])
         if 'grain' in params:
             qs = qs.filter(grain__index=params['grain'])
-        return qs.order_by('grain__sample', 'grain__index')
+        return qs.order_by('grain__sample', 'grain__index').select_related('worker')

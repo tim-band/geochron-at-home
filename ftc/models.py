@@ -118,8 +118,8 @@ class Grain(models.Model):
 
     def count_results(self):
         return FissionTrackNumbering.objects.filter(
-            grain__sample=self.sample,
-            grain__index=self.index
+            grain=self,
+            result__gte=0,
         ).count()
 
     def owners_result(self):
@@ -131,6 +131,19 @@ class Grain(models.Model):
         if ftn == None:
             return None
         return ftn.result
+
+    def roi_area_pixels(self):
+        total = 0
+        for r in Region.objects.filter(grain=self):
+            total += r.area()
+        return total
+
+    def roi_area_mm2(self):
+        scale_x = self.scale_x
+        scale_y = self.scale_y
+        if scale_x is None or scale_y is None:
+            return None
+        return scale_x * scale_y * self.roi_area_pixels()
 
 #
 class Region(models.Model):
@@ -193,7 +206,12 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         ('S', 'Spontaneous Fission Tracks'),
         ('I', 'Induced Fission Tracks'),
     )
-    grain = models.ForeignKey(Grain, on_delete=models.CASCADE, null=True)
+    grain = models.ForeignKey(
+        Grain,
+        on_delete=models.CASCADE,
+        null=True,
+        related_name='results'
+    )
     ft_type = models.CharField(max_length=1, choices=FT_TYPE)
     worker = models.ForeignKey(User, on_delete=models.CASCADE)
     result = models.IntegerField() #-1 means this is a partial save state
@@ -217,21 +235,8 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     def objects_owned_by(cls, user):
         return cls.objects.filter(grain__sample__in_project__creator=user)
 
-    def roi_area_pixels(self):
-        total = 0
-        for r in Region.objects.filter(grain=self.grain):
-            total += r.area()
-        return total
-
-    def roi_area_mm2(self):
-        scale_x = self.grain.scale_x
-        scale_y = self.grain.scale_y
-        if scale_x is None or scale_y is None:
-            return None
-        return scale_x * scale_y * self.roi_area_pixels()
-
     def roi_area_micron2(self):
-        a = self.roi_area_mm2()
+        a = self.grain.roi_area_mm2()
         if a is None:
             return None
         return a * 1e6

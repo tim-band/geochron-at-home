@@ -1,6 +1,6 @@
 # Geochron@Home
 
-Copyright 2014-2022 Jiangping He (geochron.home@gmail.com)
+Copyright 2014-2023 Jiangping He (geochron.home@gmail.com)
 and Tim Band.
 
 This work was in part funded by the Natural Environment Research Council

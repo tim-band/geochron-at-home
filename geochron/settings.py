@@ -25,7 +25,7 @@ DEBUG = os.getenv('DJANGO_DEBUG') not in ['0', 'false', 'False', 'FALSE', 'no', 
 
 TEMPLATE_DEBUG = DEBUG
 
-allowed_hosts = os.getenv('ALLOWED_HOSTS') or '127.0.0.1,localhost'
+allowed_hosts = os.getenv('ALLOWED_HOSTS') or '127.0.0.1,localhost,testserver'
 ALLOWED_HOSTS = allowed_hosts.split(',')
 
 sslOnly = os.getenv('SSL_ONLY') in ['1', 'true', 'True', 'TRUE']

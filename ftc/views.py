@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Q, Subquery
+from django.db.models import Exists, OuterRef, Q, Subquery, Prefetch
 from django.db.models.aggregates import Max
 from django.forms import (ModelForm, CharField, Textarea, FileField,
     ClearableFileInput, ValidationError)
@@ -21,6 +21,7 @@ from geochron.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 
 import base64
+import csv
 import io
 import json
 import sys
@@ -565,47 +566,148 @@ def grain_update_shift(request, pk):
     grain.save()
     return redirect('mica', pk=pk)
 
+@login_required
+@user_passes_test(user_is_staff)
+def getTableData(request):
+    # http://owtrsnc.blogspot.co.uk/2013/12/sending-ajax-data-json-to-django.html
+    # http://jonblack.org/2012/06/22/django-ajax-class-based-views/
+    # assuming request.body contains json data which is UTF-8 encoded
+    json_str = request.body.decode(encoding='UTF-8')
+    # turn the json bytestr into a python obj
+    json_obj = json.loads(json_str)
+    sample_list = json_obj['client_response']
+    res = []
+    ftq = FissionTrackNumbering.objects.filter(result__gte=0)
+    if not request.user.is_superuser:
+        ftq = ftq.filter(grain__sample__in_project__creator=request.user)
+    for sample_id in sample_list:
+        fts = ftq.filter(
+            grain__sample=sample_id
+        ).select_related(
+            'grain__sample__in_project'
+        )
+        for ft in fts:
+            a = [
+                ft.grain.sample.in_project.project_name,
+                ft.grain.sample.sample_name,
+                ft.grain.index,
+                ft.ft_type,
+                ft.result,
+                ft.worker.username,
+                ft.create_date,
+                ft.roi_area_micron2(),
+            ]
+            res.append(a)
+    return HttpResponse(
+        json.dumps({ 'aaData' : res }, cls=DjangoJSONEncoder),
+        content_type='application/json'
+    )
+
+def json_grain_result(grain):
+    res = []
+    for result in grain.results.all():
+        res.append({
+            'ft_type': result.ft_type,
+            'result': result.result,
+            'create_date': result.create_date,
+            'worker': {
+                'id': result.worker.id,
+                'username': result.worker.username
+            },
+            'latlngs': json.loads(result.latlngs)
+        })
+    j = {
+        'grain': grain.id,
+        'sample': grain.sample.id,
+        'sample_name': grain.sample.sample_name,
+        'project_name': grain.sample.in_project.project_name,
+        'results': res,
+        'area_pixels': grain.roi_area_pixels(),
+        'area_mm2': grain.roi_area_mm2()
+    }
+    for field in [
+        'id', 'index', 'image_width', 'image_height',
+        'scale_x', 'scale_y', 'stage_x', 'stage_y',
+        'mica_stage_x', 'mica_stage_y', 'shift_x', 'shift_y',
+    ]:
+        j[field] = getattr(grain, field)
+    return j
+
+def getGrainsWithResults(request):
+    gq = Grain.objects.filter(
+        results__result__gte=0
+    ).prefetch_related(
+        Prefetch(
+            lookup='results',
+            queryset=FissionTrackNumbering.objects.filter(
+                result__gte=0
+            )
+        ),
+        'results__worker',
+        'sample',
+        'sample__in_project'
+    )
+    if 'samples[]' in request.GET:
+        gq = gq.filter(
+            sample__in=request.GET.getlist('samples[]')
+        )
+    if not request.user.is_superuser:
+        gq = gq.filter(
+            sample__in_project__creator=request.user.id
+        )
+    grains = {}
+    for g in gq:
+        if g.id not in grains:
+            grains[g.id] = g
+    return grains
 
 @login_required
-def getTableData(request):
-    if request.user.is_active and request.user.is_staff:
-        try:
-            # http://owtrsnc.blogspot.co.uk/2013/12/sending-ajax-data-json-to-django.html
-            # http://jonblack.org/2012/06/22/django-ajax-class-based-views/
-            # assuming request.body contains json data which is UTF-8 encoded
-            json_str = request.body.decode(encoding='UTF-8')
-            # turn the json bytestr into a python obj
-            json_obj = json.loads(json_str)
-            sample_list = json_obj['client_response']
-            res = []
-            if sample_list:
-                for sample_id in sample_list:
-                    fts = FissionTrackNumbering.objects.filter(
-                        result__gte=0,
-                        grain__sample=sample_id
-                    ).select_related(
-                        'grain__sample__in_project'
-                    )
-                    for ft in fts:
-                        if request.user.is_superuser or ft.grain.sample.in_project.creator == request.user:
-                            a = [
-                                ft.grain.sample.in_project.project_name,
-                                ft.grain.sample.sample_name,
-                                ft.grain.index,
-                                ft.ft_type,
-                                ft.result,
-                                ft.worker.username,
-                                ft.create_date,
-                                ft.roi_area_micron2(),
-                            ]
-                            res.append(a)
-            myjson = json.dumps({ 'aaData' : res }, cls=DjangoJSONEncoder)
-        except (KeyError, Project.DoesNotExist):
-            return HttpResponse("you have no project currrently. add one?")
-        else:
-            return HttpResponse(myjson, content_type='application/json')
-    else:
-        return HttpResponse("Sorry, You don't have permission to access the requested page.")
+@user_passes_test(user_is_staff)
+def getJsonResults(request):
+    grains = getGrainsWithResults(request)
+    result = [json_grain_result(g) for g in grains.values()]
+    return HttpResponse(
+        json.dumps(result, cls=DjangoJSONEncoder),
+        content_type='application/json'
+    )
+
+@login_required
+@user_passes_test(user_is_staff)
+def getCsvResults(request):
+    grains = getGrainsWithResults(request)
+    response = HttpResponse(
+        content_type='text/csv',
+        headers={
+            'Content-Disposition': 'attachment; filename="results.csv"'
+        }
+    )
+    writer = csv.writer(response)
+    writer.writerow([
+        'project_name',
+        'sample_name',
+        'index',
+        'ft_type',
+        'username',
+        'create_date',
+        'count',
+        'area_pixels',
+        'area_mm2'
+    ])
+    for grain in grains.values():
+        for result in grain.results.all():
+            writer.writerow([
+                grain.sample.in_project.project_name,
+                grain.sample.sample_name,
+                grain.index,
+                result.ft_type,
+                result.worker.username,
+                result.create_date,
+                result.result,
+                grain.roi_area_pixels(),
+                grain.roi_area_mm2()
+            ])
+    return response
+
 
 import os, random, itertools
 from django.templatetags.static import static

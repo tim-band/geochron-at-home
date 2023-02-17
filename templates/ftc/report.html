@@ -173,42 +173,37 @@ footer {
             <button type="button" class="btn btn-primary btn-xs" data-toggle="offcanvas">Toggle nav</button>
           </p>
           <h1 class="sub-header" style="margin-top: 0px; padding-bottom: 0px;">Results</h1>
-            <table id="mytable" class="table table-striped table-bordered" cellspacing="0" width="100%">
-              <thead>
-                  <tr>
-                      <th>Project</th>
-                      <th>Sample</th>
-                      <th>Grain #</th>
-                      <th>Type</th>
-                      <th>Result</th>
-                      <th>Worker</th>
-                      <th>Submit Date</th>
-                      <th>ROI Area (&#x00B5;m&#x00B2;)</th>
-                  </tr>
-              </thead>
+          <table id="mytable" class="table table-striped table-bordered" cellspacing="0" width="100%">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Sample</th>
+                <th>Grain #</th>
+                <th>Type</th>
+                <th>Result</th>
+                <th>Worker</th>
+                <th>Submit Date</th>
+                <th>ROI Area (&#x00B5;m&#x00B2;)</th>
+              </tr>
+          </thead>
+          <tfoot>
+            <tr>
+              <th>Project</th>
+              <th>Sample</th>
+              <th>Grain #</th>
+              <th>Type</th>
+              <th>Result</th>
+              <th>Worker</th>
+              <th>Submit Date</th>
+              <th>ROI Area (&#x00B5;m&#x00B2;)</th>
+            </tr>
+          </tfoot>
+          </table>
+          <a id="json-download" href="{% url 'getJsonResults' %}" download="results.json">Download JSON</a>
+          <a id="csv-download" href="{% url 'getCsvResults' %}" download="results.csv">Download CSV</a>
+        </div>
 
-              <tfoot>
-                  <tr>
-                      <th>Project</th>
-                      <th>Sample</th>
-                      <th>Grain #</th>
-                      <th>Type</th>
-                      <th>Result</th>
-                      <th>Worker</th>
-                      <th>Submit Date</th>
-                      <th>ROI Area (&#x00B5;m&#x00B2;)</th>
-                  </tr>
-              </tfoot>
-            </table>
-
-      </div>
-
-                    <!--
-                    <div style="cursor: default;"> {{ sample.sample_name }}&nbsp;
-                    <a href="{{ project.id }}/{{ sample.id }}/{{ sample.total_grains }}"><i class="fa fa-stethoscope"></i></a></div>
-                    -->
-
-       <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
+        <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
           <div>
             <h1 class="sub-header bg-primary" style="margin-top: 0px; padding-bottom: 0px;">Projects</h1>
           </div>
@@ -352,8 +347,14 @@ footer {
             var selectedKeys = $.map(selectedNodes, function(node){
                return (node.key.charAt(0).toLowerCase() == 'p') ? null : node.key.split('_')[0];
             });
+            var query = ''
+            if (selectedKeys.length != 0) {
+              query = '?samples[]=' + selectedKeys.join('&samples[]=');
+            }
+            $('#json-download').attr('href', "{% url 'getJsonResults' %}" + query);
+            $('#csv-download').attr('href', "{% url 'getCsvResults' %}" + query);
             $.ajax({
-                url: "{% url 'getTableData'%}",
+                url: "{% url 'getTableData' %}",
                 type: 'POST',
                 //contentType: 'application/json; charset=utf-8',
                 dataType: 'json',
@@ -429,7 +430,7 @@ footer {
             data: JSON.stringify({'intermedia_res':o}),
             success: function(result) {
                 console.log('submitted: ' + result.reply);
-                window.location = "{% url 'counting'%}";
+                window.location = "{% url 'counting' %}";
             },
             error: function(xhr, errmsg, err) {
                 console.log(xhr.status + ": " + xhr.responseText);

@@ -26,3 +26,4 @@ python_version = "3.9"
 [scripts]
 gah = "./geochron/gah.py"
 server = "./manage.py runserver"
+test = "./manage.py test"
