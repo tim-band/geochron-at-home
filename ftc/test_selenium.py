@@ -25,6 +25,8 @@ def retrying(retries, f, delay=1):
             time.sleep(delay)
             return retrying(retries - 1, f)
 
+def almost_equal(x, y):
+    return abs(x - y) < 1e-6
 
 class DockerCompose:
     def __init__(self, yml):
@@ -1049,6 +1051,18 @@ class DjangoTests(TestCase):
     def rois_file_name(self):
         return os.path.abspath('test/crystals/john/p1/s1/Grain01/rois.json')
 
+    def markers_are_square(self, driver):
+        zstack = GrainPage(driver)
+        elts = zstack.marker_elements()
+        if len(elts) != 4:
+            return False
+        elt_xs = sorted([pin_x(e) for e in elts])
+        elt_ys = sorted([pin_y(e) for e in elts])
+        return (almost_equal(elt_xs[0], elt_xs[1])
+            and almost_equal(elt_xs[2], elt_xs[3])
+            and almost_equal(elt_ys[0], elt_ys[1])
+            and almost_equal(elt_ys[2], elt_ys[3]))
+
     def test_manage(self):
         HomePage(self.driver).go()
         project = SignInPage(self.driver).go().sign_in(
@@ -1087,14 +1101,7 @@ class DjangoTests(TestCase):
         )
         # Go to the zstack and check the rois is a rectangle
         zstack = grain.go_zstack().edit()
-        elts = zstack.marker_elements()
-        self.assertEqual(len(elts), 4, msg="not four markers")
-        elt_xs = sorted([pin_x(e) for e in elts])
-        elt_ys = sorted([pin_y(e) for e in elts])
-        self.assertAlmostEqual(elt_xs[0], elt_xs[1], msg="left side not straight")
-        self.assertAlmostEqual(elt_xs[2], elt_xs[3], msg="right side not straight")
-        self.assertAlmostEqual(elt_ys[0], elt_ys[1], msg="top side not straight")
-        self.assertAlmostEqual(elt_ys[2], elt_ys[3], msg="bottom side not straight")
+        WebDriverWait(self.driver, 2).until(self.markers_are_square)
         zstack.cancel().go_mica().edit_shift()
         elts = zstack.marker_elements()
         self.assertEqual(len(elts), 1, msg="should have one marker for mica shift editing")

@@ -199,8 +199,14 @@ footer {
             </tr>
           </tfoot>
           </table>
-          <a id="json-download" href="{% url 'getJsonResults' %}" download="results.json">Download JSON</a>
-          <a id="csv-download" href="{% url 'getCsvResults' %}" download="results.csv">Download CSV</a>
+          <a id="json-download" class="btn btn-default"
+            href="{% url 'getJsonResults' %}" download="results.json">
+            Download JSON
+          </a>
+          <a id="csv-download" class="btn btn-default"
+            href="{% url 'getCsvResults' %}" download="results.csv">
+            Download CSV
+          </a>
         </div>
 
         <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">

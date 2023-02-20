@@ -114,7 +114,13 @@ $ docker-compose exec django ./site_init.sh
 Run the server with:
 
 ```sh
-(geochron-at-home) $ python manage.py runserver
+$ pipenv run server
+```
+
+or from the pipenv shell you can also use:
+
+```sh
+(geochron-at-home) $ ./manage.py runserver
 ```
 
 And you can now browse to `localhost:8000/ftc`
@@ -412,6 +418,13 @@ same version number as Chrome), or
 ...for Firefox (make sure you have `geckodriver` installed on your path, at
 least version 0.32)
 
+Instead of `./manage.py test` within pipenv shell, you can use the
+following command in a normal shell:
+
+```sh
+$ pipenv run test
+```
+
 ### Troubleshooting image upload
 
 If the web server returns a 403 (forbidden) when attempting to access
@@ -547,6 +560,21 @@ names for the images are:
 * `MicaReflStackFlat.jpg` for reflected light apatite image
 * as above, but `.jpeg` instead of `.jpg`
 * as above, but `.png` instead of `.jpg` (for PNG image)
+
+## Troubleshooting Geochron@Home development
+
+You can run a Python shell that can call the app's functions directly with:
+
+```sh
+$ pipenv run shell
+```
+
+Or, for a less pleasant experience, but one that prints out the SQL commands
+that are going to the database, try:
+
+```sh
+$ pipenv run debug
+```
 
 #### TODO:
 

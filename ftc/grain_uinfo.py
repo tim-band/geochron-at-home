@@ -25,9 +25,9 @@ def choose_working_grain(request):
     project (breaking ties at random).
     """
     # Result objects not produced by guests
-    backref_count = Count('fissiontracknumbering', filter=
-        Q(fissiontracknumbering__result__gte=0)
-        & ~Q(fissiontracknumbering__worker__username='guest')
+    backref_count = Count('results', filter=
+        Q(results__result__gte=0)
+        & ~Q(results__worker__username='guest')
     )
     # Result objects produced by this user
     has_backref_user = FissionTrackNumbering.objects.filter(

@@ -1,6 +1,8 @@
 from django.test import Client, TestCase, tag
 from django.urls import reverse
 
+import csv
+import io
 import json
 from random import uniform
 
@@ -159,3 +161,44 @@ class TestCountJsonDownload(CountingCase):
     self.login('admin', 'admin_password')
     grains = self.get_json_results(['2'])
     assert(sorted(grains.keys()) == [])
+
+@tag('integration')
+class TestCountCsvDownload(CountingCase):
+  fixtures = [
+    'users.json', 'projects.json', 'samples.json',
+    'grains.json', 'grains2.json', 'images.json',
+    'results.json', 'results2.json'
+  ]
+
+  def get_csv_results(self, samples=None):
+    if samples is None:
+      r = self.client.get(reverse('getCsvResults'))
+    else:
+      r = self.client.get(
+        reverse('getCsvResults'),
+        { 'samples[]': samples }
+      )
+    dicts = csv.DictReader(io.StringIO(r.content.decode('utf-8')))
+    res = {}
+    for row in dicts:
+      psi = (row['project_name'], row['sample_name'], row['index'])
+      c = int(row['count'])
+      if psi in res:
+        res[psi].append(c)
+      else:
+        res[psi] = [c]
+    return res
+
+  def test_superuser_downloads_csv_all_grains(self):
+    self.login('super', 'super_password')
+    grains = self.get_csv_results()
+    assert(sorted(grains.keys()) == [
+      ("proj1", "adm_samp", '1'),
+      ("proj1", "adm_samp", '2'),
+      ("proj1", "adm_samp", '3'),
+      ("proj2", "counter_samp", '1')
+    ])
+    assert(sorted(grains[("proj1", "adm_samp", '1')]) == [3, 3])
+    assert(sorted(grains[("proj1", "adm_samp", '2')]) == [2])
+    assert(sorted(grains[("proj1", "adm_samp", '3')]) == [2])
+    assert(sorted(grains[("proj2", "counter_samp", '1')]) == [2, 2, 3, 3])
