@@ -561,6 +561,38 @@ names for the images are:
 * as above, but `.jpeg` instead of `.jpg`
 * as above, but `.png` instead of `.jpg` (for PNG image)
 
+## Localization
+
+Text is internationalized by including the text:
+
+```
+{& load i18n %}
+```
+
+at the top of a template, then either using the tag
+`{% translate "text to translate" %}` or the block tags:
+
+```
+{% blocktranslate %}
+Text to translate, which can
+include {{ context_variables }}
+and multiple lines.
+{% endblocktranslate %}
+```
+
+These translations are stored in `.mo` files. You can create
+these by ensuring that you have the `gettext` package installed
+on your system and typing (from the pipenv shell):
+
+```
+(geochron-at-home) $ mkdir locale
+(geochron-at-home) $ ./manage.py makemessages -l zh_HANS
+```
+
+This one makes or updates the file for Simplified Chinese, called
+`locale/zh_HANS/LC_MESSAGES/django.po`. Localization tools such as
+Weblate understand this file format.
+
 ## Troubleshooting Geochron@Home development
 
 You can run a Python shell that can call the app's functions directly with:
