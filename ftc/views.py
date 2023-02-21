@@ -611,8 +611,7 @@ def json_grain_result(grain):
             'result': result.result,
             'create_date': result.create_date,
             'worker': {
-                'id': result.worker.id,
-                'username': result.worker.username
+                'id': result.worker.id
             },
             'latlngs': json.loads(result.latlngs)
         })
@@ -689,7 +688,7 @@ def getCsvResults(request):
         'sample_name',
         'index',
         'ft_type',
-        'username',
+        'user_id',
         'create_date',
         'count',
         'area_pixels',
@@ -702,7 +701,7 @@ def getCsvResults(request):
                 grain.sample.sample_name,
                 grain.index,
                 result.ft_type,
-                result.worker.username,
+                result.worker.pk,
                 result.create_date,
                 result.result,
                 grain.roi_area_pixels(),

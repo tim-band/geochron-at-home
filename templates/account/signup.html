@@ -70,10 +70,7 @@ body {
 <p class="pull-right text-muted">{% blocktrans %}Have an account? Then <a href="{{ login_url }}">sign in</a>.{% endblocktrans %}</p>
 <div style="clear:both"></div>
   {% csrf_token %}
-<!--   {{ form.as_p }} -->
-
 {{ form.non_field_errors }}
-
 <table>
     <tr class="form-group">
         <td><label for="id_username">Username:</label></td>
@@ -96,8 +93,13 @@ body {
         <td>{{ form.password2.errors }}</td>
     </tr>
 </table>
+<p class="pull-right text-muted">
+  {% blocktranslate %}
+  The information entered here will be used only for the operation of
+  Geochron@Home and will not be passed to any other system.
+  {% endblocktranslate %}
+</p>
 <button class="btn btn-primary pull-right" type="submit">{% trans "Sign Up" %} &raquo;</button>
-
   {% if redirect_field_value %}
   <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
   {% endif %}
