@@ -134,7 +134,7 @@ class Grain(models.Model):
 
     def roi_area_pixels(self):
         total = 0
-        for r in Region.objects.filter(grain=self):
+        for r in self.region_set.all():
             total += r.area()
         return total
 
@@ -151,7 +151,8 @@ class Region(models.Model):
 
     def area(self):
         """ Returns the region's area in pixels """
-        vs = list(Vertex.objects.filter(region=self).order_by('pk'))
+        vs = list(self.vertex_set.all())
+        vs.sort(key=lambda v: v.pk)
         n = len(vs)
         if n == 0:
             return 0

@@ -645,7 +645,9 @@ def getGrainsWithResults(request):
         ),
         'results__worker',
         'sample',
-        'sample__in_project'
+        'sample__in_project',
+        'region_set',
+        'region_set__vertex_set'
     )
     if 'samples[]' in request.GET:
         gq = gq.filter(
