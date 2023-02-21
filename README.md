@@ -576,6 +576,24 @@ that are going to the database, try:
 $ pipenv run debug
 ```
 
+`django.test.Client` and `django.urls.reverse` are already imported
+for you in the `run debug` shell, and you have an instance of `Client`
+called `cli` and functions `get` and `post` that are shortcuts for
+`cli.get` and `cli.post`.
+
+To start with you are logged in as the site admin, but you can change
+this with `login(username, password)`.
+
+As an example, here is a way to see how many database commands are
+issued when downloading JSON results:
+
+```
+(Pdb) get(reverse('getJsonResults'))
+```
+
+Remember that you exit a `Pdb` shell by typing `c` and pressing
+return.
+
 #### TODO:
 
 * Need a way to find out which grain in the DB came from which folder on the file system; presumably this will need a database migration to give every grain an origin note.
