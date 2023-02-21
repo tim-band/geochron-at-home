@@ -11,7 +11,8 @@ from ftc.views import (home, signmeup, report, getTableData,
     grain_update_roi, grain_update_shift,
     GrainDetailUpdateView, GrainImagesView,
     ImageDeleteView, tutorial, saveTutorialResult,
-    CountMyGrainView, getJsonResults, getCsvResults)
+    CountMyGrainView, getJsonResults, getCsvResults,
+    GrainDeleteView)
 from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
@@ -31,6 +32,7 @@ urlpatterns = [
     path('sample/<pk>/create_grain', GrainCreateView.as_view(), name='grain_create'),
     # Z-stack microscope view of grain (with option to adjust ROI)
     path('grain/<pk>/', GrainDetailView.as_view(), name='grain'),
+    path('grain/<pk>/delete', GrainDeleteView.as_view(), name='grain_delete'),
     # Z-stack microscope view of mica (with option to adjust shift)
     path('grain/<pk>/mica', MicaDetailView.as_view(), name='mica'),
     # Form for updating grain

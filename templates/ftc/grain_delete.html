@@ -1,0 +1,25 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block head %}
+{% endblock %}
+{% block content %}
+<h1>Are you sure you want to delete grain
+{{ object.index }} of sample <em>{{ object.sample.sample_name }}</em>?
+</h1>
+<a class="btn btn-primary" href="{{ referrer }}">Cancel</a>
+<p>This would also delete:</p>
+<ul>
+    <li>{{ image_count }} image{{ image_count|pluralize }}</li>
+    <li>{{ result_count }} result{{ result_count|pluralize }}</li>
+    <li>{{ region_count }} region{{ region_count|pluralize }}</li>
+</ul>
+<form
+    action="{% url 'grain_delete' object.pk %}"
+    method="POST">
+    {% csrf_token %}
+    <input class="btn btn-danger" type="submit" value="Delete This Grain">
+    <a class="btn btn-primary" href="{{ referrer }}">Cancel</a>
+</form>
+{% endblock %}

@@ -12,7 +12,7 @@
 </h2>
 <p>View <a id="zstack" href="{% url 'grain' object.pk %}">Z-stack</a></p>
 <h3>Metadata</h3>
-<table class="metadata">
+<table class="table no-stretch">
     <tr><td>Image size:</td><td id="image-size">
         {{ object.image_width }}&#x00D7;{{ object.image_height }}
     </td></tr>
@@ -26,6 +26,7 @@
         {{ object.shift_x }},{{ object.shift_y }}
     </td></tr>
 </table>
+<a id="delete_link" href="{% url 'grain_delete' object.pk %}">Delete this grain</a>
 <h3>Images</h3>
 <table id="image-list" class="table">
     <thead>

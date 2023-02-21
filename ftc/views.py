@@ -498,6 +498,22 @@ class GrainCreateView(ParentCreatorOrSuperuserMixin, CreateView):
     def get_success_url(self):
         return reverse('grain_images', kwargs={'pk': self.object.pk})
 
+class GrainDeleteView(CreatorOrSuperuserMixin, DeleteView):
+    model = Grain
+    template_name = "ftc/grain_delete.html"
+    def get_context_data(self, *args, **kwargs):
+        pk = self.kwargs['pk']
+        ctx = super().get_context_data(*args, **kwargs)
+        ctx['image_count'] = self.object.image_set.count()
+        ctx['region_count'] = self.object.region_set.count()
+        ctx['result_count'] = self.object.results.count()
+        ctx['referrer'] = self.request.META.get(
+            "HTTP_REFERER",
+            reverse('sample', args=[self.object.sample.id])
+        )
+        return ctx
+    def get_success_url(self):
+        return reverse('sample', args=[self.object.sample.id])
 
 class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
     model = Grain

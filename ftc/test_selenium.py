@@ -510,6 +510,15 @@ class SampleCreatePage(BasePage):
 
 
 class SamplePage(BasePage):
+    def check(self):
+        h1text = self.driver.find_element(By.TAG_NAME, "h1").text
+        assert "Sample " in h1text and " of project " in h1text
+        return self
+
+    def go(self, pk):
+        self.driver.get("http://localhost:18080/ftc/sample/{0}/".format(pk))
+        return self
+
     def create_grain(self):
         self.click_by_id('create-grain')
         return GrainCreatePage(self.driver)
@@ -519,11 +528,24 @@ class SamplePage(BasePage):
             By.XPATH,
             '//table[@id="grain-set"]/tbody/tr/td/a[text()="{0}"]'.format(index)
         )
-        return GrainDetailsPage(self.driver)
+        return GrainDetailPage(self.driver)
+
+    def grain_present(self, index):
+        es = self.driver.find_elements(
+            By.XPATH,
+            '//table[@id="grain-set"]/tbody/tr/td/a[text()="{0}"]'.format(index)
+        )
+        return 0 < len(es)
 
     def edit(self):
         self.click_by_id('edit-sample')
         return SampleEditPage(self.driver)
+
+    def pk(self):
+        bits = self.driver.current_url.split('/')
+        n = len(bits)
+        last = bits[n - 1] or bits[n - 2]
+        return int(last)
 
 
 class SampleEditPage(BasePage):
@@ -620,6 +642,22 @@ class GrainDetailPage(BasePage):
         })
         self.submit(fn_detect_update)
         return self
+
+    def delete(self):
+        self.click_by_id('delete_link')
+        return GrainDeletePage(self.driver)
+
+
+class GrainDeletePage(BasePage):
+    def confirm_delete(self):
+        self.click_by_css('input.btn-danger')
+        return SamplePage(self.driver)
+
+    def cancel(self):
+        self.click_by_css('a.btn-primary')
+        # don't know whether the referrer was
+        # the sample page or the grain page
+        return None
 
 
 class GrainCreatePage(BasePage):
@@ -1218,6 +1256,7 @@ class DjangoTests(TestCase):
             False
         )
         sample = project.create_sample().create("SS2", "T", 20, 99, False)
+        sample_pk = sample.pk()
         explicit_index = 54
         grain = sample.create_grain().create([
             self.grain_file_name(1),
@@ -1225,3 +1264,15 @@ class DjangoTests(TestCase):
             self.grain_file_name(3)
         ], index=explicit_index).check()
         self.assertEqual(grain.get_grain_index(), explicit_index)
+        sample_page = SamplePage(self.driver).go(sample_pk).check()
+        other_explicit_index = 22
+        grain2 = sample_page.create_grain().create([
+            self.grain_file_name(2),
+            self.mica_file_name(1),
+            self.grain_file_name(3)
+        ], index=other_explicit_index).check()
+        sample_page.go(sample_pk).check().go_grain(
+            explicit_index
+        ).delete().confirm_delete()
+        assert sample.grain_present(other_explicit_index)
+        assert not sample.grain_present(explicit_index)
