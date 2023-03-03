@@ -35,6 +35,7 @@
         <th>Mica images</th>
         <th>Number of results</th>
         <th>Owner's track count</th>
+        <th>Count</th>
         <th>Delete</th>
     </tr>
     {% for g in object.grain_set.all|order_by:"index" %}
@@ -54,6 +55,7 @@
             {% endif %}
             {% endwith %}
         </td>
+        <td><a id="count-link-{{ g.index }}" href="{% url 'count_my' g.pk %}">Count</a></td>
         <td><a href="{% url 'grain_delete' g.pk %}">Delete</a></td>
     </tr>
     {% endfor %}

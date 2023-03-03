@@ -287,7 +287,7 @@ As with running without Docker, whenever any static files (anything
 in the `ftc/static` directory) have changed you will need to run:
 
 ```sh
-(gechron-at-home) $ python manage.py collectstatic
+(geochron-at-home) $ python manage.py collectstatic
 ```
 
 ### nginx stanza
@@ -391,6 +391,7 @@ From the pipenv shell:
 
 ```sh
 (geochron-at-home) $ pipenv requirements >requirements.txt
+(geochron-at-home) $ ./manage.py collectstatic
 (geochron-at-home) $ ./manage.py test
 ```
 

@@ -1,4 +1,5 @@
-from django.test import Client, tag, TestCase
+from django.core import mail
+from django.test import Client, tag, TestCase, LiveServerTestCase
 from pathlib import Path
 from selenium import webdriver
 from selenium.common import exceptions
@@ -28,30 +29,6 @@ def retrying(retries, f, delay=1):
 def almost_equal(x, y):
     return abs(x - y) < 1e-6
 
-class DockerCompose:
-    def __init__(self, yml):
-        if yml:
-            self.pre = ["docker-compose", "-f", yml]
-        else:
-            self.pre = ["docker-compose"]
-
-    def down(self):
-        subprocess.run(self.pre + ["down"])
-        return self
-
-    def up(self):
-        subprocess.run(self.pre + ["up", "--force-recreate", "--build", "-d"])
-        return self
-
-    def exec(self, *kargs):
-        subprocess.run(self.pre + ["exec", "django"] + list(kargs))
-        return self
-
-    def init(self):
-        self.exec("./site_init.sh")
-        return self
-
-
 def maybe_click(elt):
     if elt is None:
         return False
@@ -59,8 +36,9 @@ def maybe_click(elt):
     return True
 
 class BasePage:
-    def __init__(self, driver):
+    def __init__(self, driver, url=None):
         self.driver = driver
+        self.url = url
 
     def check(self):
         return self
@@ -135,29 +113,20 @@ class BasePage:
         self.click_element(By.CSS_SELECTOR, css)
 
 
-class WebMail(BasePage):
-    def go(self):
-        self.driver.get("http://localhost:18081/")
-        return self
-
-    def click_first_body_link(self):
-        self.driver.find_element(By.CSS_SELECTOR,  "td.body-text p a").click()
-
-
 class HomePage(BasePage):
     def go(self):
-        self.driver.get("http://localhost:18080/ftc")
+        self.driver.get(self.url + "/ftc")
         return self
 
     def join(self):
         self.driver.find_element(By.CSS_SELECTOR,  "a.btn-success").click()
-        return JoinPage(self.driver)
+        return JoinPage(self.driver, self.url)
 
     def become_guest(self):
         # log on as guest. ProfilePage is returned, which will be wrong if
         # the guest has already done the tutorial (then it will be CountingPage)
-        self.driver.get("http://localhost:18080/ftc/counting/guest")
-        return ProfilePage(self.driver)
+        self.driver.get(self.url + "/ftc/counting/guest")
+        return ProfilePage(self.driver, self.url)
 
 
 class User:
@@ -178,7 +147,7 @@ class JoinPage(BasePage):
         self.driver.find_element(By.ID, "id_password1").send_keys(user.password)
         self.driver.find_element(By.ID, "id_password2").send_keys(user.password)
         self.driver.find_element(By.CLASS_NAME, "btn-primary").click()
-        return VerifyPage(self.driver)
+        return VerifyPage(self.driver, self.url)
 
 
 class VerifyPage(BasePage):
@@ -190,6 +159,19 @@ class VerifyPage(BasePage):
 
 
 class ConfirmPage(BasePage):
+    def go(self):
+        """
+        Fetches the last email sent out and visits the link in it.
+        This should be the confirmation email and the link should
+        take us to the confirmation page.
+        """
+        mail_body = mail.outbox[-1].body
+        m = re.search(r'http://[a-zA-Z0-9_.:\-@+/]+', mail_body)
+        assert(m)
+        verification_link = m.group(0)
+        self.driver.get(verification_link)
+        return self
+
     def check(self, user):
         assert user.identity in self.driver.find_element(By.CSS_SELECTOR,  "p.lead span.lead").text
         assert user.email in self.driver.find_element(By.CSS_SELECTOR,  "p.lead > a").text
@@ -197,19 +179,25 @@ class ConfirmPage(BasePage):
 
     def confirm(self):
         self.driver.find_element(By.CSS_SELECTOR,  "button.btn-success").click()
-        return SignInPage(self.driver)
+        return SignInPage(self.driver, self.url)
 
 
 class SignInPage(BasePage):
     def go(self):
-        self.driver.get("http://localhost:18080/accounts/login")
+        self.driver.get(self.url + "/accounts/login")
         return self
 
     def sign_in(self, user):
-        self.driver.find_element(By.CSS_SELECTOR,  'input[name="login"]').send_keys(user.identity)
-        self.driver.find_element(By.CSS_SELECTOR,  'input[name="password"]').send_keys(user.password)
+        self.driver.find_element(
+            By.CSS_SELECTOR,
+            'input[name="login"]'
+        ).send_keys(user.identity)
+        self.driver.find_element(
+            By.CSS_SELECTOR,
+            'input[name="password"]'
+        ).send_keys(user.password)
         self.driver.find_element(By.CLASS_NAME, "btn-primary").click()
-        return ProfilePage(self.driver)
+        return ProfilePage(self.driver, self.url)
 
 
 class TutorialPage(BasePage):
@@ -233,7 +221,7 @@ class TutorialPage(BasePage):
 
     def go_finish(self):
         self.get_finish_link().click()
-        return CountingPage(self.driver)
+        return CountingPage(self.driver, self.url)
 
     def get_to_end_and_finish(self):
         while not self.finish_available():
@@ -260,7 +248,7 @@ class ProfilePage(BasePage):
         return self.driver.find_element(By.CLASS_NAME, 'fa-user').text
 
     def go(self):
-        self.driver.get("http://localhost:18080/accounts/profile")
+        self.driver.get(self.url + "/accounts/profile")
         return self
 
     def get_counting_link(self):
@@ -268,7 +256,7 @@ class ProfilePage(BasePage):
 
     def go_start_counting(self):
         self.get_counting_link().click()
-        return CountingPage(self.driver)
+        return CountingPage(self.driver, self.url)
 
     def check_can_count(self):
         link = self.get_counting_link()
@@ -288,11 +276,11 @@ class ProfilePage(BasePage):
 
     def go_tutorial(self):
         self.click_by_id('tutorial-link')
-        return TutorialPage(self.driver)
+        return TutorialPage(self.driver, self.url)
 
     def go_manage(self):
         self.click_by_id('manage-link')
-        return ProjectsPage(self.driver)
+        return ProjectsPage(self.driver, self.url)
 
 
 class CountingPage(BasePage):
@@ -301,7 +289,7 @@ class CountingPage(BasePage):
         return self
 
     def go(self):
-        self.driver.get("http://localhost:18080/ftc/counting")
+        self.driver.get(self.url + "/ftc/counting")
         return self
 
     def count(self):
@@ -416,19 +404,19 @@ class NavBar(BasePage):
                 )
                 return logout.is_displayed() and logout
         WebDriverWait(self.driver, 3).until(DropsDown(self)).click()
-        return HomePage(self.driver)
+        return HomePage(self.driver, self.url)
 
     def go_manage_projects(self):
         self.click_dropdown()
         self.driver.find_element(By.CSS_SELECTOR,
             'a[href="/ftc/report/"]'
         ).click()
-        return ReportPage(self.driver)
+        return ReportPage(self.driver, self.url)
 
     def go_edit_projects(self):
         self.click_dropdown()
         self.driver.find_element(By.ID, 'projects-link').click()
-        return ProjectsPage(self.driver)
+        return ProjectsPage(self.driver, self.url)
 
 
 class ReportPage(BasePage):
@@ -466,16 +454,20 @@ class ReportPage(BasePage):
 
 
 class ProjectsPage(BasePage):
+    def go(self):
+        self.driver.get(self.url + '/ftc/projects/')
+        return self
+
     def create_project(self):
         self.click_by_id('create-project')
-        return ProjectCreatePage(self.driver)
+        return ProjectCreatePage(self.driver, self.url)
 
     def go_project(self, name):
         self.click_element(
             By.XPATH,
             '//ul[@id="project-list"]/li/a[text()="{0}"]'.format(name)
         )
-        return ProjectPage(self.driver)
+        return ProjectPage(self.driver, self.url)
 
 
 class ProjectCreatePage(BasePage):
@@ -487,13 +479,20 @@ class ProjectCreatePage(BasePage):
             'closed': closed
         })
         self.submit()
-        return ProjectPage(self.driver)
+        return ProjectPage(self.driver, self.url)
 
 
 class ProjectPage(BasePage):
     def create_sample(self):
         self.driver.find_element(By.ID, 'create-sample').click()
-        return SampleCreatePage(self.driver)
+        return SampleCreatePage(self.driver, self.url)
+
+    def go_sample(self, name):
+        self.click_element(
+            By.XPATH,
+            '//tbody[@id="sample-list"]/tr/td/a[text()="{0}"]'.format(name)
+        )
+        return SamplePage(self.driver, self.url)
 
 
 class SampleCreatePage(BasePage):
@@ -506,7 +505,7 @@ class SampleCreatePage(BasePage):
             'completed': completed
         })
         self.submit()
-        return SamplePage(self.driver)
+        return SamplePage(self.driver, self.url)
 
 
 class SamplePage(BasePage):
@@ -516,19 +515,26 @@ class SamplePage(BasePage):
         return self
 
     def go(self, pk):
-        self.driver.get("http://localhost:18080/ftc/sample/{0}/".format(pk))
+        self.driver.get(self.url + "/ftc/sample/{0}/".format(pk))
         return self
 
     def create_grain(self):
         self.click_by_id('create-grain')
-        return GrainCreatePage(self.driver)
+        return GrainCreatePage(self.driver, self.url)
 
     def go_grain(self, index):
         self.click_element(
             By.XPATH,
             '//table[@id="grain-set"]/tbody/tr/td/a[text()="{0}"]'.format(index)
         )
-        return GrainDetailPage(self.driver)
+        return GrainDetailPage(self.driver, self.url)
+
+    def go_count(self, index):
+        self.click_element(
+            By.XPATH,
+            '//table[@id="grain-set"]/tbody/tr/td/a[@id="count-link-{0}"]'.format(index)
+        )
+        return CountingPage(self.driver, self.url)
 
     def grain_present(self, index):
         es = self.driver.find_elements(
@@ -539,7 +545,7 @@ class SamplePage(BasePage):
 
     def edit(self):
         self.click_by_id('edit-sample')
-        return SampleEditPage(self.driver)
+        return SampleEditPage(self.driver, self.url)
 
     def pk(self):
         bits = self.driver.current_url.split('/')
@@ -551,7 +557,7 @@ class SamplePage(BasePage):
 class SampleEditPage(BasePage):
     def cancel(self):
         self.click_by_id('cancel')
-        return SamplePage(self.driver)
+        return SamplePage(self.driver, self.url)
 
     def update(self, name, property_, priority, contributor, completed):
         self.fill_form({
@@ -561,7 +567,7 @@ class SampleEditPage(BasePage):
             'completed': completed
         })
         self.submit()
-        return SamplePage(self.driver)
+        return SamplePage(self.driver, self.url)
 
 
 class GrainDetailPage(BasePage):
@@ -572,14 +578,14 @@ class GrainDetailPage(BasePage):
 
     def go_zstack(self):
         self.click_by_id('zstack')
-        return GrainPage(self.driver)
+        return GrainPage(self.driver, self.url)
 
     def go_image(self, ft_type, index):
         self.click_element(
             By.XPATH,
             '//table[@id="image-list"]/tbody/tr[td[text()="{0}"]][td[text()="{1}"]]/td/a'.format(ft_type, index)
         )
-        return ImagePage(self.driver)
+        return ImagePage(self.driver, self.url)
 
     def get_grain_index(self):
         title = self.driver.find_element(By.ID, "title").text
@@ -645,13 +651,13 @@ class GrainDetailPage(BasePage):
 
     def delete(self):
         self.click_by_id('delete_link')
-        return GrainDeletePage(self.driver)
+        return GrainDeletePage(self.driver, self.url)
 
 
 class GrainDeletePage(BasePage):
     def confirm_delete(self):
         self.click_by_css('input.btn-danger')
-        return SamplePage(self.driver)
+        return SamplePage(self.driver, self.url)
 
     def cancel(self):
         self.click_by_css('a.btn-primary')
@@ -667,7 +673,7 @@ class GrainCreatePage(BasePage):
             'uploads': paths
         })
         self.submit()
-        return GrainDetailPage(self.driver)
+        return GrainDetailPage(self.driver, self.url)
 
 
 def find_best(a, f):
@@ -724,11 +730,11 @@ class GrainPage(BasePage):
 
     #def go_update_metadata(self):
     #    self.click_by_id('meta')
-    #    return GrainUpdateMetadataPage(self.driver)
+    #    return GrainUpdateMetadataPage(self.driver, self.url)
 
     def go_grain_images(self):
         self.click_by_id('images')
-        return GrainDetailPage(self.driver)
+        return GrainDetailPage(self.driver, self.url)
 
     def zoom_out(self, max_width=600):
         zoom_outs = self.driver.find_elements(
@@ -836,32 +842,17 @@ class GrainPage(BasePage):
 class ImagePage(BasePage):
     def delete_image(self):
         self.submit()
-        return GrainDetailPage(self.driver)
+        return GrainDetailPage(self.driver, self.url)
 
     def back(self):
         self.click_by_id('back')
-        return GrainDetailPage(self.driver)
-
-
-class ScriptUploader:
-    def __init__(self, driver):
-        self.driver = driver
-
-    def upload_projects(self, directory):
-        self.dc.exec("python3", "upload_projects.py",
-            "-s", "geochron.settings",
-            "-i", directory,
-        )
-
-    def get_index(self, file_url):
-        src = file_url.rstrip("/")
-        index = src.rfind("/") + 1
-        return int(src[index:])
+        return GrainDetailPage(self.driver, self.url)
 
 
 class WebUploader:
-    def __init__(self, driver):
+    def __init__(self, driver, url):
         self.driver = driver
+        self.url = url
         self.script="""
         var url=arguments[0];
         var done=arguments[1];
@@ -890,7 +881,7 @@ class WebUploader:
                 contents = h.read()
                 hash_ = hash(contents)
                 self.hashes[hash_] = number
-        navbar = NavBar(self.driver)
+        navbar = NavBar(self.driver, self.url)
         edit_projects = navbar.go_edit_projects()
         project_page = edit_projects.create_project().create('p1', 'description', 1, False)
         sample_page = project_page.create_sample().create('s1', 'T', 1, 1, False)
@@ -907,12 +898,10 @@ class WebUploader:
         hash_ = hash(ba)
         return self.hashes.get(hash_)
 
-
-@tag('selenium')
-class DjangoTests(TestCase):
+class SeleniumTests(LiveServerTestCase):
     def setUp(self):
-        self.project_user = User("john", "john@test.com", "john")
-        self.dc = DockerCompose("./docker-compose-test.yml").down().up().init()
+        self.project_user = User("admin", "admin@uni.ac.uk", "admin_password")
+        self.test_user = User("tester", "tester@test.com", "MyPaSsW0rd")
         self.tmp = None
         browser = os.environ.get('BROWSER')
         if browser == 'firefox':
@@ -935,29 +924,31 @@ class DjangoTests(TestCase):
 
     def tearDown(self):
         self.driver.close()
-        self.dc.down()
         if self.tmp is not None:
             os.rmdir(self.tmp)
 
+
+@tag('selenium')
+class FromClean(SeleniumTests):
+    fixtures = [
+        'users.json'
+    ]
     def test_onboard(self):
         # Upload Z-Stack images
-        test_user = User("tester", "tester@test.com", "MyPaSsW0rd")
-        HomePage(self.driver).go()
-        profile = SignInPage(self.driver).go().sign_in(self.project_user)
-        uploader = WebUploader(self.driver)
-        #uploader = new ScriptUploader(self.driver)
+        HomePage(self.driver, self.live_server_url).go()
+        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
+        uploader = WebUploader(self.driver, self.live_server_url)
         uploader.upload_projects('test/crystals')
-        navbar = NavBar(self.driver)
+        navbar = NavBar(self.driver, self.live_server_url)
         navbar.logout()
 
         # create user
-        join_page = HomePage(self.driver).go().join()
-        join_page.check().fill_in(test_user).check(test_user)
-        WebMail(self.driver).go().click_first_body_link()
-        ConfirmPage(self.driver).check(test_user).confirm()
+        join_page = HomePage(self.driver, self.live_server_url).go().join()
+        join_page.check().fill_in(self.test_user).check(self.test_user)
+        ConfirmPage(self.driver, self.live_server_url).go().check(self.test_user).confirm()
 
         # sign in as this new user
-        profile = SignInPage(self.driver).go().sign_in(test_user)
+        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
 
         # attempt to count, get a refusal, so do the tutorial
         profile.check_cannot_count()
@@ -977,104 +968,30 @@ class DjangoTests(TestCase):
         navbar.logout()
 
         # do the same thing with John
-        profile = SignInPage(self.driver).go().sign_in(self.project_user)
+        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
         profile.check_cannot_count().go_tutorial().get_to_end_and_finish().check()
         profile.go().check_can_count()
         navbar.logout()
 
         # check guest cannot count
-        HomePage(self.driver).become_guest().check_cannot_count(
+        HomePage(self.driver, self.live_server_url).become_guest().check_cannot_count(
         ).go_tutorial().get_to_end_and_finish().check()
         # but then can
-        HomePage(self.driver).become_guest()
-        CountingPage(self.driver).check()
+        HomePage(self.driver, self.live_server_url).become_guest()
+        CountingPage(self.driver, self.live_server_url).check()
         # but then cannot
         navbar.logout()
-        HomePage(self.driver).become_guest().check_cannot_count()
+        HomePage(self.driver, self.live_server_url).become_guest().check_cannot_count()
 
         # check we can still get counting after logging back in
         navbar.logout()
-        counting = SignInPage(self.driver).go().sign_in(test_user).go_start_counting().check()
-
-        # start counting tracks
+        counting = SignInPage(self.driver, self.live_server_url).go().sign_in(
+            self.test_user
+        ).go_start_counting().check()
         self.assertEqual(uploader.get_index(counting.image_displayed_url()), 1)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.33).image_displayed_url()), 2)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.67).image_displayed_url()), 4)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(-0.33).image_displayed_url()), 3)
-        counting.check_count("000")
-        self.assertFalse(counting.undo_available())
-        self.assertFalse(counting.redo_available())
-        counting.click_at(0.6, 0.35)
-        counting.check_count("001")
-        self.assertTrue(counting.undo_available())
-        self.assertFalse(counting.redo_available())
-        counting.undo()
-        self.assertFalse(counting.undo_available())
-        self.assertTrue(counting.redo_available())
-        counting.redo()
-        counting.click_at(0.45, 0.5)
-        counting.check_count("002")
-        # this one is outside of the boundary
-        counting.click_at(0.55, 0.55)
-        counting.check_count("002")
-        counting.click_at(0.52, 0.37)
-        counting.check_count("003")
-        counting.click_at(0.37, 0.52)
-        counting.check_count("004")
-        # delete one
-        counting.delete_from(0.51, 0.59, 0.33, 0.41)
-        counting.check_count("003")
-        self.assertTrue(counting.undo_available())
-        counting.undo()
-        counting.check_count("004")
-        self.assertTrue(counting.undo_available())
-        self.assertTrue(counting.redo_available())
-        counting.undo()
-        counting.check_count("003")
-        counting.redo()
-        counting.check_count("004")
-        counting.redo()
-        counting.check_count("003")
-        self.assertTrue(counting.undo_available())
-        self.assertFalse(counting.redo_available())
-        counting.undo()
-        counting.check_count("004")
-        counting.click_at(0.54, 0.35)
-        counting.check_count("005")
-        self.assertFalse(counting.redo_available())
-        self.assertTrue(counting.undo_available())
-
-        # save intermediate result and logout
-        counting.save()
-        navbar.logout()
-
-        # login, check no results yet
-        profile = SignInPage(self.driver).go().sign_in(self.project_user)
-        report = navbar.go_manage_projects()
-        report.toggle_tree_node("p1")
-        report.select_tree_node("s1")
-        # Should be no grain "1" in the table yet
-        # (as it is a partial save, not a submission)
-        self.assertRaises(AssertionError, report.result, "1")
-        # start counting, logout
-        counting.go().check_count("000")
-        navbar.check().logout()
-
-        # login as test user, we should still see the saved result
-        profile = SignInPage(self.driver).go().sign_in(test_user)
-        counting = profile.go_start_counting().check()
-        counting.check_count("005")
-
-        # submit the result
-        counting.submit()
-
-        # see this result, as project admin
-        navbar.logout()
-        profile = SignInPage(self.driver).go().sign_in(self.project_user)
-        report = navbar.go_manage_projects()
-        report.toggle_tree_node("p1")
-        report.select_tree_node("s1")
-        self.assertEqual(report.result("1"), "5")
 
     def grain_file_name(self, index, prefix=''):
         n = 'test/crystals/john/p1/s1/Grain01/{1}stack-{0:02d}.jpg'.format(index, prefix)
@@ -1102,8 +1019,8 @@ class DjangoTests(TestCase):
             and almost_equal(elt_ys[2], elt_ys[3]))
 
     def test_manage(self):
-        HomePage(self.driver).go()
-        project = SignInPage(self.driver).go().sign_in(
+        HomePage(self.driver, self.live_server_url).go()
+        project = SignInPage(self.driver, self.live_server_url).go().sign_in(
             self.project_user
         ).go_manage().create_project().create(
             "test_manage",
@@ -1246,8 +1163,8 @@ class DjangoTests(TestCase):
         self.assertNotAlmostEqual(float(y), 45)
 
     def test_explicit_grain_index(self):
-        HomePage(self.driver).go()
-        project = SignInPage(self.driver).go().sign_in(
+        HomePage(self.driver, self.live_server_url).go()
+        project = SignInPage(self.driver, self.live_server_url).go().sign_in(
             self.project_user
         ).go_manage().create_project().create(
             "test_explicit_grain_index",
@@ -1264,7 +1181,7 @@ class DjangoTests(TestCase):
             self.grain_file_name(3)
         ], index=explicit_index).check()
         self.assertEqual(grain.get_grain_index(), explicit_index)
-        sample_page = SamplePage(self.driver).go(sample_pk).check()
+        sample_page = SamplePage(self.driver, self.live_server_url).go(sample_pk).check()
         other_explicit_index = 22
         grain2 = sample_page.create_grain().create([
             self.grain_file_name(2),
@@ -1276,3 +1193,99 @@ class DjangoTests(TestCase):
         ).delete().confirm_delete()
         assert sample.grain_present(other_explicit_index)
         assert not sample.grain_present(explicit_index)
+
+
+class WithGrainsUploaded(SeleniumTests):
+    fixtures = [
+        'grains_with_images.json',
+        'tutorial_result_admin.json',
+        'tutorial_result_tester.json'
+    ]
+
+    def sign_in(self, user):
+        return SignInPage(self.driver, self.live_server_url).go().sign_in(user)
+
+    def test_can_count_tracks(self):
+        counting = self.sign_in(self.test_user).go_start_counting().check()
+        # start counting tracks
+        counting.check_count("000")
+        self.assertFalse(counting.undo_available())
+        self.assertFalse(counting.redo_available())
+        counting.click_at(0.6, 0.35)
+        counting.check_count("001")
+        self.assertTrue(counting.undo_available())
+        self.assertFalse(counting.redo_available())
+        counting.undo()
+        self.assertFalse(counting.undo_available())
+        self.assertTrue(counting.redo_available())
+        counting.redo()
+        counting.click_at(0.45, 0.5)
+        counting.check_count("002")
+        # this one is outside of the boundary
+        counting.click_at(0.55, 0.55)
+        counting.check_count("002")
+        counting.click_at(0.52, 0.37)
+        counting.check_count("003")
+        counting.click_at(0.37, 0.52)
+        counting.check_count("004")
+        # delete one
+        counting.delete_from(0.51, 0.59, 0.33, 0.41)
+        counting.check_count("003")
+        self.assertTrue(counting.undo_available())
+        counting.undo()
+        counting.check_count("004")
+        self.assertTrue(counting.undo_available())
+        self.assertTrue(counting.redo_available())
+        counting.undo()
+        counting.check_count("003")
+        counting.redo()
+        counting.check_count("004")
+        counting.redo()
+        counting.check_count("003")
+        self.assertTrue(counting.undo_available())
+        self.assertFalse(counting.redo_available())
+        counting.undo()
+        counting.check_count("004")
+        counting.click_at(0.54, 0.35)
+        counting.check_count("005")
+        self.assertFalse(counting.redo_available())
+        self.assertTrue(counting.undo_available())
+
+        # save intermediate result and logout
+        counting.save()
+        navbar = NavBar(self.driver)
+        navbar.logout()
+
+        # login, check no results yet
+        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
+        report = navbar.go_manage_projects()
+        report.toggle_tree_node("p1")
+        report.select_tree_node("s1")
+        # Should be no grain "1" in the table yet
+        # (as it is a partial save, not a submission)
+        self.assertRaises(AssertionError, report.result, "1")
+        # start counting, logout
+        counting.go().check_count("000")
+        navbar.check().logout()
+
+        # login as test user, we should still see the saved result
+        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
+        counting = profile.go_start_counting().check()
+        counting.check_count("005")
+
+        # submit the result
+        counting.submit()
+
+        # see this result, as project admin
+        navbar.logout()
+        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
+        report = navbar.go_manage_projects()
+        report.toggle_tree_node("p1")
+        report.select_tree_node("s1")
+        self.assertEqual(report.result("1"), "5")
+
+    def test_count_link(self):
+        self.sign_in(self.project_user)
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_count(1)
+        counting.check()

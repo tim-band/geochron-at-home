@@ -1,0 +1,11 @@
+[
+  {
+    "model": "ftc.tutorialresult",
+    "pk": 2,
+    "fields": {
+      "user": 104,
+      "session": "somepreviousse5510n",
+      "date": "2023-03-03T09:39:05.904Z"
+    }
+  }
+]
