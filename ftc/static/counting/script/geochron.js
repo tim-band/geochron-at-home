@@ -277,6 +277,8 @@ function grain_view(options) {
     function makeUndoStack() {
         var undoStack = [];
         var redoStack = [];
+        // length of undoStack when saved
+        var cleanState = 0;
         function execute(fromStack, toStack) {
             if (fromStack.length) {
                 var f = fromStack.pop();
@@ -308,7 +310,13 @@ function grain_view(options) {
                 redoStack = [];
                 updateUndoRedoButtons();
             },
-            updateButtons: updateUndoRedoButtons
+            updateButtons: updateUndoRedoButtons,
+            isClean: function() {
+                return cleanState == undoStack.length;
+            },
+            setClean: function() {
+                cleanState = undoStack.length;
+            }
         };
     }
     var undo = makeUndoStack();
@@ -651,7 +659,38 @@ function grain_view(options) {
             cb(markers.trackCount());
         };
         updateTrackCounter();
-    };
+    }
+
+    function doSave(url) {
+        var latlngs = markers.getLatLngs();
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.onload = function() {
+            console.log('submitted: ' + xhr.responseText);
+        };
+        xhr.onerror = function() {
+            console.log(xhr.status + ": " + xhr.responseText);
+            alert('Save failed, please try again.');
+        };
+        xhr.setRequestHeader('X-CSRFToken', options.atoken);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({
+            'sample_id': grain_info.sample_id,
+            'grain_num': grain_info.grain_num,
+            'ft_type': grain_info.ft_type,
+            'image_width': grain_info.image_width,
+            'image_height': grain_info.image_height,
+            'num_markers': latlngs.length,
+            'marker_latlngs': latlngs
+        }));
+        undo.setClean();
+    }
+
+    function saveTrackCount(url) {
+        if (confirm("Save the intermediate result to the server?")) {
+            doSave(url);
+        }
+    }
 
     return {
         setTrackCounterCallback: setTrackCounterCallback,
@@ -662,62 +701,20 @@ function grain_view(options) {
             });
         },
         submitTrackCount: function(updateUrl, newGrainUrl) {
-            if (confirm("submit the result?") == true) {
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', updateUrl);
-                xhr.onload = function() {
-                    console.log('submitted: ' + xhr.responseText);
-                    window.location.href = newGrainUrl;
-                };
-                xhr.onerror = function() {
-                    console.log(xhr.status + ": " + xhr.responseText);
-                };
-                xhr.setRequestHeader('X-CSRFToken', options.atoken);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.send(JSON.stringify({
-                    'counting_res': {
-                        'sample_id': grain_info.sample_id,
-                        'grain_num': grain_info.grain_num,
-                        'ft_type': grain_info.ft_type,
-                        'image_width': grain_info.image_width,
-                        'image_height': grain_info.image_height,
-                        'marker_latlngs': markers.getLatLngs(),
-                        'track_num': markers.trackCount()
-                    }
-                }));
+            if (confirm("submit the result?")) {
+                doSave(updateUrl);
             } else {
                 console.log("You pressed Cancel!");
             }
         },
-        saveTrackCount: function(saveUrl) {
-            if (confirm("Save the intermediate result to the server?") == true) {
-                var latlngs = markers.getLatLngs();
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', saveUrl);
-                xhr.onload = function() {
-                    console.log('submitted: ' + xhr.responseText);
-                };
-                xhr.onerror = function() {
-                    console.log(xhr.status + ": " + xhr.responseText);
-                    alert('Failed to save your intermediate result, Please try again.');
-                };
-                xhr.setRequestHeader('X-CSRFToken', options.atoken);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.send(JSON.stringify({
-                    'intermedia_res': {
-                        'sample_id': grain_info.sample_id,
-                        'grain_num': grain_info.grain_num,
-                        'ft_type': grain_info.ft_type,
-                        'image_width': grain_info.image_width,
-                        'image_height': grain_info.image_height,
-                        'num_markers': latlngs.length,
-                        'marker_latlngs': latlngs
-                    }
-                }));
+        saveTrackCount: saveTrackCount,
+        saveTrackCountIfNecessary: function(saveUrl) {
+            if (!undo.isClean()) {
+                saveTrackCount(saveUrl);
             }
         },
         restartTrackCount: function() {
-            if (confirm("Are you sure that you want to reset the counter for this grain?") == true) {
+            if (confirm("Are you sure that you want to reset the counter for this grain?")) {
                 if (!markers.empty()) {
                     undo.withUndo(removeAllFromMap());
                 }

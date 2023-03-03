@@ -23,13 +23,13 @@ class CountingCase(TestCase):
   def count_grain(self, sample, grain, count):
     self.client.post(
       reverse('updateTFNResult'),
-      { 'counting_res': {
+      {
         'sample_id': sample,
         'grain_num': grain,
         'ft_type': 'S',
-        'track_num': count,
+        'num_markers': count,
         'marker_latlngs': gen_latlngs(count)
-      }},
+      },
       content_type='application/json'
     )
 

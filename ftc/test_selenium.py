@@ -353,6 +353,18 @@ class CountingPage(BasePage):
         Alert(self.driver).accept()
         return self
 
+    def previous(self, confirm=False):
+        self.driver.find_element(By.ID, "btn-tracknum").click()
+        self.driver.find_element(By.ID, "tracknum-previous").click()
+        if confirm:
+            Alert(self.driver).accept()
+
+    def next(self, confirm=False):
+        self.driver.find_element(By.ID, "btn-tracknum").click()
+        self.driver.find_element(By.ID, "tracknum-next").click()
+        if confirm:
+            Alert(self.driver).accept()
+
     def drag_layer_handle(self, offset):
         track = self.driver.find_element(By.ID, "focus-slider")
         dy = offset * track.size['height']
@@ -1197,7 +1209,8 @@ class FromClean(SeleniumTests):
 
 class WithGrainsUploaded(SeleniumTests):
     fixtures = [
-        'grains_with_images.json',
+        'grain_with_images.json',
+        'grain_with_images2.json',
         'tutorial_result_admin.json',
         'tutorial_result_tester.json'
     ]
@@ -1289,3 +1302,21 @@ class WithGrainsUploaded(SeleniumTests):
         samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
         counting = samples.go_sample('s1').go_count(1)
         counting.check()
+
+    def test_revisit_own_count(self):
+        counting = self.sign_in(self.project_user)
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_count(1)
+        self.assertFalse(counting.undo_available())
+        self.assertFalse(counting.redo_available())
+        counting.click_at(0.6, 0.35)
+        counting.click_at(0.5, 0.25)
+        counting.check_count("002")
+        counting.next(confirm=True)
+        counting.check_count("000")
+        counting.click_at(0.51, 0.44)
+        counting.check_count("001")
+        counting.previous(confirm=True)
+        counting.check_count("002")
+        counting.next()
+        counting.check_count("001")

@@ -433,7 +433,7 @@ footer {
             url: "{% url 'saveWorkingGrain'%}",
             type: 'POST',
             dataType: 'json',
-            data: JSON.stringify({'intermedia_res':o}),
+            data: JSON.stringify(o),
             success: function(result) {
                 console.log('submitted: ' + result.reply);
                 window.location = "{% url 'counting' %}";

@@ -122,12 +122,25 @@ function setup() {
     };
     document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
     var save = document.getElementById('tracknum-save');
-//    if (save) {
-        // The save doesn't exist if you are a guest
+    if (save) {
         save.onclick = function() {
             map.saveTrackCount("{% url 'saveWorkingGrain'%}");
         };
-//    }
+    }
+    var prev_grain = document.getElementById('tracknum-previous');
+    if (prev_grain) {
+        prev_grain.onclick = function() {
+            map.saveTrackCountIfNecessary("{% url 'saveWorkingGrain'%}");
+            window.location = "{{prev_url}}"
+        };
+    }
+    var next_grain = document.getElementById('tracknum-next');
+    if (next_grain) {
+        next_grain.onclick = function() {
+            map.saveTrackCountIfNecessary("{% url 'saveWorkingGrain' %}");
+            window.location = "{{next_url}}"
+        };
+    }
     map.enableEditing();
 }
 </script>
@@ -160,13 +173,13 @@ function setup() {
     <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>submit result</a></li>
     <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>restart counting</a></li>
     {% if cancel_url %}
-    <li><a id="tracknum-cancel" href="{{cancel_url}}"><i class="fa fa-eject"></i>cancel counting</a></li>
+    <li><a id="tracknum-cancel" href="#"><i class="fa fa-eject"></i>cancel counting</a></li>
     {% endif %}
     {% if prev_url %}
-    <li><a id="tracknum-previous" href="{{prev_url}}"><i class="fa fa-angle-left"></i>previous grain</a></li>
+    <li><a id="tracknum-previous" href="#"><i class="fa fa-angle-left"></i>previous grain</a></li>
     {% endif %}
     {% if next_url %}
-    <li><a id="tracknum-next" href="{{next_url}}"><i class="fa fa-angle-right"></i>next grain</a></li>
+    <li><a id="tracknum-next" href="#"><i class="fa fa-angle-right"></i>next grain</a></li>
     {% endif %}
   </ul>
 </div>

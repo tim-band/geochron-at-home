@@ -936,8 +936,7 @@ def updateTFNResult(request):
     sep = '~'
     if request.user.is_active:
         json_str = request.body.decode(encoding='UTF-8')
-        json_obj = json.loads(json_str)
-        res_dic = json_obj['counting_res']
+        res_dic = json.loads(json_str)
         grain = Grain.objects.get(
             sample__id=res_dic['sample_id'],
             index=res_dic['grain_num']
@@ -952,7 +951,7 @@ def updateTFNResult(request):
         fts = FissionTrackNumbering(grain=grain,
                                     ft_type=res_dic['ft_type'],
                                     worker=request.user,
-                                    result=res_dic['track_num'],
+                                    result=res_dic['num_markers'],
                                     latlngs=latlng_json_str,
         )
         fts.save()
@@ -968,8 +967,7 @@ def saveWorkingGrain(request):
         with transaction.atomic():
             user = User.objects.get(username=request.user.username)
             json_str = request.body.decode(encoding='UTF-8')
-            res_json = json.loads(json_str)
-            res = res_json['intermedia_res']
+            res = json.loads(json_str)
             grain = Grain.objects.get(sample__id=res['sample_id'], index=res['grain_num'])
             if user.username != 'guest':
                 # Remove any previous or partial save state
