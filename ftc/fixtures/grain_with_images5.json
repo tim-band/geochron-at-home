@@ -1,10 +1,10 @@
 [
   {
     "model": "ftc.grain",
-    "pk": 2,
+    "pk": 5,
     "fields": {
       "sample": 1,
-      "index": 2,
+      "index": 5,
       "image_width": 200,
       "image_height": 200,
       "scale_x": null,
@@ -20,43 +20,43 @@
   },
   {
     "model": "ftc.region",
-    "pk": 3,
+    "pk": 50,
     "fields": {
-      "grain": 2
+      "grain": 5
     }
   },
   {
     "model": "ftc.vertex",
-    "pk": 20,
+    "pk": 50,
     "fields": {
-      "region": 3,
+      "region": 50,
       "x": 2,
       "y": 197
     }
   },
   {
     "model": "ftc.vertex",
-    "pk": 21,
+    "pk": 51,
     "fields": {
-      "region": 3,
+      "region": 50,
       "x": 197,
       "y": 1
     }
   },
   {
     "model": "ftc.vertex",
-    "pk": 22,
+    "pk": 52,
     "fields": {
-      "region": 3,
+      "region": 50,
       "x": 1,
       "y": 1
     }
   },
   {
     "model": "ftc.image",
-    "pk": 21,
+    "pk": 51,
     "fields": {
-      "grain": 2,
+      "grain": 5,
       "format": "J",
       "ft_type": "S",
       "index": 1,
@@ -67,9 +67,9 @@
   },
   {
     "model": "ftc.image",
-    "pk": 22,
+    "pk": 52,
     "fields": {
-      "grain": 2,
+      "grain": 5,
       "format": "J",
       "ft_type": "S",
       "index": 4,
@@ -80,9 +80,9 @@
   },
   {
     "model": "ftc.image",
-    "pk": 23,
+    "pk": 53,
     "fields": {
-      "grain": 2,
+      "grain": 5,
       "format": "J",
       "ft_type": "S",
       "index": 2,
@@ -93,9 +93,9 @@
   },
   {
     "model": "ftc.image",
-    "pk": 24,
+    "pk": 54,
     "fields": {
-      "grain": 2,
+      "grain": 5,
       "format": "J",
       "ft_type": "S",
       "index": 3,
@@ -106,9 +106,9 @@
   },
   {
     "model": "ftc.image",
-    "pk": 25,
+    "pk": 55,
     "fields": {
-      "grain": 2,
+      "grain": 5,
       "format": "J",
       "ft_type": "I",
       "index": 1,

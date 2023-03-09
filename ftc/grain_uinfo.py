@@ -1,6 +1,6 @@
 from django.db.models import Count, Exists, F, OuterRef, Subquery, Q
 
-from ftc.models import Project, Sample, Grain, FissionTrackNumbering
+from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering
 import os, random, itertools, json
 
 def sorted_rand_T(qeuryset):
@@ -38,6 +38,10 @@ def choose_working_grain(request, ft_type):
         ft_type=ft_type,
         result__gte=0
     )
+    has_backref_image = Image.objects.filter(
+        grain=OuterRef('pk'),
+        ft_type=ft_type
+    )
     # Grains without results from this user, and with more results needed
     # Ordered by priority of project then priority of sample
     # A random one of these top priority samples will be first
@@ -45,6 +49,7 @@ def choose_working_grain(request, ft_type):
         backref_count=backref_count
     ).filter(
         ~Q(Exists(has_backref_user)),
+        Q(Exists(has_backref_image)),
         sample__in_project__closed=False,
         sample__completed=False,
         sample__min_contributor_num__gte=F('backref_count')

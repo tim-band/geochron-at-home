@@ -1322,7 +1322,7 @@ class WithOneGrainUploaded(SeleniumTests):
 class WithTwoGrainsUploaded(SeleniumTests):
     fixtures = [
         'grain_with_images.json',
-        'grain_with_images2.json',
+        'grain_with_images5.json',
         'tutorial_result_admin.json',
         'tutorial_result_tester.json'
     ]
@@ -1392,9 +1392,10 @@ class WithTwoGrainsUploaded(SeleniumTests):
         self.sign_in(self.project_user)
         samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1).check()
-        # This position is not present with the shift
+        # This position is not within the shifted ROI
         counting.click_at(0.75, 0.7)
         counting.check_count("000")
+        # But this one is
         counting.click_at(0.75, 0.6)
         counting.check_count("001")
 
@@ -1422,4 +1423,52 @@ class WithTwoGrainsUploaded(SeleniumTests):
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
         self.assertEqual(report.result("1"), "2")
-        self.assertEqual(report.result("2"), "1")
+        self.assertEqual(report.result("5"), "1")
+
+class OneGrainWithoutMica(SeleniumTests):
+    fixtures = [
+        'grain_with_images.json',
+        'grain_with_images_mineral_only.json',
+        'grain_with_images5.json',
+        'tutorial_result_admin.json',
+        'tutorial_result_tester.json'
+    ]
+
+    def test_mica_count_goes_past_grain_with_no_mica_images(self):
+        self.sign_in(self.project_user)
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_count(1).check()
+        assert self.driver.current_url.endswith('/1/')
+        counting.next().check()
+        assert self.driver.current_url.endswith('/3/')
+        counting.next().check()
+        assert self.driver.current_url.endswith('/5/')
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_mica_count(1).check()
+        assert self.driver.current_url.endswith('/1/')
+        counting.next().check()
+        assert self.driver.current_url.endswith('/5/')
+
+class OneGrainWithoutMineral(SeleniumTests):
+    fixtures = [
+        'grain_with_images.json',
+        'grain_with_images_mica_only.json',
+        'grain_with_images5.json',
+        'tutorial_result_admin.json',
+        'tutorial_result_tester.json'
+    ]
+
+    def test_mineral_count_goes_past_grain_with_no_mineral_images(self):
+        self.sign_in(self.project_user)
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_mica_count(1).check()
+        assert self.driver.current_url.endswith('/1/')
+        counting.next().check()
+        assert self.driver.current_url.endswith('/4/')
+        counting.next().check()
+        assert self.driver.current_url.endswith('/5/')
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_count(1).check()
+        assert self.driver.current_url.endswith('/1/')
+        counting.next().check()
+        assert self.driver.current_url.endswith('/5/')

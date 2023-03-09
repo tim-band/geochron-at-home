@@ -842,9 +842,14 @@ def count_my_grain_extra_links(user, current_id, ft_type):
         ft_type=ft_type,
         result__gte=0
     ))
+    has_backref_image = Image.objects.filter(
+        grain=OuterRef('pk'),
+        ft_type=ft_type
+    )
     next_grain = Grain.objects.annotate(
         done=Exists(done_query)
     ).filter(
+        Q(Exists(has_backref_image)),
         sample__in_project__creator=user,
         sample__in_project=project,
         sample=sample,
@@ -856,6 +861,7 @@ def count_my_grain_extra_links(user, current_id, ft_type):
     prev_grain = Grain.objects.annotate(
         done=Exists(done_query)
     ).filter(
+        Q(Exists(has_backref_image)),
         sample__in_project__creator=user,
         sample__in_project=project,
         sample=sample,
