@@ -1,5 +1,6 @@
 from django.core import mail
-from django.test import Client, tag, TestCase, LiveServerTestCase
+from django.test import tag, LiveServerTestCase
+from django.urls import reverse
 from pathlib import Path
 from selenium import webdriver
 from selenium.common import exceptions
@@ -10,6 +11,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 import base64
 import glob
+import json
 import os
 import re
 import subprocess
@@ -92,6 +94,11 @@ class BasePage:
     def find_by_css(self, css):
         return WebDriverWait(self.driver, timeout=2).until(
             lambda d: d.find_element(By.CSS_SELECTOR, css)
+        )
+
+    def find_by_xpath(self, xpath):
+        return WebDriverWait(self.driver, timeout=2).until(
+            lambda d: d.find_element(By.XPATH, xpath)
         )
 
     def click_element(self, locator, css):
@@ -299,6 +306,7 @@ class CountingPage(BasePage):
     def assert_count(self, count):
         c = self.count()
         assert c == count, "Count should be '{0}' but is '{1}'".format(count, c)
+        return self
 
     def check_count(self, count):
         retrying(
@@ -306,6 +314,7 @@ class CountingPage(BasePage):
             lambda: self.assert_count(count),
             0.3
         )
+        return self
 
     def click_at(self, x, y):
         mp = self.driver.find_element(By.ID, "map")
@@ -332,9 +341,11 @@ class CountingPage(BasePage):
 
     def undo(self):
         self.driver.find_element(By.ID, "ftc-btn-undo").click()
+        return self
 
     def redo(self):
         self.driver.find_element(By.ID, "ftc-btn-redo").click()
+        return self
 
     def undo_available(self):
         return not self.element_is_disabled("ftc-btn-undo")
@@ -346,6 +357,7 @@ class CountingPage(BasePage):
         self.driver.find_element(By.ID, "btn-tracknum").click()
         self.driver.find_element(By.ID, "tracknum-submit").click()
         Alert(self.driver).accept()
+        return self
 
     def save(self):
         self.driver.find_element(By.ID, "btn-tracknum").click()
@@ -358,12 +370,14 @@ class CountingPage(BasePage):
         self.driver.find_element(By.ID, "tracknum-previous").click()
         if confirm:
             Alert(self.driver).accept()
+        return self
 
     def next(self, confirm=False):
         self.driver.find_element(By.ID, "btn-tracknum").click()
         self.driver.find_element(By.ID, "tracknum-next").click()
         if confirm:
             Alert(self.driver).accept()
+        return self
 
     def drag_layer_handle(self, offset):
         track = self.driver.find_element(By.ID, "focus-slider")
@@ -420,9 +434,7 @@ class NavBar(BasePage):
 
     def go_manage_projects(self):
         self.click_dropdown()
-        self.driver.find_element(By.CSS_SELECTOR,
-            'a[href="/ftc/report/"]'
-        ).click()
+        self.click_by_css('a[href="/ftc/report/"]')
         return ReportPage(self.driver, self.url)
 
     def go_edit_projects(self):
@@ -468,6 +480,10 @@ class ReportPage(BasePage):
 class ProjectsPage(BasePage):
     def go(self):
         self.driver.get(self.url + '/ftc/projects/')
+        return self
+
+    def check(self):
+        self.find_by_xpath('//h1[text()="Projects"]')
         return self
 
     def create_project(self):
@@ -545,6 +561,13 @@ class SamplePage(BasePage):
         self.click_element(
             By.XPATH,
             '//table[@id="grain-set"]/tbody/tr/td/a[@id="count-link-{0}"]'.format(index)
+        )
+        return CountingPage(self.driver, self.url)
+
+    def go_mica_count(self, index):
+        self.click_element(
+            By.XPATH,
+            '//table[@id="grain-set"]/tbody/tr/td/a[@id="count-mica-link-{0}"]'.format(index)
         )
         return CountingPage(self.driver, self.url)
 
@@ -910,6 +933,7 @@ class WebUploader:
         hash_ = hash(ba)
         return self.hashes.get(hash_)
 
+@tag('selenium')
 class SeleniumTests(LiveServerTestCase):
     def setUp(self):
         self.project_user = User("admin", "admin@uni.ac.uk", "admin_password")
@@ -934,13 +958,15 @@ class SeleniumTests(LiveServerTestCase):
                 )
             )
 
+    def sign_in(self, user):
+        return SignInPage(self.driver, self.live_server_url).go().sign_in(user)
+
     def tearDown(self):
         self.driver.close()
         if self.tmp is not None:
             os.rmdir(self.tmp)
 
 
-@tag('selenium')
 class FromClean(SeleniumTests):
     fixtures = [
         'users.json'
@@ -1207,16 +1233,12 @@ class FromClean(SeleniumTests):
         assert not sample.grain_present(explicit_index)
 
 
-class WithGrainsUploaded(SeleniumTests):
+class WithOneGrainUploaded(SeleniumTests):
     fixtures = [
         'grain_with_images.json',
-        'grain_with_images2.json',
         'tutorial_result_admin.json',
         'tutorial_result_tester.json'
     ]
-
-    def sign_in(self, user):
-        return SignInPage(self.driver, self.live_server_url).go().sign_in(user)
 
     def test_can_count_tracks(self):
         counting = self.sign_in(self.test_user).go_start_counting().check()
@@ -1297,6 +1319,14 @@ class WithGrainsUploaded(SeleniumTests):
         report.select_tree_node("s1")
         self.assertEqual(report.result("1"), "5")
 
+class WithTwoGrainsUploaded(SeleniumTests):
+    fixtures = [
+        'grain_with_images.json',
+        'grain_with_images2.json',
+        'tutorial_result_admin.json',
+        'tutorial_result_tester.json'
+    ]
+
     def test_count_link(self):
         self.sign_in(self.project_user)
         samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
@@ -1304,7 +1334,7 @@ class WithGrainsUploaded(SeleniumTests):
         counting.check()
 
     def test_revisit_own_count(self):
-        counting = self.sign_in(self.project_user)
+        self.sign_in(self.project_user)
         samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
         counting = samples.go_sample('s1').go_count(1)
         self.assertFalse(counting.undo_available())
@@ -1320,3 +1350,76 @@ class WithGrainsUploaded(SeleniumTests):
         counting.check_count("002")
         counting.next()
         counting.check_count("001")
+
+    def test_can_count_mica(self):
+        self.sign_in(self.project_user)
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_mica_count(1)
+        counting.click_at(0.6, 0.35)
+        counting.click_at(0.5, 0.25)
+        counting.check_count("002")
+        counting.next(confirm=True)
+        counting.check_count("000")
+        # Check that the triangular ROI is flipped:
+        # The lower left corner is in the ROI
+        counting.click_at(0.75, 0.7)
+        counting.check_count("001")
+        # The lower right corner is not in the ROI
+        counting.click_at(0.25,0.7)
+        counting.check_count("001")
+        counting.previous(confirm=True)
+        counting.check_count("002")
+        counting.next()
+        counting.check_count("001")
+        counting.previous()
+        counting.check_count("002")
+
+    def test_mica_shift(self):
+        login_page = reverse('account_login')
+        self.client.get(login_page)
+        r = self.client.post(login_page, {
+          'login': self.project_user.identity,
+          'password': self.project_user.password
+        })
+        assert r.status_code < 400
+        r = self.client.post(reverse('grain_update_shift', kwargs={
+            'pk': 1
+        }), {
+            'x': 0,
+            'y': 20
+        })
+        assert r.status_code < 400
+        self.sign_in(self.project_user)
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_mica_count(1).check()
+        # This position is not present with the shift
+        counting.click_at(0.75, 0.7)
+        counting.check_count("000")
+        counting.click_at(0.75, 0.6)
+        counting.check_count("001")
+
+    def test_mineral_does_not_interfere_with_mica_counting(self):
+        self.sign_in(self.project_user)
+        projects = ProjectsPage(self.driver, self.live_server_url)
+        samples = projects.go().check().go_project('p1')
+        counting = samples.go_sample('s1').go_count(1)
+        retrying(3, lambda: counting.click_at(0.6, 0.35))
+        counting.click_at(0.5, 0.25)
+        counting.check_count("002").submit()
+        # we must wait for the new grain to appear
+        retrying(3, lambda: counting.check_count("000"))
+        projects.go()
+        projects.check()
+        samples = projects.go_project('p1')
+        counting = samples.go_sample('s1').go_mica_count(1)
+        counting.check_count("000").next().check_count("000")
+        counting.click_at(0.75, 0.7).check_count("001")
+        counting.previous(confirm=True)
+        retrying(3, lambda: counting.check_count("000"))
+        counting.next()
+        counting.check_count("001").submit()
+        report = NavBar(self.driver).go_manage_projects()
+        report.toggle_tree_node("p1")
+        report.select_tree_node("s1")
+        self.assertEqual(report.result("1"), "2")
+        self.assertEqual(report.result("2"), "1")

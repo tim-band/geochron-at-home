@@ -122,15 +122,22 @@ class Grain(models.Model):
             result__gte=0,
         ).count()
 
-    def owners_result(self):
+    def owners_result_of(self, ft_type):
         ftn = FissionTrackNumbering.objects.filter(
             grain__sample=self.sample,
             grain__index=self.index,
+            ft_type=ft_type,
             worker=self.get_owner()
         ).first()
         if ftn == None:
             return None
         return ftn.result
+
+    def owners_result(self):
+        return self.owners_result_of('S')
+
+    def owners_result_mica(self):
+        return self.owners_result_of('I')
 
     def roi_area_pixels(self):
         total = 0

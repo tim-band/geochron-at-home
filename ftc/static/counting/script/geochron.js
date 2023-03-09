@@ -316,6 +316,11 @@ function grain_view(options) {
             },
             setClean: function() {
                 cleanState = undoStack.length;
+            },
+            reset: function() {
+                undoStack = [];
+                redoStack = [];
+                cleanState = 0;
             }
         };
     }
@@ -651,6 +656,7 @@ function grain_view(options) {
             latlng = grain_info.marker_latlngs[i];
             createMarker(latlng);
         }
+        undo.reset();
     }
     map.setView([yOverX / 2, 0.5], mapZoom);
 
@@ -661,12 +667,16 @@ function grain_view(options) {
         updateTrackCounter();
     }
 
-    function doSave(url) {
+    function doSave(url, go_to) {
         var latlngs = markers.getLatLngs();
         var xhr = new XMLHttpRequest();
         xhr.open('POST', url);
         xhr.onload = function() {
             console.log('submitted: ' + xhr.responseText);
+            undo.setClean();
+            if (go_to) {
+                window.location = go_to;
+            }
         };
         xhr.onerror = function() {
             console.log(xhr.status + ": " + xhr.responseText);
@@ -683,12 +693,11 @@ function grain_view(options) {
             'num_markers': latlngs.length,
             'marker_latlngs': latlngs
         }));
-        undo.setClean();
     }
 
-    function saveTrackCount(url) {
+    function saveTrackCount(url, go_to) {
         if (confirm("Save the intermediate result to the server?")) {
-            doSave(url);
+            doSave(url, go_to);
         }
     }
 
@@ -700,17 +709,19 @@ function grain_view(options) {
                 element.setRangeText(v, 0, 3, 'end');
             });
         },
-        submitTrackCount: function(updateUrl, newGrainUrl) {
+        submitTrackCount: function(update_url, new_grain_url) {
             if (confirm("submit the result?")) {
-                doSave(updateUrl);
+                doSave(update_url, new_grain_url);
             } else {
                 console.log("You pressed Cancel!");
             }
         },
         saveTrackCount: saveTrackCount,
-        saveTrackCountIfNecessary: function(saveUrl) {
+        saveTrackCountIfNecessary: function(save_url, go_to) {
             if (!undo.isClean()) {
-                saveTrackCount(saveUrl);
+                saveTrackCount(save_url, go_to);
+            } else if (go_to) {
+                window.location = go_to
             }
         },
         restartTrackCount: function() {
@@ -731,6 +742,9 @@ function grain_view(options) {
             undo.updateButtons();
         },
         map: map,
-        roisLayer: zStack.rois_layer
+        roisLayer: zStack.rois_layer,
+        resetUndo: function() {
+            undo.reset();
+        }
     }
 }

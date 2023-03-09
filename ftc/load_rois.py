@@ -2,32 +2,35 @@ import os
 import json
 from ftc.models import Grain, Region, Vertex
 
-def load_rois(project_name, sample_name, sample_property, grain_nth, ft_type):
-    grains = Grain.objects.filter(
-        index=grain_nth,
-        sample__sample_name=sample_name,
-        sample__in_project__project_name=project_name
-    )
-    grain = grains[0]
-
+def load_rois(grain, ft_type, matrix):
     w = grain.image_width
     h = grain.image_height
-
+    shift_x = 0
+    shift_y = 0
+    if ft_type == 'I':
+        if grain.shift_x:
+            shift_x = grain.shift_x / w
+        if grain.shift_y:
+            shift_y = grain.shift_y / w
     rois = list()
     for index, item in enumerate(grain.region_set.all()):
-        coords = item.vertex_set.order_by('id')
+        vertices = item.vertex_set.order_by('id')
         latlng = list()
         # only 'Induced Fission Tracks' will shift coordinates
         # positive sx or sy mean move along the image positive axis directions
-        """if ft_type == 'I':
-            for coord in coords:
-                x = w - (float(coord.x) + item.shift_x)
-                y = float(coord.y) + item.shift_y
-                latlng.append([(h-y)/w, x/w])"""
-        for coord in coords:
-            x = float(coord.x)
-            y = float(coord.y)
-            latlng.append([(h-y)/w, x/w])
+        #TODO: combine this logic with similar in ftc.views.MicaDetailView
+        for vertex in vertices:
+            lat = (h - vertex.y) / w
+            lng = vertex.x / w
+            if ft_type == 'I':
+                if matrix:
+                    x = lng - 0.5
+                    y = lat - 0.5
+                    lng = 0.5 + x * m.x0 + y * m.y0
+                    lat = 0.5 + x * m.x1 + y * m.y1
+                else:
+                    lng = 1 - lng
+            latlng.append([lat + shift_y, lng + shift_x])
         if len(latlng) < 1:
             return None
         else:

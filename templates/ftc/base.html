@@ -62,17 +62,32 @@
                 <i class="fa fa-user fa-lg"></i>&nbsp; {{ user.username | default:"User"}} &nbsp;<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
                 {% if user.is_authenticated %}
-                    <li><a href="{% url 'profile'%}"><i class="fa fa-cogs"></i>Site dashboard</a></li>
+                    <li><a href="{% url 'profile' %}"><i class="fa fa-cogs"></i>Site dashboard</a></li>
                     <li class="divider"></li>
                     <li><a href="{% url 'logout' %}"><i class="fa fa-sign-out"></i>Logout</a></li>
                     {% if user.username != "guest"  %}
-                    <li><a href="{% url 'account_change_password'%}"><i class="fa fa-key"></i>Change password</a></li>
+                    <li><a href="{% url 'account_change_password' %}"><i class="fa fa-key"></i>Change password</a></li>
                     {% endif %}
                 {% else %}
-                    <li><a href="{% url 'account_login'%}"><i class="fa fa-sign-in"></i>Sign in</a></li>
+                    <li><a href="{% url 'account_login' %}"><i class="fa fa-sign-in"></i>Sign in</a></li>
                 {% endif %}
-                <!-- <li class="dropdown-header">admin your projects</li>  -->
-                {% block right_nav_functon_li %}{% endblock %}
+                <li class="divider"></li>
+                {% block right_nav_fn_counting %}
+                  {% if user.is_authenticated %}
+                    <li><a href="{% url 'counting' %}"><i class="fa fa-rotate-90 fa-sliders"></i>fission track counting</a></li>
+                  {% endif %}
+                {% endblock %}
+                {% block right_nav_fn_edit %}
+                  {% if user.is_staff or user.is_superuser %}
+                    <li><a id='projects-link' href="{% url 'projects' %}"><i class="fa fa-flash"></i>Edit your projects</a></li>
+                  {% endif %}
+                {% endblock %}
+                {% block right_nav_fn_results %}
+                  {% if user.is_staff %}
+                    <li class="divider"></li>
+                    <li><a href="{% url 'report' %}"><i class="fa fa-cubes"></i>Get the results</a></li>
+                  {% endif %}
+                {% endblock %}
               </ul>
             </li>
             <li><a href="{%url 'tutorial' %}" target="_blank"><i class="fa fa-question-circle fa-lg"></i></a></li>

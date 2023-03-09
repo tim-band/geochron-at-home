@@ -182,21 +182,22 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
         return '[{0},{1}]'.format(lat, lng)
     def get_shift(self):
         return [0, 0]
-    def get_context_data(self, *args, **kwargs):
-        pk = self.kwargs['pk']
-        ctx = super().get_context_data(*args, **kwargs)
-        ctx['images'] = self.object.image_set.filter(ft_type=self.ft_type).order_by('index')
-        ctx['ft_type'] = self.ft_type
-        regions = ''
-        w = self.object.image_width
-        h = self.object.image_height
-        ctx['regions'] = json_array([
+    def get_regions_json(self, w, h):
+        return json_array([
             json_array([
                 self.json_latlng((h - vertex.y) / w, vertex.x / w)
                 for vertex in region.vertex_set.order_by('id').iterator()
             ])
             for region in self.object.region_set.order_by('id').iterator()
         ])
+    def get_context_data(self, *args, **kwargs):
+        pk = self.kwargs['pk']
+        ctx = super().get_context_data(*args, **kwargs)
+        ctx['images'] = self.object.image_set.filter(ft_type=self.ft_type).order_by('index')
+        ctx['ft_type'] = self.ft_type
+        w = self.object.image_width
+        h = self.object.image_height
+        ctx['regions'] = self.get_regions_json(w, h)
         shift = self.get_shift()
         ctx['shift_x'] = shift[0]
         ctx['shift_y'] = shift[1]
@@ -729,10 +730,15 @@ def getCsvResults(request):
 import os, random, itertools
 from django.templatetags.static import static
 
-from .get_img_list_of_grain  import get_grain_images_list
 from .get_image_size import get_image_size, UnknownImageFormat
 from .grain_uinfo import choose_working_grain, restore_grain_uinfo
 from .load_rois import load_rois
+
+def get_grain_images_list(grain, ft_type):
+    images = grain.image_set.filter(
+        ft_type=ft_type
+    ).order_by('index')
+    return list(map(lambda x: reverse('get_image', args=[x.pk]), images))
 
 @login_required
 def get_image(request, pk):
@@ -741,11 +747,13 @@ def get_image(request, pk):
     return HttpResponse(image.data, content_type=mime)
 
 def redirect_to_count(request):
+    ft_type = 'S'  # At the moment we're only choosing minerals randomly
     res = {}
     grain = None
     if request.user.is_active:
         partial_save = FissionTrackNumbering.objects.filter(
             result=-1,
+            ft_type=ft_type,
             worker=request.user
         ).first()
         if partial_save != None:
@@ -754,73 +762,59 @@ def redirect_to_count(request):
                 index=partial_save.grain.index
             ).first()
     if grain == None:
-        grain = choose_working_grain(request)
+        grain = choose_working_grain(request, ft_type)
     if grain != None:
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def get_grain_info(request, pk, **kwargs):
+def add_grain_info_markers(info, grain, ft_type, worker):
+    save = FissionTrackNumbering.objects.filter(
+        worker=worker,
+        grain=grain,
+        ft_type=ft_type
+    ).order_by('result').first()
+    if save:
+        latlngs = json.loads(save.latlngs)
+        info['marker_latlngs'] = latlngs
+        info['num_markers'] = len(latlngs)
+
+def get_grain_info(request, pk, ft_type, **kwargs):
     if pk == 'done':
         return {
             'grain_info': 'null',
             'messages': ['All grains complete, congratulations!']
         }
     grain = Grain.objects.get(pk=pk)
-    save = FissionTrackNumbering.objects.filter(
-        worker=request.user,
-        grain__index=grain.index,
-        grain__sample=grain.sample
-    ).order_by('result').first()
-    the_project = grain.sample.in_project
     the_sample = grain.sample
     the_grain = grain.index
-    ft_type = 'S' # should be grain.sample.sample_property
-    images_list = get_grain_images_list(
-        the_project.project_name,
-        the_sample.sample_name,
-        the_sample.sample_property,
-        the_grain,
-        ft_type
-    )
+    ft_type = ft_type
+    images_list = get_grain_images_list(grain, ft_type)
     rois = None
     if len(images_list) > 0:
-        rois = load_rois(
-            the_project.project_name,
-            the_sample.sample_name,
-            the_sample.sample_property,
-            the_grain,
-            ft_type
-        )
+        matrix = grain.mica_transform_matrix if ft_type == 'I' else None
+        rois = load_rois(grain, ft_type, matrix)
     if rois is None:
         return {
             'grain_info': 'null',
             'messages': [
                 "[Project: {0}, Sample: {1}, Grain #: {2}, FT_type: {3}] has no images or has no ROIs\n".format(
-                        the_project.project_name, the_sample.sample_name, the_grain, ft_type
-                ) + "Refresh page to load another Grain."]
+                        grain.sample.in_project.project_name,
+                        the_sample.sample_name,
+                        the_grain,
+                        ft_type
+                )]
         }
-    try:
-        gs = Grain.objects.filter(index=the_grain,
-            sample__sample_name=the_sample.sample_name,
-            sample__in_project__project_name=the_project.project_name)
-        width = gs[0].image_width
-        height = gs[0].image_height
-    except UnknownImageFormat:
-        width, height = 1, 1
     info = {
         'sample_id': the_sample.id,
         'grain_num': the_grain,
         'ft_type': ft_type,
-        'image_width': width,
-        'image_height': height,
+        'image_width': grain.image_width,
+        'image_height': grain.image_height,
         'scale_x': grain.scale_x,
         'images': images_list,
         'rois': rois
     }
-    if save:
-        latlngs = json.loads(save.latlngs)
-        info['marker_latlngs'] = latlngs
-        info['num_markers'] = len(latlngs)
+    add_grain_info_markers(info, grain, ft_type, request.user)
     return {
         'grain_info': json.dumps(info),
         'messages': [],
@@ -833,11 +827,11 @@ def count_grain(request, pk):
     return render(
         request,
         'ftc/counting.html',
-        get_grain_info(request, pk, submit_url=reverse('counting'))
+        get_grain_info(request, pk, 'S', submit_url=reverse('counting'))
     )
 
 
-def count_my_grain_extra_links(user, current_id):
+def count_my_grain_extra_links(user, current_id, ft_type):
     current_grain = Grain.objects.get(id=current_id)
     sample = current_grain.sample
     project = sample.in_project
@@ -845,6 +839,7 @@ def count_my_grain_extra_links(user, current_id):
     done_query = Subquery(FissionTrackNumbering.objects.filter(
         worker=user,
         grain=OuterRef('id'),
+        ft_type=ft_type,
         result__gte=0
     ))
     next_grain = Grain.objects.annotate(
@@ -874,12 +869,13 @@ def count_my_grain_extra_links(user, current_id):
         'submit_url': back,
         'cancel_url': back
     }
+    view_name = 'count_my_mica' if ft_type == 'I' else 'count_my'
     if next_grain != None:
-        url = reverse('count_my', args=[next_grain.id])
+        url = reverse(view_name, args=[next_grain.id])
         r['next_url'] = url
         r['submit_url'] = url
     if prev_grain != None:
-        r['prev_url'] = reverse('count_my', args=[prev_grain.id])
+        r['prev_url'] = reverse(view_name, args=[prev_grain.id])
     return r
 
 class ImageDeleteView(CreatorOrSuperuserMixin, DeleteView):
@@ -889,6 +885,7 @@ class ImageDeleteView(CreatorOrSuperuserMixin, DeleteView):
         return reverse('grain_images', args=[self.object.grain_id])
 
 class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
+    ft_type = 'S'
     model = Grain
     template_name = "ftc/counting.html"
     def get_context_data(self, **kwargs):
@@ -897,9 +894,13 @@ class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
         ctx.update(get_grain_info(
             self.request,
             pk,
-            **count_my_grain_extra_links(self.request.user, pk)
+            self.ft_type,
+            **count_my_grain_extra_links(self.request.user, pk, self.ft_type)
         ))
         return ctx
+
+class CountMyGrainMicaView(CountMyGrainView):
+    ft_type = 'I'
 
 from django.contrib.auth.models import User
 def tutorialCompleted(request):
@@ -942,14 +943,16 @@ def updateTFNResult(request):
             index=res_dic['grain_num']
         )
         latlng_json_str = json.dumps(res_dic['marker_latlngs'])
+        ft_type = res_dic['ft_type']
         if request.user.username != 'guest':
             # Remove any previous or partial save state
             FissionTrackNumbering.objects.filter(
                 grain=grain,
                 worker=request.user,
+                ft_type=ft_type
             ).delete()
         fts = FissionTrackNumbering(grain=grain,
-                                    ft_type=res_dic['ft_type'],
+                                    ft_type=ft_type,
                                     worker=request.user,
                                     result=res_dic['num_markers'],
                                     latlngs=latlng_json_str,
@@ -969,16 +972,18 @@ def saveWorkingGrain(request):
             json_str = request.body.decode(encoding='UTF-8')
             res = json.loads(json_str)
             grain = Grain.objects.get(sample__id=res['sample_id'], index=res['grain_num'])
+            ft_type = res['ft_type']
             if user.username != 'guest':
                 # Remove any previous or partial save state
                 FissionTrackNumbering.objects.filter(
                     grain=grain,
                     worker=user,
+                    ft_type=ft_type
                 ).delete()
             # Save the new state
             ftn = FissionTrackNumbering(
                 grain=grain,
-                ft_type='S',
+                ft_type=ft_type,
                 worker=user,
                 result=-1,
                 latlngs=res['marker_latlngs'],

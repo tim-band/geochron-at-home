@@ -124,38 +124,36 @@ function setup() {
     var save = document.getElementById('tracknum-save');
     if (save) {
         save.onclick = function() {
-            map.saveTrackCount("{% url 'saveWorkingGrain'%}");
+            map.saveTrackCount("{% url 'saveWorkingGrain'%}", null);
         };
     }
     var prev_grain = document.getElementById('tracknum-previous');
     if (prev_grain) {
         prev_grain.onclick = function() {
-            map.saveTrackCountIfNecessary("{% url 'saveWorkingGrain'%}");
-            window.location = "{{prev_url}}"
+            map.saveTrackCountIfNecessary(
+                "{% url 'saveWorkingGrain'%}",
+                "{{prev_url}}"
+            );
         };
     }
     var next_grain = document.getElementById('tracknum-next');
     if (next_grain) {
         next_grain.onclick = function() {
-            map.saveTrackCountIfNecessary("{% url 'saveWorkingGrain' %}");
-            window.location = "{{next_url}}"
+            map.saveTrackCountIfNecessary(
+                "{% url 'saveWorkingGrain' %}",
+                "{{next_url}}"
+            );
         };
     }
+    map.resetUndo();
     map.enableEditing();
 }
 </script>
 {% endblock %}
 
 {% block left_nav_li %}{% endblock %}
-
 {% block right_nav_li %}{% endblock %}
-
-{% block right_nav_functon_li %}
-    {% if user.is_staff %}
-        <li class="divider"></li>
-        <li><a href="{%url 'report'%}"><i class="fa fa-cubes"></i>Manage your projects</a></li>
-    {% endif %}
-{% endblock %}
+{% block right_nav_fn_counting %}{% endblock %}
 
 {% block body_attributes %}onload='setup()'{% endblock %}
 

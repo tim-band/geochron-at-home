@@ -11,8 +11,8 @@ from ftc.views import (home, signmeup, report, getTableData,
     grain_update_roi, grain_update_shift,
     GrainDetailUpdateView, GrainImagesView,
     ImageDeleteView, tutorial, saveTutorialResult,
-    CountMyGrainView, getJsonResults, getCsvResults,
-    GrainDeleteView)
+    CountMyGrainView, CountMyGrainMicaView, getJsonResults,
+    getCsvResults, GrainDeleteView)
 from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
@@ -53,6 +53,7 @@ urlpatterns = [
     path('counting/', counting, name='counting'),
     path('count/<pk>/', count_grain, name='count'),
     path('count_my/<pk>/', CountMyGrainView.as_view(), name='count_my'),
+    path('count_my_mica/<pk>/', CountMyGrainMicaView.as_view(), name='count_my_mica'),
     path('saveWorkingGrain/', saveWorkingGrain, name='saveWorkingGrain'),
     path('image/<pk>/', get_image, name="get_image"),
     path('image/<pk>/delete', ImageDeleteView.as_view(), name='image_delete'),

@@ -2,16 +2,6 @@
 
 {% load static %}
 
-{% block right_nav_functon_li %}
-    {% if user.is_authenticated %}
-        <li class="divider"></li>
-        <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i>fission track counting</a></li>
-    {% endif %}
-    {% if user.is_staff or user.is_superuser %}
-        <li><a id='projects-link' href="{% url 'projects'%}"><i class="fa fa-flash"></i>Edit your projects</a></li>
-    {% endif %}
-{% endblock %}
-
 {% block content %}
 
     {% if messages %}

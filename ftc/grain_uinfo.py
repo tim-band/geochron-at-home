@@ -18,11 +18,13 @@ def sorted_rand(qeuryset):
     res.reverse()
     return res
 
-def choose_working_grain(request):
+def choose_working_grain(request, ft_type):
     """
     Chooses from the highest priority unclosed projects (breaking ties
     at random), and the highest priority uncompleted sample from that
     project (breaking ties at random).
+    A sample is uncompleted if there are no complete (result > 0)
+    FissionTrackNumbering objects of the correct type associated with it.
     """
     # Result objects not produced by guests
     backref_count = Count('results', filter=
@@ -33,6 +35,7 @@ def choose_working_grain(request):
     has_backref_user = FissionTrackNumbering.objects.filter(
         grain=OuterRef('pk'),
         worker=request.user,
+        ft_type=ft_type,
         result__gte=0
     )
     # Grains without results from this user, and with more results needed

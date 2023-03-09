@@ -131,43 +131,14 @@ footer {
 
 {% endblock %}
 
-            {% block left_nav_li %}{% endblock %}
-            {% block right_nav_li %}{% endblock %}
-
-            {% block right_nav_functon_li %}
-                {% if user.is_staff %}
-                    <li class="divider"></li>
-                    <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i>fission track counting</a></li>
-                {% endif %}
-                {% if user.is_staff or user.is_superuser %}
-                    <li><a id='projects-link' href="{% url 'projects'%}"><i class="fa fa-flash"></i>Edit your projects</a></li>
-                {% endif %}
-            {% endblock %}
+{% block right_nav_fn_results %}{% endblock %}
+{% block left_nav_li %}{% endblock %}
+{% block right_nav_li %}{% endblock %}
 
 {% block content %}
    <div class="container">
 
       <div class="row row-offcanvas row-offcanvas-right">
-<!--
-       <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
-          <ul class="nav nav-sidebar">
-            <li class="active"><a href="#">Projects</a></li>
-          </ul>
-          <div id="tree">
-            <ul>
-             {% for project in projects.all %}
-             <li id="p{{ project.id }}" class="folder">{{ project.project_name }}
-                <ul>
-                {% for sample in project.sample_set.all %}
-                  <li id="{{ sample.id }}"> {{ sample.sample_name }} </li>
-                {% endfor %}
-                </ul>
-             </li>
-             {% endfor %}
-            </ul>
-          </div>
-        </div>
--->
         <div class="col-xs-12 col-sm-9">
           <p class="pull-right visible-xs">
             <button type="button" class="btn btn-primary btn-xs" data-toggle="offcanvas">Toggle nav</button>

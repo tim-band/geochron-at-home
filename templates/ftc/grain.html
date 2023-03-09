@@ -149,6 +149,7 @@ window.addEventListener('load', function() {
         in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
     </span>
     <a id="count" class="btn btn-default" href="{% url 'count_my' object.pk %}">Count</a>
+    <a id="count-mica" class="btn btn-default" href="{% url 'count_my_mica' object.pk %}">Count Mica</a>
     <a id="images" class="btn btn-default" href="{% url 'grain_images' object.pk %}">View Image Stack Info</a>
     <a id="meta" class="btn btn-default" href="{% url 'grain_update_meta' object.pk %}">Edit Metadata</a>
     {% if ft_type == 'S' %}
