@@ -325,10 +325,13 @@ class CountingPage(BasePage):
         actions.click().pause(1.0).perform()
         return self
 
+    def leaflet_image_layer(self):
+        mp = self.find_by_id("map")
+        return mp.find_element(By.CSS_SELECTOR,  'img.leaflet-image-layer')
+
     def delete_from(self, minx, maxx, miny, maxy):
         self.click_by_id('ftc-btn-select')
-        mp = self.driver.find_element(By.ID, "map")
-        lil = mp.find_element(By.CSS_SELECTOR,  'img.leaflet-image-layer')
+        lil = self.leaflet_image_layer()
         w = lil.size["width"]
         h = lil.size["height"]
         actions = ActionChains(self.driver)
@@ -337,6 +340,19 @@ class CountingPage(BasePage):
         actions.move_to_element_with_offset(lil, (maxx - 0.5) * w, (maxy - 0.5) * h)
         actions.click().pause(0.1).perform()
         self.driver.find_element(By.ID, "ftc-btn-delete").click()
+        return self
+
+    def find_marker(self, x, y):
+        lil = self.leaflet_image_layer()
+        ms = self.driver.find_elements(By.CSS_SELECTOR, 'img.leaflet-marker-icon')
+        return find_best(ms, lambda m: sum_squares(
+            x * lil.rect['width'] + lil.rect['x'] - pin_x(m),
+            y * lil.rect['height'] + lil.rect['y'] - centre_y(m)
+        ))
+
+    def drag(self, marker, dx, dy):
+        actions = ActionChains(self.driver)
+        actions.drag_and_drop_by_offset(marker, dx, dy).perform()
         return self
 
     def undo(self):
@@ -740,6 +756,9 @@ def pin_x(elt):
 
 def pin_y(elt):
     return elt.rect['y'] + elt.rect['height']
+
+def centre_y(elt):
+    return elt.rect['y'] + elt.rect['height'] / 2
 
 
 class GrainPage(BasePage):
@@ -1285,6 +1304,29 @@ class WithOneGrainUploaded(SeleniumTests):
         counting.check_count("005")
         self.assertFalse(counting.redo_available())
         self.assertTrue(counting.undo_available())
+        marker = counting.find_marker(0.54, 0.35)
+        mx1 = marker.rect['x']
+        my1 = marker.rect['y']
+        counting.drag(marker, 20, -20)
+        counting.check_count("005")
+        mx2 = marker.rect['x']
+        my2 = marker.rect['y']
+        # Drag outside the ROI to delete
+        counting.drag(marker, 60, 90)
+        counting.check_count("004")
+        counting.undo()
+        counting.check_count("005")
+        counting.undo()
+        counting.check_count("005")
+        marker = counting.find_marker(0.54, 0.35)
+        assert marker.rect['x'] == mx1
+        assert marker.rect['y'] == my1
+        counting.redo()
+        counting.check_count("005")
+        assert marker.rect['x'] == mx2
+        assert marker.rect['y'] == my2
+        counting.redo()
+        counting.check_count("004")
 
         # save intermediate result and logout
         counting.save()
@@ -1306,7 +1348,7 @@ class WithOneGrainUploaded(SeleniumTests):
         # login as test user, we should still see the saved result
         profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
         counting = profile.go_start_counting().check()
-        counting.check_count("005")
+        counting.check_count("004")
 
         # submit the result
         counting.submit()
@@ -1317,7 +1359,7 @@ class WithOneGrainUploaded(SeleniumTests):
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
-        self.assertEqual(report.result("1"), "5")
+        self.assertEqual(report.result("1"), "4")
 
 class WithTwoGrainsUploaded(SeleniumTests):
     fixtures = [

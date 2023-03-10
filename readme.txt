@@ -16,5 +16,5 @@ The third party packages used in this software have their own copyright.
   - font-awesome-4.7.0 (Font Awesome Free license https://github.com/FortAwesome/Font-Awesome/blob/master/LICENSE.txt)
   - jquery-1.12.4 (MIT license https://tldrlegal.com/license/mit-license)
   - jquery-ui-1.12.1 (licensed as for jquery)
-  - leaflet-1.7.1 (BSD 2-clause https://github.com/Leaflet/Leaflet/blob/master/LICENSE)
+  - leaflet-1.9.3 (BSD 2-clause https://github.com/Leaflet/Leaflet/blob/master/LICENSE)
   - noUiSlider-14.6.3 (MIT license https://github.com/leongersen/noUiSlider/blob/master/LICENSE.md)

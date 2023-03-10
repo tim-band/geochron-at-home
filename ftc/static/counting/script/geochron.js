@@ -30,17 +30,18 @@
 function grain_view(options) {
     var grain_info = options.grain_info;
     var mapZoom = 11;
-    var myIcon = L.Icon.extend({
+    var MarkerIcon = L.Icon.extend({
         options: {
-            //iconUrl: "{% static 'counting/images/circle.png' %}",
-            /* convert -size 81x81 xc:none -fill yellow -draw "circle 40,40 40,80" circle.png */
             iconSize: [6, 6],
             iconAnchor: [3, 3],
             popupAnchor: [0, 0]
         }
     });
-    var normalIcon = new myIcon({
+    var normalIcon = new MarkerIcon({
         iconUrl: options.iconUrl_normal
+    });
+    var selectedIcon = new MarkerIcon({
+        iconUrl: options.iconUrl_selected
     });
     function makeDeleter(map, markers) {
         var rect = L.rectangle([
@@ -54,9 +55,6 @@ function grain_view(options) {
             weight: 2,
             fill: false,
             clickable: true
-        });
-        var selectedIcon = new myIcon({
-            iconUrl: options.iconUrl_selected
         });
         var trash_mks_in = [];
         var oneCorner, twoCorner;
@@ -152,6 +150,7 @@ function grain_view(options) {
         var track_id = 0;
         var track_num = 0;
         var markers = {};
+        var dragged_out = false;
         return {
             makeDeleter: function() {
                 return makeDeleter(map, markers);
@@ -161,14 +160,42 @@ function grain_view(options) {
             // with the value as this new marker. This return
             // value can be passed into addToMap as is.
             make: function(latlng) {
-                var mk = new L.marker(latlng, {
+                var mks = {};
+                var mk;
+                var startLatLng = null;
+                mk = new L.marker(latlng, {
                     icon: normalIcon,
+                    draggable: true,
                     riseOnHover: true,
                     className: 'jhe-fissionTrack-' + track_id
                 }).on('click', function(e) {
-                    //need this to prevent event propagation
+                    e.preventDefault()
+                    e.stopPropagation()
+                }).on('dragstart', function(e) {
+                    dragged_out = false;
+                    startLatLng = e.target.getLatLng();
+                }).on('drag', function(e) {
+                    var out = dragged_out;
+                    dragged_out = !zStack.pointInRois(e.latlng.lat, e.latlng.lng);
+                    if (out) {
+                        if (!dragged_out) {
+                            mk.setOpacity(1)
+                        }
+                    } else if (dragged_out) {
+                        mk.setOpacity(0.5)
+                    }
+                }).on('dragend', function(e) {
+                    // delete if we are outside of the ROI
+                    if (dragged_out) {
+                        mk.setOpacity(1)
+                        mk.setLatLng(startLatLng);
+                        undo.withUndo(removeFromMap(mks));
+                    } else {
+                        // we already did this move, but we need to make it part of the
+                        // undo stack
+                        undo.withUndo(moveMarker(mk, startLatLng, e.target.getLatLng()));
+                    }
                 });
-                var mks = {};
                 mks[track_id] = mk;
                 track_id++;
                 return mks;
@@ -367,6 +394,12 @@ function grain_view(options) {
         var mks = markers.make(latlng);
         undo.withUndo(addToMap(mks));
     };
+
+    function moveMarker(mk, fromLatLng, toLatLng) {
+        mk.setLatLng(toLatLng);
+        return function() { return moveMarker(mk, toLatLng, fromLatLng); };
+    }
+
 
     function onMapClick(e) {
         L.DomEvent.preventDefault(e);
