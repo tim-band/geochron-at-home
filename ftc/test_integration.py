@@ -19,7 +19,29 @@ def gen_latlngs(n):
   return r
 
 
-class CountingCase(TestCase):
+@tag('integration')
+class GahCase(TestCase):
+  def login(self, user, password):
+    login_page = reverse('account_login')
+    self.client.get(login_page)
+    r = self.client.post(login_page, {
+      'login': user,
+      'password': password
+    })
+    return r
+
+  def login_admin(self):
+    self.login('admin', 'admin_password')
+
+  def login_super(self):
+    self.login('super', 'super_password')
+
+  def logout(self):
+    self.client.post(reverse('logout'))
+
+
+
+class CountingCase(GahCase):
   def count_grain(self, sample, grain, count):
     self.client.post(
       reverse('updateTFNResult'),
@@ -33,9 +55,6 @@ class CountingCase(TestCase):
       content_type='application/json'
     )
 
-  def logout(self):
-    self.client.post(reverse('logout'))
-
   def complete_tutorial(self):
     self.client.get(reverse('tutorial'))
     self.client.post(reverse('tutorial_result'))
@@ -46,15 +65,6 @@ class CountingCase(TestCase):
     for ((sample, grain), count) in grain_counts.items():
       self.count_grain(sample, grain, count)
     self.logout()
-
-  def login(self, user, password):
-    login_page = reverse('account_login')
-    self.client.get(login_page)
-    r = self.client.post(login_page, {
-      'login': user,
-      'password': password
-    })
-    return r
 
   def get_total_track_count(self):
     r = self.client.post(
@@ -72,7 +82,6 @@ class CountingCase(TestCase):
     return total
 
 
-@tag('integration')
 class TestGuestCounts(CountingCase):
   fixtures = [
     'users.json', 'projects.json', 'samples.json',
@@ -85,18 +94,17 @@ class TestGuestCounts(CountingCase):
     guest_count = 5
     for i in range(guest_count):
       self.perform_guest_count({ (1, 1): s1count, (2, 1): s2count })
-    self.login('admin', 'admin_password')
+    self.login_admin()
     total = self.get_total_track_count()
     # should get the results from sample 1 which is owned by admin
     assert(total == guest_count * s1count)
     self.logout()
-    self.login('super', 'super_password')
+    self.login_super()
     total = self.get_total_track_count()
     # should get the results from all samples
     assert(total == guest_count * (s1count + s2count))
 
 
-@tag('integration')
 class TestCountJsonDownload(CountingCase):
   fixtures = [
     'users.json', 'projects.json', 'samples.json',
@@ -112,13 +120,10 @@ class TestCountJsonDownload(CountingCase):
         reverse('getJsonResults'),
         { 'samples[]': samples }
       )
-    gs = json.loads(r.content)
-    r = {}
-    for g in gs:
-      grain_id = g['grain']
-      assert(grain_id not in r)
-      r[grain_id] = g
-    return r
+    return {
+      g['grain']: g
+      for g in json.loads(r.content)
+    }
 
   def sorted_results_for_grain(self, grain):
     return sorted([
@@ -126,7 +131,7 @@ class TestCountJsonDownload(CountingCase):
     ])
 
   def test_superuser_downloads_all_grains(self):
-    self.login('super', 'super_password')
+    self.login_super()
     grains = self.get_json_results()
     assert(sorted(grains.keys()) == [1, 2, 3, 4])
     assert(self.sorted_results_for_grain(grains[1]) == [3, 3])
@@ -135,7 +140,7 @@ class TestCountJsonDownload(CountingCase):
     assert(self.sorted_results_for_grain(grains[4]) == [2])
 
   def test_admin_downloads_only_her_grains(self):
-    self.login('admin', 'admin_password')
+    self.login_admin()
     grains = self.get_json_results()
     assert(sorted(grains.keys()) == [1, 3, 4])
     assert(self.sorted_results_for_grain(grains[1]) == [3, 3])
@@ -143,7 +148,7 @@ class TestCountJsonDownload(CountingCase):
     assert(self.sorted_results_for_grain(grains[4]) == [2])
 
   def test_many_samples(self):
-    self.login('super', 'super_password')
+    self.login_super()
     grains = self.get_json_results(['1', '2'])
     assert(sorted(grains.keys()) == [1, 2, 3, 4])
     assert(self.sorted_results_for_grain(grains[1]) == [3, 3])
@@ -152,17 +157,16 @@ class TestCountJsonDownload(CountingCase):
     assert(self.sorted_results_for_grain(grains[4]) == [2])
 
   def test_superuser_downloads_any_grains(self):
-    self.login('super', 'super_password')
+    self.login_super()
     grains = self.get_json_results(['2'])
     assert(sorted(grains.keys()) == [2])
     assert(self.sorted_results_for_grain(grains[2]) == [2, 2, 3, 3])
 
   def test_admin_cannot_download_others_results(self):
-    self.login('admin', 'admin_password')
+    self.login_admin()
     grains = self.get_json_results(['2'])
     assert(sorted(grains.keys()) == [])
 
-@tag('integration')
 class TestCountCsvDownload(CountingCase):
   fixtures = [
     'users.json', 'projects.json', 'samples.json',
@@ -190,7 +194,7 @@ class TestCountCsvDownload(CountingCase):
     return res
 
   def test_superuser_downloads_csv_all_grains(self):
-    self.login('super', 'super_password')
+    self.login_super()
     grains = self.get_csv_results()
     assert(sorted(grains.keys()) == [
       ("proj1", "adm_samp", '1'),
@@ -202,3 +206,83 @@ class TestCountCsvDownload(CountingCase):
     assert(sorted(grains[("proj1", "adm_samp", '2')]) == [2])
     assert(sorted(grains[("proj1", "adm_samp", '3')]) == [2])
     assert(sorted(grains[("proj2", "counter_samp", '1')]) == [2, 2, 3, 3])
+
+
+class RegionCase(GahCase):
+  fixtures = [
+    'grain_with_images.json',
+    'grain_with_images5.json',
+    'grain6.json'
+  ]
+
+  def setUp(self):
+    self.login_admin()
+
+  def test_download_grain_rois(self):
+    r = self.client.get(
+      reverse('download_grain_rois', kwargs={ 'pk': 5 })
+    )
+    self.assertContains(r, '', status_code=200)
+    roi = json.loads(r.content)
+    self.assertDictContainsSubset({
+      'grain_id': 5
+    }, roi)
+    self.assertIn('regions', roi)
+    self.assertEqual(len(roi['regions']), 1)
+    self.assertEqual([
+      [2, 197],
+      [197, 3],
+      [1, 3]
+    ], roi['regions'][0]["vertices"])
+
+  def test_download_sample_roiss(self):
+    r = self.client.get(
+      reverse('download_roiss'),
+      { 'samples[]': [1] }
+    )
+    self.assertContains(r, '', status_code=200)
+    j = json.loads(r.content)
+    self.assertEqual(len(j), 2)
+    rois = {
+      region['grain_id']: region
+      for region in j
+    }
+    self.assertIn(1, rois)
+    self.assertIn('regions', rois[5])
+    self.assertEqual(len(rois[5]['regions']), 1)
+    self.assertEqual([
+      [2, 197],
+      [197, 3],
+      [1, 3]
+    ], rois[5]['regions'][0]["vertices"])
+    self.assertIn(5, rois)
+    self.assertIn('regions', rois[5])
+    self.assertEqual(len(rois[5]['regions']), 1)
+    self.assertEqual([
+      [2, 197],
+      [197, 3],
+      [1, 3]
+    ], rois[5]['regions'][0]["vertices"])
+
+  def test_download_project_roiss(self):
+    r = self.client.get(
+      reverse('download_roiss'),
+      { 'projects[]': [1] }
+    )
+    self.assertContains(r, '', status_code=200)
+    j = json.loads(r.content)
+    self.assertEqual(len(j), 3)
+    rois = {
+      region['grain_id']: region
+      for region in j
+    }
+    self.assertIn(1, rois)
+    self.assertIn(5, rois)
+    self.assertIn(6, rois)
+    self.assertIn('regions', rois[6])
+    self.assertEqual(len(rois[6]['regions']), 1)
+    self.assertEqual([
+      [3, 195],
+      [183, 7],
+      [6, 7]
+    ], rois[6]['regions'][0]["vertices"])

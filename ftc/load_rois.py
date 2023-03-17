@@ -1,6 +1,6 @@
 import os
 import json
-from ftc.models import Grain, Region, Vertex
+from ftc.models import Grain, Region, Vertex, Sample, Project
 
 def load_rois(grain, ft_type, matrix):
     w = grain.image_width
@@ -45,20 +45,27 @@ def rois_vertex(vertex):
     return [vertex.x, vertex.y]
 
 def rois_region(region, grain):
-    vertices = Vertex.objects.filter(region=region).order_by('id')
+    vertices = region.vertex_set.order_by('id')
     return {
         "shift": [grain.shift_x, grain.shift_y],
-        "vertices": map(rois_vertex, vertices)
+        "vertices": list(map(rois_vertex, vertices))
     }
+
+def transform2d_as_matrix(transform):
+    if not transform:
+        return None
+    return [
+        [ transform.x0, transform.y0, transform.t0 ],
+        [ transform.x1, transform.y1, transform.t1 ]
+    ]
 
 def get_rois(grain):
     """
     Returns a python object that represents ROIs (and other
     metadata) about the Grain.
     """
-    regions = Region.objects.filter(grain=grain)
-    rjs = map(lambda region : rois_region(region, grain), regions)
-    r = {
+    return {
+        "grain_id": grain.id,
         "image_width": grain.image_width,
         "image_height": grain.image_height,
         "scale_x": grain.scale_x,
@@ -67,13 +74,16 @@ def get_rois(grain):
         "stage_y": grain.stage_y,
         "mica_stage_x": grain.mica_stage_x,
         "mica_stage_y": grain.mica_stage_y,
-        "regions": rjs,
-        "mica_transform_matrix": None
+        "regions": list([
+            rois_region(region, grain)
+            for region in grain.region_set.all()
+        ]),
+        "mica_transform_matrix": transform2d_as_matrix(
+            grain.mica_transform_matrix
+        )
     }
-    transform = grain.mica_transform_matrix
-    if transform:
-        r["mica_transform_matrix"] = [
-            [ transform.x0, transform.y0, transform.t0 ],
-            [ transform.x1, transform.y1, transform.t1 ]
-        ]
-    return r
+
+def get_roiss(grains):
+    return list([
+        get_rois(grain) for grain in grains
+    ])

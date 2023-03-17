@@ -540,4 +540,119 @@ class ApiCount(JwtTestCase):
         j = json.loads(r.content.decode(r.charset))
         jl = json.loads(j[0]['latlngs'])
         self.assertListEqual(jl, self.latlngs)
-        self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'} ,j[0]['worker'])
+        self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
+
+
+class ApiGrainCreate(ApiTestMixin, JwtTestCase):
+    fixtures = [
+        'grain_with_images.json',
+        'grain_with_images5.json',
+        'grain6.json'
+    ]
+
+    def test_download_roi(self):
+        r = self.client.get('/ftc/api/grain/6/rois/', **self.super_headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content.decode(r.charset))
+        self.assertDictContainsSubset({
+            "stage_x": 12345,
+            "stage_y": 54321,
+            "mica_stage_x": 1234,
+            "mica_stage_y": 4321,
+            "grain_id": 6
+        }, j)
+        self.assertIn('regions', j)
+        self.assertEqual(len(j['regions']), 1)
+        self.assertDictContainsSubset({
+            'shift': [10, -9],
+        }, j['regions'][0])
+        self.assertIn('vertices', j['regions'][0])
+        self.assertSequenceEqual([
+            [3, 195],
+            [183, 7],
+            [6, 7]
+        ], j['regions'][0]['vertices'])
+        self.assertIn('mica_transform_matrix', j)
+        mtm = j['mica_transform_matrix']
+        self.assertEqual(len(mtm), 2)
+        self.assertEqual(len(mtm[0]), 3)
+        self.assertEqual(len(mtm[1]), 3)
+        self.assertAlmostEqual(mtm[0][0], 0.98)
+        self.assertAlmostEqual(mtm[0][1], 0.2)
+        self.assertAlmostEqual(mtm[0][2], -9000.9)
+        self.assertAlmostEqual(mtm[1][0], 0.2)
+        self.assertAlmostEqual(mtm[1][1], -0.98)
+        self.assertAlmostEqual(mtm[1][2], 100.1)
+
+    def test_download_rois_from_sample(self):
+        r = self.client.get(
+            '/ftc/api/rois/',
+            { 'samples[]': [1] },
+            **self.super_headers
+        )
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content.decode(r.charset))
+        self.assertEqual(len(j), 2)
+        jd = { v['grain_id']:v for v in j }
+        self.assertIn(1, jd)
+        self.assertIn('regions', jd[1])
+        self.assertEqual(len(jd[1]['regions']), 1)
+        self.assertDictContainsSubset({
+            'shift': [0, 0],
+        }, jd[1]['regions'][0])
+        self.assertIn('vertices', jd[1]['regions'][0])
+        self.assertSequenceEqual([
+            [2, 197],
+            [197, 1],
+            [1, 1]
+        ], jd[1]['regions'][0]['vertices'])
+        self.assertIn(5, jd)
+        self.assertIn('regions', jd[5])
+        self.assertEqual(len(jd[5]['regions']), 1)
+        self.assertDictContainsSubset({
+            'shift': [0, 0],
+        }, jd[5]['regions'][0])
+        self.assertIn('vertices', jd[5]['regions'][0])
+        self.assertSequenceEqual([
+            [2, 197],
+            [197, 3],
+            [1, 3]
+        ], jd[5]['regions'][0]['vertices'])
+
+    def test_download_rois_from_project(self):
+        r = self.client.get(
+            '/ftc/api/rois/',
+            { 'projects[]': [1] },
+            **self.super_headers
+        )
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content.decode(r.charset))
+        self.assertEqual(len(j), 3)
+        jd = { v['grain_id']:v for v in j }
+        self.assertIn(1, jd)
+        self.assertIn('regions', jd[1])
+        self.assertEqual(len(jd[1]['regions']), 1)
+        self.assertIn('vertices', jd[1]['regions'][0])
+        self.assertSequenceEqual([
+            [2, 197],
+            [197, 1],
+            [1, 1]
+        ], jd[1]['regions'][0]['vertices'])
+        self.assertIn(5, jd)
+        self.assertIn('regions', jd[5])
+        self.assertEqual(len(jd[5]['regions']), 1)
+        self.assertIn('vertices', jd[5]['regions'][0])
+        self.assertSequenceEqual([
+            [2, 197],
+            [197, 3],
+            [1, 3]
+        ], jd[5]['regions'][0]['vertices'])
+        self.assertIn(6, jd)
+        self.assertIn('regions', jd[6])
+        self.assertEqual(len(jd[6]['regions']), 1)
+        self.assertIn('vertices', jd[6]['regions'][0])
+        self.assertSequenceEqual([
+            [3, 195],
+            [183, 7],
+            [6, 7]
+        ], jd[6]['regions'][0]['vertices'])

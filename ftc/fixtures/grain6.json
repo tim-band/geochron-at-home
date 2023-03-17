@@ -1,0 +1,80 @@
+[
+  {
+    "model": "ftc.sample",
+    "pk": 2,
+    "fields": {
+      "sample_name": "s2",
+      "in_project": 1,
+      "sample_property": "T",
+      "total_grains": 0,
+      "priority": 1,
+      "min_contributor_num": 1,
+      "completed": false
+    }
+  },
+  {
+    "model": "ftc.transform2d",
+    "pk": 6,
+    "fields": {
+      "x0": 0.98,
+      "y0": 0.2,
+      "t0": -9000.9,
+      "x1": 0.2,
+      "y1": -0.98,
+      "t1": 100.1
+    }
+  },
+  {
+    "model": "ftc.grain",
+    "pk": 6,
+    "fields": {
+      "sample": 2,
+      "index": 6,
+      "image_width": 205,
+      "image_height": 206,
+      "scale_x": 9e-8,
+      "scale_y": 1e-7,
+      "stage_x": 12345,
+      "stage_y": 54321,
+      "mica_stage_x": 1234,
+      "mica_stage_y": 4321,
+      "shift_x": 10,
+      "shift_y": -9,
+      "mica_transform_matrix": 6
+    }
+  },
+  {
+    "model": "ftc.region",
+    "pk": 6,
+    "fields": {
+      "grain": 6
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 60,
+    "fields": {
+      "region": 6,
+      "x": 3,
+      "y": 195
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 61,
+    "fields": {
+      "region": 6,
+      "x": 183,
+      "y": 7
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 62,
+    "fields": {
+      "region": 6,
+      "x": 6,
+      "y": 7
+    }
+  }
+]

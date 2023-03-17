@@ -509,7 +509,7 @@ class ProjectsPage(BasePage):
     def go_project(self, name):
         self.click_element(
             By.XPATH,
-            '//ul[@id="project-list"]/li/a[text()="{0}"]'.format(name)
+            '//tbody[@id="project-list"]/tr/td/a[text()="{0}"]'.format(name)
         )
         return ProjectPage(self.driver, self.url)
 

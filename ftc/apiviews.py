@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from django.db.models import F
+from django.db.models import F, Prefetch
 from django.db.models.aggregates import Max
 from django.shortcuts import get_object_or_404
 from rest_framework import exceptions
@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from ftc.get_image_size import get_image_size_from_handle
-from ftc.load_rois import get_rois
+from ftc.load_rois import get_rois, get_roiss
 from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering, Transform2D
 from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
@@ -221,9 +221,34 @@ class GrainInfoView(RetrieveUpdateDeleteView):
 
 @api_view()
 @permission_classes([IsAuthenticated])
-def download_rois(request, pk):
+def get_grain_rois(request, pk):
     grain = Grain.objects.get(id=pk)
     return Response(get_rois(grain))
+
+def request_roiss(request):
+    gq = Grain.objects.all()
+    if 'grains[]' in request.GET:
+        gq = gq.filter(
+            id__in=request.GET.getlist('grains[]')
+        )
+    if 'samples[]' in request.GET:
+        gq = gq.filter(
+            sample__in=request.GET.getlist('samples[]')
+        )
+    if 'projects[]' in request.GET:
+        gq = gq.filter(
+            sample__in_project__in=request.GET.getlist('projects[]')
+        )
+    return get_roiss(gq.prefetch_related(
+        'sample__in_project',
+        'region_set__vertex_set',
+        'mica_transform_matrix'
+    ))
+
+@api_view()
+@permission_classes([IsAuthenticated])
+def get_many_roiss(request):
+    return Response(request_roiss(request))
 
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:

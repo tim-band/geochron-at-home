@@ -22,12 +22,13 @@
 <h2>Samples</h2>
 <a id="create-sample" href="{% url 'sample_create' object.pk %}">Create new sample</a>
 <table class="table no-stretch">
-    <thead><th>Sample</th><th>Excluded?</th></thead>
+    <thead><th>Sample</th><th>Excluded?</th><th>Download ROIs</th></thead>
     <tbody id="sample-list">
         {% for s in object.sample_set.all %}
         <tr>
             <td><a href="{% url 'sample' s.pk %}">{{ s.sample_name }}</a></td>
             <td>{{ s.completed }}</td>
+            <td><a id="download-roiss" href="{% url 'download_roiss' %}?samples[]={{ s.pk }}" download="roiss.json">Download ROIs</a></td>
         </tr>
         {% endfor %}
     </tbody>

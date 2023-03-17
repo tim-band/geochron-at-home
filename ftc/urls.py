@@ -12,12 +12,13 @@ from ftc.views import (home, signmeup, report, getTableData,
     GrainDetailUpdateView, GrainImagesView,
     ImageDeleteView, tutorial, saveTutorialResult,
     CountMyGrainView, CountMyGrainMicaView, getJsonResults,
+    download_rois, download_roiss,
     getCsvResults, GrainDeleteView)
 from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
     ImageListView, GrainListView, FissionTrackNumberingView,
-    download_rois)
+    get_grain_rois, get_many_roiss)
 
 urlpatterns = [
     path('', home, name='home'),
@@ -59,6 +60,8 @@ urlpatterns = [
     path('image/<pk>/delete', ImageDeleteView.as_view(), name='image_delete'),
     path('tutorial/', tutorial, name='tutorial'),
     path('tutorial_result/', saveTutorialResult, name='tutorial_result'),
+    path('rois/<pk>/', download_rois, name='download_grain_rois'),
+    path('rois/', download_roiss, name='download_roiss'),
 
     path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get_jwt_token'),
     path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh_jwt_token'),
@@ -69,7 +72,8 @@ urlpatterns = [
     path('api/sample/<sample>/grain/', SampleGrainListView.as_view(), name='api_sample_grain_list'),
     path('api/grain/', GrainListView.as_view(), name='api_grain_list'),
     path('api/grain/<pk>/', GrainInfoView.as_view(), name='api_grain_info'),
-    path('api/grain/<pk>/rois/', download_rois, name='api_grain_rois'),
+    path('api/grain/<pk>/rois/', get_grain_rois, name='api_grain_rois'),
+    path('api/rois/', get_many_roiss, name='api_roiss'),
     path('api/grain/<grain>/image/', GrainImageListView.as_view(), name='api_grain_image_list'),
     path('api/image/', ImageListView.as_view(), name='api_image_list'),
     path('api/image/<pk>/', ImageInfoView.as_view(), name='api_image_info'),

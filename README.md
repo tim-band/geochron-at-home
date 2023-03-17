@@ -198,6 +198,8 @@ After=network.target
 Type=simple
 User=wwwrunner
 WorkingDirectory=/var/www/repos/geochron-at-home
+ExecStartPre=/usr/bin/python3 -m pipenv run collect
+ExecStartPre=/usr/bin/python3 -m pipenv run migrate
 ExecStart=/usr/bin/python3 -m pipenv run gunicorn --log-level info --bind 127.0.0.1:39401 --workers=2 geochron.wsgi
 Restart=always
 
@@ -236,6 +238,8 @@ sudo -u wwwrunner pipenv run ./site_init.sh
 ```
 
 and start with `sudo systemctl start geochron-at-home`.
+
+If you update the code, you can redeploy with `sudo systemctl restart geochron-at-home`.
 
 And you can look at the logs with `journalctl -eu geochron-at-home`.
 

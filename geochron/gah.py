@@ -209,6 +209,24 @@ def add_set_subparser(subparsers):
     set_parser.add_argument('value', help="value of the config setting to set")
 
 
+def get_config(opts, config):
+    if opts.key:
+        print(config[opts.key])
+    else:
+        for (k, v) in config.items():
+            if k not in ['refresh', 'access']:
+                print("{0}: {1}".format(k, v))
+
+
+def add_get_subparser(subparsers):
+    set_parser = subparsers.add_parser('get')
+    set_parser.set_defaults(func=get_config)
+    set_parser.add_argument(
+        '--key',
+        help="name of the config setting to get, for example 'url'; the default is all of them except JWT tokens"
+    )
+
+
 def refresh_token(config):
     if 'refresh' not in config:
         print("Please log in:")
@@ -375,6 +393,26 @@ def project_new(opts, config):
     with api_post(config, 'project', **o) as response:
         print(response.read())
 
+def add_json_options(parser, id_help):
+    parser.add_argument('id', help=id_help, type=int)
+    parser.add_argument(
+        '--file',
+        help='output file (default standard out)',
+        type=argparse.FileType('w', encoding='utf-8'),
+        default=sys.stdout
+    )
+    parser.add_argument(
+        '--indent',
+        help='how many spaces to use as the indent (default 2)',
+        type=int,
+        default=2
+    )
+    parser.add_argument(
+        '--compact',
+        help='use compact representation',
+        action='store_true'
+    )
+
 
 def add_project_subparser(subparsers):
     # project has verbs list, info, new, update and delete
@@ -405,6 +443,9 @@ def add_project_subparser(subparsers):
         help='This project will not be shown to counters',
         action='store_true',
     )
+    rois = verbs.add_parser('rois', help='download a ROI file for the grains in a project')
+    rois.set_defaults(func=project_rois_download)
+    add_json_options(rois, 'project ID')
 
 
 @token_refresh
@@ -542,6 +583,9 @@ def add_sample_subparser(subparsers):
         'dir',
         help='Directory containing the grains'
     )
+    rois = verbs.add_parser('rois', help='download a ROI file for the grains in a sample')
+    rois.set_defaults(func=sample_rois_download)
+    add_json_options(rois, 'sample ID')
 
 
 @token_refresh
@@ -570,13 +614,36 @@ def grain_new(opts, config):
         return id
 
 
+def output_json(opts, object):
+    v = json.loads(object)
+    indent = None if opts.compact else opts.indent
+    print(json.dumps(v, indent=indent), file=options.file)
+
+
+@token_refresh
+def project_rois_download(opts, config):
+    with api_get(
+        config,
+        'rois',
+        **{ 'project[]': opts.id }
+    ) as response:
+        output_json(opts, response.read())
+
+
+@token_refresh
+def sample_rois_download(opts, config):
+    with api_get(
+        config,
+        'rois',
+        **{ 'sample[]': opts.id }
+    ) as response:
+        output_json(opts, response.read())
+
+
 @token_refresh
 def grain_rois_download(opts, config):
     with api_get(config, 'grain', opts.id, 'rois') as response:
-        body = response.read()
-        v = json.loads(body)
-        indent = None if opts.compact else opts.indent
-        print(json.dumps(v, indent=indent), file=options.file)
+        output_json(opts, response.read())
 
 
 @token_refresh
@@ -594,7 +661,6 @@ def grain_info(opts, config):
             v.get('scale_x'), v.get('scale_y'),
             v.get('stage_x'), v.get('stage_y'),
         ))
-
 
 def add_grain_subparser(subparsers):
     grain_parser = subparsers.add_parser('grain', help='operations on grains')
@@ -634,24 +700,7 @@ def add_grain_subparser(subparsers):
     info.add_argument('id', help='grain ID', type=int)
     rois = verbs.add_parser('rois', help='download a ROI file for a grain')
     rois.set_defaults(func=grain_rois_download)
-    rois.add_argument('id', help='grain ID', type=int)
-    rois.add_argument(
-        '--file',
-        help='output file (default standard out)',
-        type=argparse.FileType('w', encoding='utf-8'),
-        default=sys.stdout
-    )
-    rois.add_argument(
-        '--indent',
-        help='how many spaces to use as the indent (default 2)',
-        type=int,
-        default=2
-    )
-    rois.add_argument(
-        '--compact',
-        help='use compact representation',
-        action='store_true'
-    )
+    add_json_options(rois, 'grain ID')
 
 
 @token_refresh
@@ -920,6 +969,7 @@ def parse_argv():
     subparsers = parser.add_subparsers(dest='command')
     subparsers.required = True
     add_set_subparser(subparsers)
+    add_get_subparser(subparsers)
     add_login_subparser(subparsers)
     add_project_subparser(subparsers)
     add_sample_subparser(subparsers)

@@ -15,8 +15,12 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import redirect
 
-from ftc.parse_image_name import parse_upload_name
+from ftc.apiviews import request_roiss
 from ftc.get_image_size import get_image_size_from_handle
+from ftc.load_rois import get_rois, get_roiss
+from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
+    TutorialResult, Region, Vertex)
+from ftc.parse_image_name import parse_upload_name
 from geochron.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 
@@ -25,9 +29,6 @@ import csv
 import io
 import json
 import sys
-
-from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
-    TutorialResult, Region, Vertex)
 
 #
 def home(request):
@@ -678,6 +679,23 @@ def getGrainsWithResults(request):
         if g.id not in grains:
             grains[g.id] = g
     return grains
+
+@login_required
+@user_passes_test(user_is_staff)
+def download_rois(request, pk):
+    grain = Grain.objects.get(id=pk)
+    return HttpResponse(
+        json.dumps(get_rois(grain)),
+        content_type='application/json'
+    )
+
+@login_required
+@user_passes_test(user_is_staff)
+def download_roiss(request):
+    return HttpResponse(
+        json.dumps(request_roiss(request)),
+        content_type='application/json'
+    )
 
 @login_required
 @user_passes_test(user_is_staff)
