@@ -64,7 +64,6 @@ def creategrain(src, sample, grain_nth):
 def copygrains(src, sample):
     # create sample
     folders = next(os.walk(src))[1]
-    total_grain = 0
     names = sorted(os.listdir(src))
     for name in names:
         try:
@@ -75,8 +74,6 @@ def copygrains(src, sample):
         if os.path.isdir(srcname) and name[0:5] == 'Grain':
             grain = creategrain(srcname, sample, grain_nth)
             copyimages(srcname, grain)
-            total_grain += 1
-    sample.total_grains = total_grain
     sample.save()
 
 
@@ -86,7 +83,7 @@ def copysamples(src, project):
         srcname = os.path.join(src, name)
         if os.path.isdir(srcname):
             sample = project.sample_set.create(sample_name=name,
-                sample_property='T', total_grains=0, completed=False)
+                sample_property='T', completed=False)
             copygrains(srcname, sample)
 
 

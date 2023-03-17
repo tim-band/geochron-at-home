@@ -108,7 +108,6 @@
       "sample_name": "s1",
       "in_project": 1,
       "sample_property": "T",
-      "total_grains": 0,
       "priority": 1,
       "min_contributor_num": 1,
       "completed": false

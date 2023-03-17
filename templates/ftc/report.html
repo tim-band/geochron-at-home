@@ -191,7 +191,7 @@ footer {
              <li id="p{{ project.id }}" class="folder">{{ project.project_name }}
                 <ul>
                 {% for sample in project.sample_set.all %}
-                  <li id="{{ sample.id }}_{{ sample.total_grains }}_{{ sample.sample_property }}">{{ sample.sample_name }}</li>
+                  <li id="{{ sample.id }}_{{ sample.sample_property }}">{{ sample.sample_name }}</li>
                 {% endfor %}
                 </ul>
              </li>

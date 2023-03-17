@@ -90,9 +90,8 @@ class SampleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sample
         fields = ['id', 'sample_name', 'in_project', 'sample_property',
-            'total_grains', 'priority', 'min_contributor_num', 'completed']
+            'priority', 'min_contributor_num', 'completed']
 
-    total_grains = serializers.IntegerField(required=False, read_only=True)
     completed = serializers.BooleanField(required=False, read_only=True)
 
 
@@ -115,7 +114,7 @@ class SampleListView(ListCreateView):
         if (not self.request.user.is_superuser and
             serializer.validated_data['in_project'].get_owner() != self.request.user):
             raise exceptions.PermissionDenied
-        serializer.save(total_grains=0, completed=False)
+        serializer.save(completed=False)
 
 
 class SampleInfoView(RetrieveUpdateDeleteView):

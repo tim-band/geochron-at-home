@@ -542,7 +542,7 @@ function:
 
 ```sh
 (geochron-at-home) $ ./gah.py sample create Sample123 2 T 20 50
-b'{"id":199,"sample_name":"Sample123","in_project":2,"sample_property":"T","total_grains":0,"priority":20,"min_contributor_num":50,"completed":false}'
+b'{"id":199,"sample_name":"Sample123","in_project":2,"sample_property":"T","priority":20,"min_contributor_num":50,"completed":false}'
 (geochron-at-home) $ ./gah.py grain create 199 /path/to/directory/of/grains
 Created new grain 28
 Uploaded image /path/to/directory/of/grains/Grain01/Stack-09.jpg as image 469

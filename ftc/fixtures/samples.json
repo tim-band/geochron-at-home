@@ -6,7 +6,6 @@
             "sample_name": "adm_samp",
             "in_project": 1,
             "sample_property": "T",
-            "total_grains": 0,
             "priority": 5,
             "min_contributor_num": 10,
             "completed": false
@@ -19,7 +18,6 @@
             "sample_name": "counter_samp",
             "in_project": 2,
             "sample_property": "T",
-            "total_grains": 0,
             "priority": 10,
             "min_contributor_num": 4,
             "completed": false

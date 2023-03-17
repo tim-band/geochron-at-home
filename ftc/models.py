@@ -44,7 +44,6 @@ class Sample(models.Model):
     sample_name = models.CharField(max_length=36, validators=[not_too_mad])
     in_project = models.ForeignKey(Project, on_delete=models.CASCADE)
     sample_property = models.CharField(max_length=1, choices=SAMPLE_PROPERTY, default='T')
-    total_grains = models.IntegerField()
     priority = models.IntegerField(default='0')
     min_contributor_num = models.IntegerField(default='1')
     completed = models.BooleanField(default=False)

@@ -160,7 +160,6 @@ class SampleCreateView(ParentCreatorOrSuperuserMixin, CreateView):
     fields = ['sample_name', 'sample_property', 'priority', 'min_contributor_num', 'completed']
 
     def form_valid(self, form):
-        form.instance.total_grains = 0
         form.instance.in_project = self.parent_object
         return super().form_valid(form)
 
