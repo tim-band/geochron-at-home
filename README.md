@@ -217,6 +217,7 @@ DB_PORT=5432
 PROMETHEUS_METRICS_EXPORT_PORT_RANGE=39480-39499
 SCRIPT_NAME=/geochron@home
 SITE_NAME=geochron@home
+SITE_DOMAIN=your.domain.ac.uk
 ```
 
 Make sure you have set the postgres password and know what it is
@@ -225,7 +226,7 @@ Make sure you have set the postgres password and know what it is
 Then:
 
 ```
-sudo -u wwwrunner pipenv --python 3.9
+sudo -u wwwrunner pipenv install
 sudo -u wwwrunner pipenv shell
 mkdir ~/html
 exit

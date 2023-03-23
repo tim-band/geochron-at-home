@@ -799,6 +799,7 @@ def get_grain_info(request, pk, ft_type, **kwargs):
     if pk == 'done':
         return {
             'grain_info': 'null',
+            'sample_id': None,
             'messages': ['All grains complete, congratulations!']
         }
     grain = Grain.objects.get(pk=pk)
@@ -813,6 +814,7 @@ def get_grain_info(request, pk, ft_type, **kwargs):
     if rois is None:
         return {
             'grain_info': 'null',
+            'sample_id': the_sample.id,
             'messages': [
                 "[Project: {0}, Sample: {1}, Grain #: {2}, FT_type: {3}] has no images or has no ROIs\n".format(
                         grain.sample.in_project.project_name,
@@ -834,6 +836,7 @@ def get_grain_info(request, pk, ft_type, **kwargs):
     add_grain_info_markers(info, grain, ft_type, request.user)
     return {
         'grain_info': json.dumps(info),
+        'sample_id': the_sample.id,
         'messages': [],
         **kwargs
     }

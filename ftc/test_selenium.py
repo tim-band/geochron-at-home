@@ -395,6 +395,13 @@ class CountingPage(BasePage):
             Alert(self.driver).accept()
         return self
 
+    def cancel(self, confirm=False):
+        self.driver.find_element(By.ID, "btn-tracknum").click()
+        self.driver.find_element(By.ID, "tracknum-cancel").click()
+        if confirm:
+            Alert(self.driver).accept()
+        return SamplePage(self.driver, self.url)
+
     def drag_layer_handle(self, offset):
         track = self.driver.find_element(By.ID, "focus-slider")
         dy = offset * track.size['height']
@@ -553,9 +560,11 @@ class SampleCreatePage(BasePage):
 
 
 class SamplePage(BasePage):
-    def check(self):
-        h1text = self.driver.find_element(By.TAG_NAME, "h1").text
+    def check(self, grain_present=None):
+        h1text = self.find_by_css("h1").text
         assert "Sample " in h1text and " of project " in h1text
+        if grain_present is not None:
+            assert self.grain_present(grain_present)
         return self
 
     def go(self, pk):
@@ -587,10 +596,10 @@ class SamplePage(BasePage):
         )
         return CountingPage(self.driver, self.url)
 
-    def grain_present(self, index):
+    def grain_present(self, pk):
         es = self.driver.find_elements(
             By.XPATH,
-            '//table[@id="grain-set"]/tbody/tr/td/a[text()="{0}"]'.format(index)
+            '//table[@id="grain-set"]/tbody/tr/td/a[text()="{0}"]'.format(pk)
         )
         return 0 < len(es)
 
@@ -1392,6 +1401,9 @@ class WithTwoGrainsUploaded(SeleniumTests):
         counting.check_count("002")
         counting.next()
         counting.check_count("001")
+        counting.cancel(confirm=False).check(grain_present=1).go_count(1).check()
+        counting.click_at(0.51, 0.24)
+        counting.cancel(confirm=True).check(grain_present=1)
 
     def test_can_count_mica(self):
         self.sign_in(self.project_user)
