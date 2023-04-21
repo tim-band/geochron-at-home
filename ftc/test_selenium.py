@@ -1473,6 +1473,7 @@ class WithTwoGrainsUploaded(SeleniumTests):
         retrying(3, lambda: counting.check_count("000"))
         counting.next()
         counting.check_count("001").submit()
+        projects.go()
         report = NavBar(self.driver).go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
