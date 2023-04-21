@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-import base64
 import csv
 from getpass import getpass
-from html.parser import HTMLParser
 import json
 import os.path
 import re
@@ -1003,8 +1001,12 @@ def perform_action(options):
         config_fh.close()
     except HTTPError as e:
         print("Failed (with HTTP code {0}: {1})".format(e.code, e.reason))
-        body = json.loads(e.read().decode())
-        render_json(body)
+        body = e.read().decode()
+        try:
+            j = json.loads(body)
+            render_json(j)
+        except:
+            print(body)
         exit(1)
 
 if __name__ == '__main__':
