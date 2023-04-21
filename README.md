@@ -48,7 +48,7 @@ You can set up a pipenv to run Geochron@home like so (after installing Python 3)
 
 ```sh
 $ pip install pipenv
-$ pipenv install
+$ pipenv install --dev
 ```
 
 Now you can enter the pipenv shell like this:

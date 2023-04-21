@@ -1,22 +1,28 @@
 from django.contrib.auth.models import User
-from django.db.models import F, Prefetch
 from django.db.models.aggregates import Max
-from django.shortcuts import get_object_or_404
-from rest_framework import exceptions
 import json
-from rest_framework import generics, serializers, status
-from rest_framework.authentication import TokenAuthentication
+import logging
+from rest_framework import exceptions
+from rest_framework import generics, serializers
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.negotiation import DefaultContentNegotiation
-from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import exception_handler
 
-from ftc.get_image_size import get_image_size_from_handle
 from ftc.load_rois import get_rois, get_roiss
 from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering, Transform2D
 from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
+
+
+def explicit_exception_handler(exc, context):
+    if isinstance(exc, exceptions.ValidationError):
+        logging.info(exc)
+        return Response(
+            { 'failed_validations': exc.detail },
+            status=400
+        )
+    return exception_handler(exc, context)
 
 
 def models_owned(model_class, request):
@@ -115,7 +121,6 @@ class SampleListView(ListCreateView):
             serializer.validated_data['in_project'].get_owner() != self.request.user):
             raise exceptions.PermissionDenied
         serializer.save(completed=False)
-
 
 class SampleInfoView(RetrieveUpdateDeleteView):
     model = Sample

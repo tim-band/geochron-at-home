@@ -382,25 +382,35 @@ function addRegionMarkers(crystal) {
     });
 }
 
-function cancelEdit(crystal, edit_id, save_id) {
+function disable_element(id) {
+    var e = document.getElementById(id);
+    if (e) {
+        e.setAttribute('disabled', true);
+    }
+}
+
+function enable_element(id) {
+    var e = document.getElementById(id);
+    if (e) {
+        e.removeAttribute('disabled');
+    }
+}
+
+function cancelEdit(crystal) {
     removeRegionMarkers(crystal);
-    var edit = document.getElementById(edit_id);
-    var save = document.getElementById(save_id);
-    var cancel = document.getElementById('cancel_edit');
-    edit.removeAttribute('disabled');
-    save.setAttribute('disabled', true);
-    cancel.setAttribute('disabled', true);
+    enable_element('edit');
+    enable_element('edit_shift');
+    disable_element('save');
+    disable_element('save_shift');
+    disable_element('cancel_edit');
     crystal.marker_layer.clearLayers();
 }
 
 function beginEdit(crystal) {
     addRegionMarkers(crystal);
-    var edit = document.getElementById("edit");
-    var save = document.getElementById("save");
-    var cancel = document.getElementById("cancel_edit");
-    edit.setAttribute('disabled', true);
-    save.removeAttribute('disabled');
-    cancel.removeAttribute('disabled');
+    disable_element('edit');
+    enable_element('save');
+    enable_element('cancel_edit');
 }
 
 function save(crystal, url, form, error_callback) {
@@ -413,7 +423,7 @@ function save(crystal, url, form, error_callback) {
         });
     });
     xhr.addEventListener("load", function() {
-        cancelEdit(crystal, 'edit', 'save');
+        cancelEdit(crystal);
     });
     if (error_callback) {
         xhr.addEventListener("error", function() {
@@ -448,12 +458,9 @@ function beginShiftEdit(crystal) {
         crystal.shift_x = shift_to[1] * crystal.image_width;
         crystal.shift_y = -shift_to[0] * crystal.image_width;
     });
-    var edit = document.getElementById("edit_shift");
-    var save = document.getElementById("save_shift");
-    var cancel = document.getElementById("cancel_edit");
-    edit.setAttribute('disabled', true);
-    save.removeAttribute('disabled');
-    cancel.removeAttribute('disabled');
+    disable_element('edit_shift');
+    enable_element('save_shift');
+    enable_element('cancel_edit');
 }
 
 function saveShift(crystal, url, form, error_callback) {
@@ -462,7 +469,7 @@ function saveShift(crystal, url, form, error_callback) {
     fd.append('x', Math.floor(crystal.shift_x + 0.5));
     fd.append('y', Math.floor(crystal.shift_y + 0.5));
     xhr.addEventListener("load", function() {
-        cancelEdit(crystal, 'edit_shift', 'save_shift');
+        cancelEdit(crystal);
     });
     if (error_callback) {
         xhr.addEventListener("error", function() {

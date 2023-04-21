@@ -64,7 +64,8 @@ SIMPLE_JWT = {
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ]
+    ],
+    'EXCEPTION_HANDLER': 'ftc.apiviews.explicit_exception_handler'
 }
 
 # Application definition
@@ -241,6 +242,7 @@ LOGGING = {
     'root': {
         'handlers': ['console'],
         'level': 'INFO',
+#        'level': 'DEBUG',  # use this to see HTTP requests and responses
     },
 }
 

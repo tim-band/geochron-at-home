@@ -462,7 +462,7 @@ class NavBar(BasePage):
 
     def go_edit_projects(self):
         self.click_dropdown()
-        self.driver.find_element(By.ID, 'projects-link').click()
+        self.click_by_id('projects-link')
         return ProjectsPage(self.driver, self.url)
 
 

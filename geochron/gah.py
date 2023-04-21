@@ -300,6 +300,11 @@ def add_login_subparser(subparsers):
     login_parser.add_argument('--user', help='name of the user to log in as')
 
 
+def add_headers(req, config):
+    req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
+    req.add_header('Accept', 'application/json')
+
+
 def api_verb(verb, config, *args, **kwargs):
     url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args))
     if kwargs:
@@ -307,7 +312,7 @@ def api_verb(verb, config, *args, **kwargs):
     else:
         url += '/'
     req = Request(url, method=verb)
-    req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
+    add_headers(req, config)
     return urlopen(req)
 
 
@@ -319,7 +324,7 @@ def api_post(config, *args, **kwargs):
     url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args)) + '/'
     data = urlencode(kwargs)
     req = Request(url, data=data.encode('ascii'), method='POST')
-    req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
+    add_headers(req, config)
     return urlopen(req)
 
 
@@ -936,26 +941,7 @@ def add_genrois_subparser(subparsers):
     parser.set_defaults(func=generate_roiss)
 
 
-class ExceptionExtractor(HTMLParser):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.levels = 0
-
-    def handle_starttag(self, tag, attrs):
-        if self.levels != 0 or ('class', 'exception_value') in attrs:
-            self.levels += 1
-
-    def handle_endtag(self, tag):
-        if self.levels != 0:
-            self.levels -= 1
-
-    def handle_data(self, data):
-        if self.levels != 0:
-            print(data)                
-
-
 def parse_argv():
-    usage = "usage: %prog -s SETTINGS | --settings=SETTINGS"
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '-c',
@@ -995,6 +981,19 @@ def save_config(config_fh, config):
         json.dump(config, config_fh)
         config_fh.truncate()
 
+def render_json(j, indent=''):
+    if type(j) is list:
+        new_indent = indent + '- '
+        for item in j:
+            render_json(item, new_indent)
+    elif type(j) is dict:
+        new_indent = indent + '  '
+        for k, v in j.items():
+            print('{0}{1}:'.format(indent, k))
+            render_json(v, new_indent)
+    else:
+        print('{0}{1}'.format(indent, j))
+
 def perform_action(options):
     config_fh = open_config(options)
     config = load_config(config_fh, options)
@@ -1004,8 +1003,8 @@ def perform_action(options):
         config_fh.close()
     except HTTPError as e:
         print("Failed (with HTTP code {0}: {1})".format(e.code, e.reason))
-        body = e.read().decode()
-        ExceptionExtractor().feed(body)
+        body = json.loads(e.read().decode())
+        render_json(body)
         exit(1)
 
 if __name__ == '__main__':
