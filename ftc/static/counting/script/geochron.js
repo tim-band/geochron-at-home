@@ -754,7 +754,12 @@ function grain_view(options) {
             if (!undo.isClean()) {
                 saveTrackCount(save_url, go_to);
             } else if (go_to) {
-                window.location = go_to
+                window.location = go_to;
+            }
+        },
+        cancelWithConfirm: function(go_to) {
+            if (undo.isClean() || confirm("Discard changes?")) {
+                window.location = go_to;
             }
         },
         restartTrackCount: function() {

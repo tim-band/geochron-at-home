@@ -148,8 +148,7 @@ function setup() {
     var cancel = document.getElementById('tracknum-cancel');
     if (cancel) {
         cancel.onclick = function() {
-            map.saveTrackCountIfNecessary(
-                "{% url 'saveWorkingGrain' %}",
+            map.cancelWithConfirm(
                 "{% url 'sample' sample_id %}"
             );
         };
