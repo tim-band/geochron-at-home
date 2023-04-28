@@ -1527,3 +1527,47 @@ class OneGrainWithoutMineral(SeleniumTests):
         assert self.driver.current_url.endswith('/1/')
         counting.next().check()
         assert self.driver.current_url.endswith('/5/')
+
+class GrainsWithDifferentlySizedRegions(SeleniumTests):
+    fixtures = [
+        'grain_with_small_region.json',
+        'grain_with_images.json'
+    ]
+
+    def within_bounds(self, x, edge, width, margin):
+        if margin < 0:
+            return edge + margin * width < x and x <= edge
+        else:
+            return edge <= x and x < edge + margin * width
+
+    def within_both_bounds(self, x_start, x_width, container_start, container_width, margin):
+        on_start = self.within_bounds(x_start, container_start, container_width, margin)
+        on_end = self.within_bounds(
+            x_start + x_width,
+            container_start + container_width,
+            container_width,
+            -margin
+        )
+        return on_start and on_end
+
+    def assert_all_markers_are_close_to_edge(self, counting):
+        map_rect = self.driver.find_element(By.ID, 'map').rect
+        p = self.driver.find_element(By.CSS_SELECTOR, '#map svg g path')
+        path_rect = p.rect
+        margin = 0.2
+        assert self.within_both_bounds(
+            path_rect['x'], path_rect['width'], map_rect['x'], map_rect['width'], margin
+        ) or self.within_both_bounds(
+            path_rect['y'], path_rect['height'], map_rect['y'], map_rect['height'], margin
+        )
+
+    def test_region_is_zoomed_to_fit(self):
+        self.sign_in(self.project_user)
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_count(1).check()
+        assert self.driver.current_url.endswith('/1/')
+        self.assert_all_markers_are_close_to_edge(counting)
+        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        counting = samples.go_sample('s1').go_count(6).check()
+        assert self.driver.current_url.endswith('/6/')
+        self.assert_all_markers_are_close_to_edge(counting)

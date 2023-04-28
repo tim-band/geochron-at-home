@@ -9,7 +9,7 @@ from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic import DetailView
 from django.urls import reverse
 from django.http import (HttpResponse, HttpResponseRedirect,
-    HttpResponseForbidden, HttpResponseNotFound)
+    HttpResponseForbidden)
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.serializers.json import DjangoJSONEncoder
@@ -17,18 +17,17 @@ from django.shortcuts import redirect
 
 from ftc.apiviews import request_roiss
 from ftc.get_image_size import get_image_size_from_handle
-from ftc.load_rois import get_rois, get_roiss
+from ftc.load_rois import get_rois
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex)
 from ftc.parse_image_name import parse_upload_name
 from geochron.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 
-import base64
 import csv
 import io
 import json
-import sys
+import os
 
 #
 def home(request):
@@ -744,11 +743,7 @@ def getCsvResults(request):
     return response
 
 
-import os, random, itertools
-from django.templatetags.static import static
-
-from .get_image_size import get_image_size, UnknownImageFormat
-from .grain_uinfo import choose_working_grain, restore_grain_uinfo
+from .grain_uinfo import choose_working_grain
 from .load_rois import load_rois
 
 def get_grain_images_list(grain, ft_type):

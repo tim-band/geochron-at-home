@@ -10,7 +10,8 @@
  * grain_info.images Array of URLs to the z-stack images
  * grain_info.marker_latlngs Array of marker positions
  * grain_info.rois Array of regions of interest, each of which is an array
- *   of vertex positions [x,y] in pixels
+ *   of vertex positions [lat,lng] (that is, [(height - y_pixels)/width,
+ *   x_pixels/width])
  * iconUrl_normal Url of marker image
  * iconUrl_selected Url of selected marker image
  * atoken CSRF token
@@ -28,6 +29,8 @@
  * roisLayer: The Leaflet layer containing the region polygons
  */
 function grain_view(options) {
+    // default tile size in Leaflet is 256x256
+    var TILE_SIZE = 256;
     var grain_info = options.grain_info;
     var mapZoom = 11;
     var MarkerIcon = L.Icon.extend({
@@ -511,7 +514,7 @@ function grain_view(options) {
 
     var map = L.map('map', {
         center: [grain_info.image_height / grain_info.image_width / 2, 0.5],
-        zoomSnap: 0.5,
+        zoomSnap: 0,
         zoomDelta: 0.5,
         zoom: mapZoom,
         minZoom: mapZoom - 2,
@@ -691,7 +694,31 @@ function grain_view(options) {
         }
         undo.reset();
     }
-    map.setView([yOverX / 2, 0.5], mapZoom);
+    function fit_region_to_window(grain_info) {
+        var minx = Infinity, miny = Infinity;
+        var maxx = -Infinity, maxy = -Infinity;
+        grain_info.rois.forEach(function(roi) {
+            roi.forEach(function(v) {
+                minx = Math.min(minx, v[1]);
+                miny = Math.min(miny, v[0]);
+                maxx = Math.max(maxx, v[1]);
+                maxy = Math.max(maxy, v[0]);
+            });
+        });
+        var map_window = document.getElementById('map');
+        var scale_to_fit_height = map_window.clientHeight / (maxy - miny);
+        var scale_to_fit_width = map_window.clientWidth / (maxx - minx);
+        console.log(scale_to_fit_height, scale_to_fit_width, L.CRS.zoom(Math.min(scale_to_fit_height, scale_to_fit_width)));
+        map.setView(
+            [
+                (maxy + miny) / 2,
+                (maxx + minx) / 2
+            ],
+            L.CRS.zoom(Math.min(scale_to_fit_height, scale_to_fit_width) * TILE_SIZE),
+            { animate: false }
+        );
+    }
+    fit_region_to_window(grain_info);
 
     function setTrackCounterCallback(cb) {
         updateTrackCounter = function() {

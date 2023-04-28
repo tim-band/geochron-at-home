@@ -26,8 +26,8 @@ def load_rois(grain, ft_type, matrix):
                 if matrix:
                     x = lng - 0.5
                     y = lat - 0.5
-                    lng = 0.5 + x * m.x0 + y * m.y0
-                    lat = 0.5 + x * m.x1 + y * m.y1
+                    lng = 0.5 + x * matrix.x0 + y * matrix.y0
+                    lat = 0.5 + x * matrix.x1 + y * matrix.y1
                 else:
                     lng = 1 - lng
             latlng.append([lat + shift_y, lng + shift_x])
