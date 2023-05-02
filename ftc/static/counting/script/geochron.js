@@ -248,6 +248,40 @@ function grain_view(options) {
             }
         };
     }
+    /**
+     * Sets the position and zoom of the view so that the region(s)
+     * are as large as they can be in the window (with a little margin).
+     * fit_region_to_window(true) animates the zoom and pan, whereas
+     * fit_region_to_window(false) snaps it to the home position
+     * immediately.
+     */
+    var fit_region_to_window = function() {
+        var minx = Infinity, miny = Infinity;
+        var maxx = -Infinity, maxy = -Infinity;
+        grain_info.rois.forEach(function(roi) {
+            roi.forEach(function(v) {
+                minx = Math.min(minx, v[1]);
+                miny = Math.min(miny, v[0]);
+                maxx = Math.max(maxx, v[1]);
+                maxy = Math.max(maxy, v[0]);
+            });
+        });
+        var map_window = document.getElementById('map');
+        var scale_to_fit_height = map_window.clientHeight / (maxy - miny);
+        var scale_to_fit_width = map_window.clientWidth / (maxx - minx);
+        return function(animate) {
+            map.setView(
+                [
+                    (maxy + miny) / 2,
+                    (maxx + minx) / 2
+                ],
+                // multiplying by TILE_SIZE here feels wrong, but seems to produce
+                // decent results
+                L.CRS.zoom(Math.min(scale_to_fit_height, scale_to_fit_width) * TILE_SIZE),
+                { animate: animate }
+            );
+        }
+    }();
     var isEditable = false;
     var markers = null;
     var deleter = null;
@@ -258,8 +292,7 @@ function grain_view(options) {
             icon: 'fa-arrows-alt',
             tipText: 'fit images to window',
             action: function() {
-                var yox = grain_info.image_height / grain_info.image_width;
-                map.setView([yox / 2, 0.5], mapZoom);
+                fit_region_to_window(true);
             }
         },
         'undo': {
@@ -694,31 +727,7 @@ function grain_view(options) {
         }
         undo.reset();
     }
-    function fit_region_to_window(grain_info) {
-        var minx = Infinity, miny = Infinity;
-        var maxx = -Infinity, maxy = -Infinity;
-        grain_info.rois.forEach(function(roi) {
-            roi.forEach(function(v) {
-                minx = Math.min(minx, v[1]);
-                miny = Math.min(miny, v[0]);
-                maxx = Math.max(maxx, v[1]);
-                maxy = Math.max(maxy, v[0]);
-            });
-        });
-        var map_window = document.getElementById('map');
-        var scale_to_fit_height = map_window.clientHeight / (maxy - miny);
-        var scale_to_fit_width = map_window.clientWidth / (maxx - minx);
-        console.log(scale_to_fit_height, scale_to_fit_width, L.CRS.zoom(Math.min(scale_to_fit_height, scale_to_fit_width)));
-        map.setView(
-            [
-                (maxy + miny) / 2,
-                (maxx + minx) / 2
-            ],
-            L.CRS.zoom(Math.min(scale_to_fit_height, scale_to_fit_width) * TILE_SIZE),
-            { animate: false }
-        );
-    }
-    fit_region_to_window(grain_info);
+    fit_region_to_window(false);
 
     function setTrackCounterCallback(cb) {
         updateTrackCounter = function() {
@@ -794,8 +803,7 @@ function grain_view(options) {
                 if (!markers.empty()) {
                     undo.withUndo(removeAllFromMap());
                 }
-                var yox = grain_info.image_height / grain_info.image_width;
-                map.setView([yox / 2, 0.5], mapZoom);
+                fit_region_to_window(true);
             }
         },
         enableEditing: function() {
