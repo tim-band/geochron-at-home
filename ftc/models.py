@@ -253,3 +253,20 @@ class TutorialResult(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     session = models.TextField()
     date = models.DateTimeField(auto_now_add=True)
+
+class GrainPointCategory(models.Model):
+    """
+    Type of grain point feature (for example, track or crystal defect)
+    """
+    name = models.CharField(primary_key=True, max_length=20)
+    description = models.TextField()
+
+class GrainPoint(models.Model):
+    """
+    A marker for a track or possibly some other feature.
+    """
+    result = models.ForeignKey(FissionTrackNumbering, on_delete=models.CASCADE)
+    x_pixels = models.IntegerField()
+    y_pixels = models.IntegerField()
+    category = models.ForeignKey(GrainPointCategory, on_delete=models.CASCADE)
+    comment = models.TextField()
