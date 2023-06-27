@@ -49,7 +49,6 @@ class CountingCase(GahCase):
         'sample_id': sample,
         'grain_num': grain,
         'ft_type': 'S',
-        'num_markers': count,
         'marker_latlngs': gen_latlngs(count)
       },
       content_type='application/json'
@@ -84,6 +83,7 @@ class CountingCase(GahCase):
 
 class TestGuestCounts(CountingCase):
   fixtures = [
+    'essential.json',
     'users.json', 'projects.json', 'samples.json',
     'grains.json', 'images.json'
   ]
@@ -107,6 +107,7 @@ class TestGuestCounts(CountingCase):
 
 class TestCountJsonDownload(CountingCase):
   fixtures = [
+    'essential.json',
     'users.json', 'projects.json', 'samples.json',
     'grains.json', 'grains2.json', 'images.json',
     'results.json', 'results2.json'
@@ -169,6 +170,7 @@ class TestCountJsonDownload(CountingCase):
 
 class TestCountCsvDownload(CountingCase):
   fixtures = [
+    'essential.json',
     'users.json', 'projects.json', 'samples.json',
     'grains.json', 'grains2.json', 'images.json',
     'results.json', 'results2.json'
@@ -210,6 +212,7 @@ class TestCountCsvDownload(CountingCase):
 
 class RegionCase(GahCase):
   fixtures = [
+    'essential.json',
     'grain_with_images.json',
     'grain_with_images5.json',
     'grain6.json'

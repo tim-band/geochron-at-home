@@ -7,8 +7,37 @@
             "ft_type": "S",
             "worker": 101,
             "result": 3,
-            "create_date": "2023-01-01",
-            "latlngs": "[[0.3,0.2],[0.9,0.1],[0.5,0.4]]"
+            "create_date": "2023-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 10,
+        "fields": {
+            "result": 1,
+            "category": "track",
+            "x_pixels": 80,
+            "y_pixels": 120
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 11,
+        "fields": {
+            "result": 1,
+            "category": "track",
+            "x_pixels": 40,
+            "y_pixels": 362
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 12,
+        "fields": {
+            "result": 1,
+            "category": "track",
+            "x_pixels": 201,
+            "y_pixels": 160
         }
     },
     {
@@ -19,8 +48,27 @@
             "ft_type": "S",
             "worker": 101,
             "result": 2,
-            "create_date": "2023-01-02",
-            "latlngs": "[[0.5,0.6],[0.6,0.7]]"
+            "create_date": "2023-01-02T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 20,
+        "fields": {
+            "result": 2,
+            "category": "track",
+            "x_pixels": 302,
+            "y_pixels": 250
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 21,
+        "fields": {
+            "result": 2,
+            "category": "track",
+            "x_pixels": 351,
+            "y_pixels": 301
         }
     },
     {
@@ -31,8 +79,37 @@
             "ft_type": "S",
             "worker": 102,
             "result": 3,
-            "create_date": "2023-02-01",
-            "latlngs": "[[0.31,0.21],[0.91,0.11],[0.51,0.41]]"
+            "create_date": "2023-02-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 30,
+        "fields": {
+            "result": 3,
+            "category": "track",
+            "x_pixels": 105,
+            "y_pixels": 155
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 31,
+        "fields": {
+            "result": 3,
+            "category": "track",
+            "x_pixels": 55,
+            "y_pixels": 456
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 32,
+        "fields": {
+            "result": 3,
+            "category": "track",
+            "x_pixels": 206,
+            "y_pixels": 256
         }
     }
 ]

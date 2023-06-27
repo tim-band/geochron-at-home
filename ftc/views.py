@@ -19,7 +19,7 @@ from ftc.apiviews import request_roiss
 from ftc.get_image_size import get_image_size_from_handle
 from ftc.load_rois import get_rois
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
-    TutorialResult, Region, Vertex)
+    TutorialResult, Region, Vertex, GrainPoint, GrainPointCategory)
 from ftc.parse_image_name import parse_upload_name
 from geochron.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
@@ -629,7 +629,7 @@ def json_grain_result(grain):
             'worker': {
                 'id': result.worker.id
             },
-            'latlngs': json.loads(result.latlngs)
+            'latlngs': result.get_latlngs()
         })
     j = {
         'grain': grain.id,
@@ -786,9 +786,7 @@ def add_grain_info_markers(info, grain, ft_type, worker):
         ft_type=ft_type
     ).order_by('result').first()
     if save:
-        latlngs = json.loads(save.latlngs)
-        info['marker_latlngs'] = latlngs
-        info['num_markers'] = len(latlngs)
+        info['marker_latlngs'] = save.get_latlngs()
 
 def get_grain_info(request, pk, ft_type, **kwargs):
     if pk == 'done':
@@ -951,6 +949,21 @@ def counting(request, uname=None):
     })
 
 
+def addGrainPoints(ftn, marker_latlngs):
+    width = ftn.grain.image_width
+    height = ftn.grain.image_height
+    track = GrainPointCategory(name='track')
+    GrainPoint.objects.bulk_create([
+        GrainPoint(
+            category=track,
+            result=ftn,
+            x_pixels=lng * width,
+            y_pixels=height - lat * width
+        )
+        for (lat, lng) in marker_latlngs
+    ])
+
+
 @login_required
 @transaction.atomic
 def updateTFNResult(request):
@@ -963,7 +976,6 @@ def updateTFNResult(request):
             sample__id=res_dic['sample_id'],
             index=res_dic['grain_num']
         )
-        latlng_json_str = json.dumps(res_dic['marker_latlngs'])
         ft_type = res_dic['ft_type']
         if request.user.username != 'guest':
             # Remove any previous or partial save state
@@ -972,13 +984,14 @@ def updateTFNResult(request):
                 worker=request.user,
                 ft_type=ft_type
             ).delete()
-        fts = FissionTrackNumbering(grain=grain,
-                                    ft_type=ft_type,
-                                    worker=request.user,
-                                    result=res_dic['num_markers'],
-                                    latlngs=latlng_json_str,
+        fts = FissionTrackNumbering(
+            grain=grain,
+            ft_type=ft_type,
+            worker=request.user,
+            result=len(res_dic['marker_latlngs']),
         )
         fts.save()
+        addGrainPoints(fts, res_dic['marker_latlngs'])
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
         return HttpResponse(myjson, content_type='application/json')
     else:
@@ -1007,9 +1020,9 @@ def saveWorkingGrain(request):
                 ft_type=ft_type,
                 worker=user,
                 result=-1,
-                latlngs=res['marker_latlngs'],
             )
             ftn.save()
+            addGrainPoints(ftn, res['marker_latlngs'])
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
         return HttpResponse(myjson, content_type='application/json')
     else:

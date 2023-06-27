@@ -154,6 +154,15 @@ function grain_view(options) {
         var track_num = 0;
         var markers = {};
         var dragged_out = false;
+        var map_window = document.getElementById('map');
+        function within_map(x, y) {
+            for (const r of map_window.getClientRects()) {
+                if (r.left <= x && x < r.right && r.top <= y && y < r.bottom) {
+                    return true;
+                }
+            }
+            return false;
+        }
         return {
             makeDeleter: function() {
                 return makeDeleter(map, markers);
@@ -179,7 +188,8 @@ function grain_view(options) {
                     startLatLng = e.target.getLatLng();
                 }).on('drag', function(e) {
                     var out = dragged_out;
-                    dragged_out = !zStack.pointInRois(e.latlng.lat, e.latlng.lng);
+                    var dragged_out_of_screen = !within_map(e.originalEvent.clientX, e.originalEvent.clientY);
+                    dragged_out = dragged_out_of_screen || !zStack.pointInRois(e.latlng.lat, e.latlng.lng);
                     if (out) {
                         if (!dragged_out) {
                             mk.setOpacity(1)
@@ -759,7 +769,6 @@ function grain_view(options) {
             'ft_type': grain_info.ft_type,
             'image_width': grain_info.image_width,
             'image_height': grain_info.image_height,
-            'num_markers': latlngs.length,
             'marker_latlngs': latlngs
         }));
     }

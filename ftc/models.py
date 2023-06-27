@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from django.urls import reverse
 from django_prometheus.models import ExportModelOperationsMixin
+import json
 
 class Project(models.Model):
     alphanumeric = RegexValidator(r'^[0-9a-zA-Z_-]+$', 'Only alphanumeric, "-" and "_" are allowed.')
@@ -223,7 +224,6 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     worker = models.ForeignKey(User, on_delete=models.CASCADE)
     result = models.IntegerField() #-1 means this is a partial save state
     create_date = models.DateTimeField(auto_now_add=True)
-    latlngs = models.TextField(default='')
 
     def project_name(self):
         return self.grain.sample.in_project
@@ -247,6 +247,20 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         if a is None:
             return None
         return a * 1e6
+
+    def get_latlngs(self):
+        width = self.grain.image_width
+        height = self.grain.image_height
+        return [
+            [ (height - gp.y_pixels) / width, gp.x_pixels / width ]
+            for gp in self.grainpoint_set.filter(category__name='track')
+        ]
+    
+    def latlngs(self):
+        """
+        Returns the old latlngs field for backward compatibility.
+        """
+        return json.dumps(self.get_latlngs())
 
 #
 class TutorialResult(models.Model):

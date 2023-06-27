@@ -74,11 +74,9 @@ def restore_grain_uinfo(username):
     if len(ftns) == 0:
         return grain_uinfo, None
     ftn = ftns[0]
-    latlngs = json.loads(ftn.latlngs)
     grain_uinfo['project'] = ftn.grain.sample.in_project
     grain_uinfo['sample'] =  ftn.sample
-    grain_uinfo['num_markers'] = len(latlngs)
-    grain_uinfo['marker_latlngs'] = latlngs
+    grain_uinfo['marker_latlngs'] = ftn.get_latlngs()
     grain_uinfo['grain_index'] =  ftn.grain.index
     grain_uinfo['ft_type'] = 'S'
     return grain_uinfo, ftn

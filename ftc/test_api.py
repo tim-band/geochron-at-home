@@ -65,7 +65,10 @@ class ApiTestMixin:
 
 @tag('api')
 class ApiJwt(JwtTestCase):
-    fixtures = ['users.json']
+    fixtures = [
+        'essential.json',
+        'users.json'
+    ]
 
     def test_api_login_failure(self):
         c = Client()
@@ -99,7 +102,10 @@ class ApiJwt(JwtTestCase):
 
 @tag('api')
 class ApiProjectCreate(JwtTestCase):
-    fixtures = ['users.json']
+    fixtures = [
+        'essential.json',
+        'users.json'
+    ]
 
     def setUp(self):
         self.headers = log_in_headers(self.client, 'admin', 'admin_password')
@@ -141,7 +147,11 @@ class ApiProjectCreate(JwtTestCase):
 
 
 class ApiProjectUpdate(ApiTestMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json'
+    ]
 
     def test_update(self):
         new_text = 'amended'
@@ -209,7 +219,11 @@ class DeleteTestBaseMixin:
 
 
 class ApiProjectDelete(DeleteTestBaseMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json'
+    ]
     path = 'project/'
     ids = [1,2]
     counter_id = 2
@@ -217,7 +231,12 @@ class ApiProjectDelete(DeleteTestBaseMixin, JwtTestCase):
 
 
 class ApiSampleDelete(DeleteTestBaseMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json',
+        'samples.json'
+    ]
     path = 'sample/'
     ids = [1,2]
     counter_id = 2
@@ -225,7 +244,13 @@ class ApiSampleDelete(DeleteTestBaseMixin, JwtTestCase):
 
 
 class ApiGrainDelete(DeleteTestBaseMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json',
+        'samples.json',
+        'grains.json'
+    ]
     path = 'grain/'
     ids = [1,2]
     counter_id = 2
@@ -233,7 +258,14 @@ class ApiGrainDelete(DeleteTestBaseMixin, JwtTestCase):
 
 
 class ApiImageDelete(DeleteTestBaseMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json',
+        'samples.json',
+        'grains.json',
+        'images.json'
+    ]
     path = 'image/'
     ids = [1,2]
     counter_id = 2
@@ -241,7 +273,11 @@ class ApiImageDelete(DeleteTestBaseMixin, JwtTestCase):
 
 
 class ApiSampleCreate(ApiTestMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json'
+    ]
 
     def setUp(self):
         super().setUp()
@@ -280,7 +316,12 @@ class ApiSampleCreate(ApiTestMixin, JwtTestCase):
 
 
 class ApiSampleUpdate(ApiTestMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json',
+        'samples.json'
+    ]
 
     def test_sample_update(self):
         new_priority = 23
@@ -324,7 +365,12 @@ class ApiSampleUpdate(ApiTestMixin, JwtTestCase):
 
 
 class ApiGrainCreate(ApiTestMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json',
+        'samples.json'
+    ]
 
     def upload_rois(self, sample_id, rois, headers):
         with open(rois, 'rb') as fh:
@@ -364,7 +410,13 @@ class ApiGrainCreate(ApiTestMixin, JwtTestCase):
 
 
 class ApiGrainUpdate(ApiTestMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json',
+        'samples.json',
+        'grains.json'
+    ]
 
     def test_grain_update_roi(self):
         new_index = 23
@@ -411,7 +463,13 @@ class ApiGrainUpdate(ApiTestMixin, JwtTestCase):
 
 
 class ApiImageCreate(ApiTestMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json',
+        'samples.json',
+        'grains.json'
+    ]
 
     def upload_image(self, grain_id, image, headers):
         with open(image, 'rb') as fh:
@@ -461,7 +519,14 @@ class ApiImageCreate(ApiTestMixin, JwtTestCase):
         self.assertIn(id, ids)
 
 class ApiImageUpdate(ApiTestMixin, JwtTestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json',
+        'samples.json',
+        'grains.json',
+        'images.json'
+    ]
 
     def setUp(self):
         self.headers = log_in_headers(self.client, 'counter', 'counter_password')
@@ -515,7 +580,14 @@ class ApiImageUpdate(ApiTestMixin, JwtTestCase):
 
 @tag('api')
 class ApiCount(JwtTestCase):
-    fixtures = ['users.json', 'projects.json', 'samples.json', 'grains.json', 'images.json']
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'projects.json',
+        'samples.json',
+        'grains.json',
+        'images.json'
+    ]
 
     def setUp(self):
         self.latlngs = [
@@ -526,7 +598,6 @@ class ApiCount(JwtTestCase):
         logged_in = self.client.login(username='counter', password='counter_password')
         self.assertTrue(logged_in, 'failed to log in')
         r = self.client.post('/ftc/updateTFNResult/', {
-            'num_markers': len(self.latlngs),
             'marker_latlngs': self.latlngs,
             'sample_id': 1,
             'grain_num': 1,
@@ -539,12 +610,21 @@ class ApiCount(JwtTestCase):
         r = self.client.get('/ftc/api/count/', {'all': True}, **self.headers)
         j = json.loads(r.content.decode(r.charset))
         jl = json.loads(j[0]['latlngs'])
-        self.assertListEqual(jl, self.latlngs)
+        self.assertListAlmostEqual(jl, self.latlngs)
         self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
+
+    def assertListAlmostEqual(self, xs, ys):
+        if type(xs) is list and type(ys) is list:
+            self.assertEqual(len(xs), len(ys))
+            for i in range(len(xs)):
+                self.assertListAlmostEqual(xs[i], ys[i])
+        else:
+            self.assertAlmostEqual(xs, ys, delta=0.05)
 
 
 class ApiGrainCreate(ApiTestMixin, JwtTestCase):
     fixtures = [
+        'essential.json',
         'grain_with_images.json',
         'grain_with_images5.json',
         'grain6.json'

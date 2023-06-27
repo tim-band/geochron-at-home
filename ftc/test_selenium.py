@@ -997,6 +997,7 @@ class SeleniumTests(LiveServerTestCase):
 
 class FromClean(SeleniumTests):
     fixtures = [
+        'essential.json',
         'users.json'
     ]
     def test_onboard(self):
@@ -1263,6 +1264,7 @@ class FromClean(SeleniumTests):
 
 class WithOneGrainUploaded(SeleniumTests):
     fixtures = [
+        'essential.json',
         'grain_with_images.json',
         'tutorial_result_admin.json',
         'tutorial_result_tester.json'
@@ -1372,6 +1374,7 @@ class WithOneGrainUploaded(SeleniumTests):
 
 class WithTwoGrainsUploaded(SeleniumTests):
     fixtures = [
+        'essential.json',
         'grain_with_images.json',
         'grain_with_images5.json',
         'tutorial_result_admin.json',
@@ -1482,6 +1485,7 @@ class WithTwoGrainsUploaded(SeleniumTests):
 
 class OneGrainWithoutMica(SeleniumTests):
     fixtures = [
+        'essential.json',
         'grain_with_images.json',
         'grain_with_images_mineral_only.json',
         'grain_with_images5.json',
@@ -1506,6 +1510,7 @@ class OneGrainWithoutMica(SeleniumTests):
 
 class OneGrainWithoutMineral(SeleniumTests):
     fixtures = [
+        'essential.json',
         'grain_with_images.json',
         'grain_with_images_mica_only.json',
         'grain_with_images5.json',
@@ -1530,6 +1535,7 @@ class OneGrainWithoutMineral(SeleniumTests):
 
 class GrainsWithDifferentlySizedRegions(SeleniumTests):
     fixtures = [
+        'essential.json',
         'grain_with_small_region.json',
         'grain_with_images.json'
     ]

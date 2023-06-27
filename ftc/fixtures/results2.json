@@ -7,8 +7,37 @@
             "ft_type": "S",
             "worker": 101,
             "result": 3,
-            "create_date": "2023-01-01",
-            "latlngs": "[[0.3,0.2],[0.9,0.1],[0.5,0.4]]"
+            "create_date": "2023-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 40,
+        "fields": {
+            "result": 4,
+            "category": "track",
+            "x_pixels": 80,
+            "y_pixels": 120
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 41,
+        "fields": {
+            "result": 4,
+            "category": "track",
+            "x_pixels": 40,
+            "y_pixels": 361
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 42,
+        "fields": {
+            "result": 4,
+            "category": "track",
+            "x_pixels": 161,
+            "y_pixels": 200
         }
     },
     {
@@ -19,8 +48,27 @@
             "ft_type": "S",
             "worker": 101,
             "result": 2,
-            "create_date": "2023-01-02",
-            "latlngs": "[[0.5,0.6],[0.6,0.7]]"
+            "create_date": "2023-01-02T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 50,
+        "fields": {
+            "result": 5,
+            "category": "track",
+            "x_pixels": 301,
+            "y_pixels": 251
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 51,
+        "fields": {
+            "result": 5,
+            "category": "track",
+            "x_pixels": 351,
+            "y_pixels": 301
         }
     },
     {
@@ -31,8 +79,27 @@
             "ft_type": "S",
             "worker": 101,
             "result": 2,
-            "create_date": "2023-01-02",
-            "latlngs": "[[0.53,0.63],[0.63,0.73]]"
+            "create_date": "2023-01-02T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 50,
+        "fields": {
+            "result": 5,
+            "category": "track",
+            "x_pixels": 260,
+            "y_pixels": 218
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 51,
+        "fields": {
+            "result": 5,
+            "category": "track",
+            "x_pixels": 301,
+            "y_pixels": 259
         }
     },
     {
@@ -43,8 +110,27 @@
             "ft_type": "S",
             "worker": 101,
             "result": 2,
-            "create_date": "2023-01-02",
-            "latlngs": "[[0.54,0.64],[0.64,0.74]]"
+            "create_date": "2023-01-02T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 50,
+        "fields": {
+            "result": 5,
+            "category": "track",
+            "x_pixels": 270,
+            "y_pixels": 227
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 51,
+        "fields": {
+            "result": 5,
+            "category": "track",
+            "x_pixels": 312,
+            "y_pixels": 269
         }
     },
     {
@@ -55,8 +141,37 @@
             "ft_type": "S",
             "worker": 102,
             "result": 3,
-            "create_date": "2023-02-01",
-            "latlngs": "[[0.32,0.22],[0.92,0.12],[0.52,0.42]]"
+            "create_date": "2023-02-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 80,
+        "fields": {
+            "result": 8,
+            "category": "track",
+            "x_pixels": 110,
+            "y_pixels": 160
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 81,
+        "fields": {
+            "result": 8,
+            "category": "track",
+            "x_pixels": 60,
+            "y_pixels": 461
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 82,
+        "fields": {
+            "result": 8,
+            "category": "track",
+            "x_pixels": 211,
+            "y_pixels": 261
         }
     }
 ]
