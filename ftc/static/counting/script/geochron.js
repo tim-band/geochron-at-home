@@ -199,14 +199,13 @@ function grain_view(options) {
             restoreCounting: restoreCounting,
             drawRectangle: drawRectangle,
             resetMarkers: resetMarkers,
-            selectMarker: function(marker_index) {
+            selectMarkers: function(marker_indices) {
                 stopSelecting();
-                trash_mks_in = [marker_index];
-                markers[marker_index].marker.setIcon(selectedIcon);
-                updateMarkerDataFn(
-                    markers[marker_index].category,
-                    markers[marker_index].comment
-                );
+                trash_mks_in = marker_indices;
+                for (var i in marker_indices) {
+                    markers[marker_indices[i]].marker.setIcon(selectedIcon);
+                }
+                updateMarkerData();
             },
             setCategory: function(category) {
                 var d = {};
@@ -277,7 +276,7 @@ function grain_view(options) {
                     className: 'jhe-fissionTrack-' + track_id
                 }).on('click', function() {
                     if (deleter) {
-                        deleter.selectMarker(Object.keys(mks)[0]);
+                        deleter.selectMarkers([Object.keys(mks)[0]]);
                     }
                 }).on('dragstart', function(e) {
                     dragged_out = false;
@@ -320,6 +319,11 @@ function grain_view(options) {
                     mk.marker.addTo(map);
                     markers[k] = mk;
                     track_num += 1;
+                }
+                if (deleter) {
+                    deleter.selectMarkers(
+                        Object.keys(markersToAdd)
+                    );
                 }
             },
             removeFromMap: function(markersToRemove) {
