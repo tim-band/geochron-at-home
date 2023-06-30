@@ -987,7 +987,7 @@ def addGrainPoints(ftn, res_dic):
     if 'points' in res_dic:
         addGrainPointsFromGrainPoints(ftn, res_dic['points'])
     else:
-        addGrainPointsFromLatlngs(fts, res_dic['marker_latlngs'])
+        addGrainPointsFromLatlngs(ftn, res_dic['marker_latlngs'])
 
 
 def grainPointCount(res_dic):

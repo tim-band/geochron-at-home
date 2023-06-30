@@ -240,9 +240,16 @@ function grain_view(options) {
         }
         var update_category_and_comment_fn = function(cat, com) {};
         var category_select = document.getElementById('category');
-        if (category_select) {
+        var comment_text = document.getElementById('comment-text');
+        if (category_select && comment_text) {
             update_category_and_comment_fn = function(category, comment) {
                 category_select.value = category;
+                comment_text.value = comment;
+                if (comment === '' || comment === null) {
+                    removeClass('btn-comment', 'btn-info');
+                } else {
+                    addClass('btn-comment', 'btn-info');
+                }
             };
         }
         var deleter = null;
@@ -406,7 +413,14 @@ function grain_view(options) {
     var category_select = document.getElementById('category');
     if (category_select) {
         category_select.onchange = function() {
-            deleter.setCategory(category_select.value)
+            deleter.setCategory(category_select.value);
+        };
+    }
+    var comment_submit = document.getElementById('btn-comment-submit');
+    var comment_text = document.getElementById('comment-text');
+    if (comment_submit && comment_text) {
+        comment_submit.onclick = function() {
+            deleter.setComment(comment_text.value);
         };
     }
     var buttons = {
