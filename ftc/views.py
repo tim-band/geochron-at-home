@@ -788,6 +788,7 @@ def add_grain_info_markers(info, grain, ft_type, worker):
     ).order_by('result').first()
     if save:
         info['marker_latlngs'] = save.get_latlngs()
+        info['points'] = save.points()
 
 def get_grain_info(request, pk, ft_type, **kwargs):
     if pk == 'done':
@@ -950,7 +951,7 @@ def counting(request, uname=None):
     })
 
 
-def addGrainPoints(ftn, marker_latlngs):
+def addGrainPointsFromLatlngs(ftn, marker_latlngs):
     width = ftn.grain.image_width
     height = ftn.grain.image_height
     track = GrainPointCategory(name='track')
@@ -963,6 +964,36 @@ def addGrainPoints(ftn, marker_latlngs):
         )
         for (lat, lng) in marker_latlngs
     ])
+
+
+def addGrainPointsFromGrainPoints(ftn, points):
+    for p in points:
+        category = p['category']
+        gpc = GrainPointCategory.objects.get(pk=category)
+        if gpc is None:
+            logging.warn('No such category {0}'.format(category))
+            gpc = GrainPointCategory.objects.get(pk='track')
+        gp = GrainPoint(
+            result=ftn,
+            x_pixels=p['x_pixels'],
+            y_pixels=p['y_pixels'],
+            comment=p['comment'],
+            category=gpc
+        )
+        gp.save()
+
+
+def addGrainPoints(ftn, res_dic):
+    if 'points' in res_dic:
+        addGrainPointsFromGrainPoints(ftn, res_dic['points'])
+    else:
+        addGrainPointsFromLatlngs(fts, res_dic['marker_latlngs'])
+
+
+def grainPointCount(res_dic):
+    if 'points' in res_dic:
+        return len(res_dic['points'])
+    return len(res_dic['marker_latlngs'])
 
 
 @login_required
@@ -989,26 +1020,10 @@ def updateTFNResult(request):
             grain=grain,
             ft_type=ft_type,
             worker=request.user,
-            result=len(res_dic['marker_latlngs']),
+            result=grainPointCount(res_dic),
         )
         fts.save()
-        if 'points' in res_dic:
-            for p in res_dic['points']:
-                category = p['category']
-                gpc = GrainPointCategory.objects.get(pk=category)
-                if gpc is None:
-                    logging.warn('No such category {0}'.format(category))
-                    gpc = GrainPointCategory.objects.get(pk='track')
-                gp = GrainPoint(
-                    result=fts,
-                    x_pixels=p['x_pixels'],
-                    y_pixels=p['y_pixels'],
-                    comment=p['comment'],
-                    category=gpc
-                )
-                gp.save()
-        else:
-            addGrainPoints(fts, res_dic['marker_latlngs'])
+        addGrainPoints(fts, res_dic)
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
         return HttpResponse(myjson, content_type='application/json')
     else:
@@ -1039,7 +1054,7 @@ def saveWorkingGrain(request):
                 result=-1,
             )
             ftn.save()
-            addGrainPoints(ftn, res['marker_latlngs'])
+            addGrainPoints(ftn, res)
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
         return HttpResponse(myjson, content_type='application/json')
     else:

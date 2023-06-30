@@ -68,6 +68,10 @@ font-family: "ds-digitalitalic";
   width:30px;height:46px;border-radius:0;padding:6px 1px;
 }
 
+#btn-comment {
+    height: 50px;
+}
+
 .noUi-vertical .noUi-tooltip {
     transform: none;
     -webkit-transform: none;
@@ -166,6 +170,17 @@ function setup() {
     <option value="defect">Crystal defect</option>
     <option value="surface">Surface imperfection</option>
 </select>
+<div class="btn-group">
+    <button id="btn-comment" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+        Comment
+    </button>
+    <div class="dropdown-menu">
+        <input type="text" id="comment-text">
+        <button id="btn-comment-submit" type="button" class="btn btn-default">
+            submit
+        </button>
+    </div>
+</div>
 {% endif %}{% endblock %}
 {% block right_nav_li %}{% endblock %}
 {% block right_nav_fn_counting %}{% endblock %}

@@ -8,7 +8,12 @@
  * grain_info.shift_y The y-difference in pixels of the Mica layers from the crystal layers
  * grain_info.scale_x Meters per pixel, if known
  * grain_info.images Array of URLs to the z-stack images
- * grain_info.marker_latlngs Array of marker positions
+ * grain_info.marker_latlngs Array of marker positions, instead of `points`
+ * grain_info.points Array of marker positions and categories, instead of `marker_latlngs`. Objects with keys:
+ * - x_pixels: x position in pixels from the left of the image
+ * - y_pixels: y position in pixels from the top of the image
+ * - category: string referencing the name (primary key) of the appropriate GrainPointCategory ('track', 'defect' etc.)
+ * - comment: arbitrary string describing this particular marker
  * grain_info.rois Array of regions of interest, each of which is an array
  *   of vertex positions [lat,lng] (that is, [(height - y_pixels)/width,
  *   x_pixels/width])
@@ -254,7 +259,7 @@ function grain_view(options) {
             // as an object with a single key (the new track ID)
             // with the value as this new marker. This return
             // value can be passed into addToMap as is.
-            make: function(latlng) {
+            make: function(latlng, category, comment) {
                 var mks = {};
                 var mk;
                 var startLatLng = null;
@@ -295,8 +300,8 @@ function grain_view(options) {
                 });
                 mks[track_id] = {
                     marker: mk,
-                    category: 'track',
-                    comment: ''
+                    category: category,
+                    comment: comment
                 };
                 track_id++;
                 return mks;
@@ -543,8 +548,8 @@ function grain_view(options) {
         return function() { return addToMap(deleted); }
     }
 
-    function createMarker(latlng) {
-        var mks = markers.make(latlng);
+    function createMarker(latlng, category, comment) {
+        var mks = markers.make(latlng, category, comment);
         undo.withUndo(addToMap(mks));
     };
 
@@ -558,7 +563,7 @@ function grain_view(options) {
         L.DomEvent.preventDefault(e);
         L.DomEvent.stopPropagation(e);
         if (isEditable && zStack.pointInRois(e.latlng.lat, e.latlng.lng)) {
-            createMarker(e.latlng);
+            createMarker(e.latlng, 'track', '');
         }
     };
 
@@ -830,17 +835,27 @@ function grain_view(options) {
             'max': sliderNum - 1
         }
     }, true);
-    var yOverX = grain_info.image_height / grain_info.image_width;
+    var width = grain_info.image_width;
+    var height = grain_info.image_height;
+    var yOverX = height / width;
     zStack = makeZStack(
         map, grain_info.images, sliderNum, yOverX, grain_info.rois
     );
     markers = makeMarkers(map);
     deleter = markers.makeDeleter();
-    if ('marker_latlngs' in grain_info) {
-        var latlng;
-        for (var i = 0; i < grain_info.marker_latlngs.length; i++) {
-            latlng = grain_info.marker_latlngs[i];
-            createMarker(latlng);
+    if ('points' in grain_info) {
+        for (var i in grain_info.points) {
+            var points = grain_info.points[i];
+            createMarker(
+                [(height - points.y_pixels) / width, points.x_pixels / width],
+                points.category,
+                points.comment
+            );
+        }
+    } else if ('marker_latlngs' in grain_info) {
+        for (var i in grain_info.marker_latlngs) {
+            var latlng = grain_info.marker_latlngs[i];
+            createMarker(latlng, 'track', '');
         }
         undo.reset();
     }

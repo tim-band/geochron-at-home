@@ -248,6 +248,17 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
             return None
         return a * 1e6
 
+    def points(self):
+        return [
+            {
+                'x_pixels': gp.x_pixels,
+                'y_pixels': gp.y_pixels,
+                'category': gp.category.name,
+                'comment': gp.comment
+            }
+            for gp in self.grainpoint_set.all()
+        ]
+
     def get_latlngs(self):
         width = self.grain.image_width
         height = self.grain.image_height
