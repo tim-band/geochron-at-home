@@ -46,7 +46,7 @@ function grain_view(options) {
     var selectedIcon = new MarkerIcon({
         iconUrl: options.iconUrl_selected
     });
-    function makeDeleter(map, markers) {
+    function makeDeleter(map, markers, updateMarkerDataFn) {
         var rect = L.rectangle([
             [0., 0.],
             [0., 0.]
@@ -65,19 +65,21 @@ function grain_view(options) {
         function resetMarkers() {
             for (var i in trash_mks_in) {
                 var indx = trash_mks_in[i]
-                markers[indx].setIcon(normalIcon);
+                markers[indx].marker.setIcon(normalIcon);
             }
             trash_mks_in = [];
+            updateMarkerDataFn('', '');
         }
         function deleteSelected() {
             if (trash_mks_in.length !== 0) {
                 var mks = {};
                 for (var i in trash_mks_in) {
                     var indx = trash_mks_in[i]
-                    mks[indx] = markers[indx];
+                    mks[indx] = markers[indx].marker;
                 }
                 undo.withUndo(removeFromMap(mks));
                 trash_mks_in = [];
+                updateMarkerDataFn('', '');
             }
         }
         function stopSelecting() {
@@ -87,6 +89,29 @@ function grain_view(options) {
                 [0., 0.]
             ]);
             resetMarkers();
+        }
+        function updateMarkerData() {
+            var category = null;
+            var comment = null;
+            for (var i in trash_mks_in) {
+                var mk = markers[trash_mks_in[i]];
+                if (category === null) {
+                    category = mk.category;
+                    comment = mk.comment;
+                } else {
+                    if (category !== mk.category) {
+                        category = '';
+                    }
+                    if (comment !== mk.comment) {
+                        comment = '';
+                    }
+                    if (category === '' && comment === '') {
+                        updateMarkerDataFn('', '');
+                        return;
+                    }
+                }
+            }
+            updateMarkerDataFn(category, comment);
         }
         function setDrawRectangle(e) {
             twoCorner = e.latlng;
@@ -100,10 +125,10 @@ function grain_view(options) {
             map._container.style.cursor = 'crosshair';
             var j = 0;
             for (var i in markers) {
-                latlon = markers[i].getLatLng();
-                if (bounds.contains(latlon)) {
+                var latlng = markers[i].marker.getLatLng();
+                if (bounds.contains(latlng)) {
                     trash_mks_in[j] = i;
-                    markers[i].setIcon(selectedIcon);
+                    markers[i].marker.setIcon(selectedIcon);
                     j++;
                 }
             }
@@ -113,6 +138,7 @@ function grain_view(options) {
                 trash_mks_in = [];
                 restoreCounting(e);
             }
+            updateMarkerData();
         }
         function setOneCorner(e) {
             //L.DomEvent.preventDefault(e);
@@ -143,10 +169,54 @@ function grain_view(options) {
             stopSelecting();
             addClass('ftc-btn-delete', 'leaflet-disabled');
         }
+        var setting_keys = ['category', 'comment'];
+        // data is an object whose keys are indexes into the marker array
+        // and whose values are objects whose keys are a subset of
+        // { 'category', 'comment' } and whose values are the strings
+        // to set. Returns a function that would set it all back.
+        function setData(data) {
+            var undo_data = {};
+            for (var i in data) {
+                var o = data[i];
+                undo_data[i] = {}
+                setting_keys.forEach(function(k) {
+                    if (k in o) {
+                        undo_data[i][k] = markers[i][k];
+                        markers[i][k] = o[k];
+                    }
+                });
+            }
+            updateMarkerData();
+            return setData.bind(null, undo_data);
+        }
         return {
             deleteSelected: deleteSelected,
             restoreCounting: restoreCounting,
-            drawRectangle: drawRectangle
+            drawRectangle: drawRectangle,
+            resetMarkers: resetMarkers,
+            selectMarker: function(marker_index) {
+                stopSelecting();
+                trash_mks_in = [marker_index];
+                markers[marker_index].marker.setIcon(selectedIcon);
+                updateMarkerDataFn(
+                    markers[marker_index].category,
+                    markers[marker_index].comment
+                );
+            },
+            setCategory: function(category) {
+                var d = {};
+                trash_mks_in.forEach(function(i) {
+                    d[i] = { category: category };
+                });
+                undo.withUndo(setData(d));
+            },
+            setComment: function(comment) {
+                var d = {};
+                trash_mks_in.forEach(function(i) {
+                    d[i] = { comment: comment };
+                });
+                undo.withUndo(setData(d));
+            }
         }
     }
     function makeMarkers(map) {
@@ -163,9 +233,22 @@ function grain_view(options) {
             }
             return false;
         }
+        var update_category_and_comment_fn = function(cat, com) {};
+        var category_select = document.getElementById('category');
+        if (category_select) {
+            update_category_and_comment_fn = function(category, comment) {
+                category_select.value = category;
+            };
+        }
+        var deleter = null;
         return {
             makeDeleter: function() {
-                return makeDeleter(map, markers);
+                deleter = makeDeleter(
+                    map,
+                    markers,
+                    update_category_and_comment_fn
+                );
+                return deleter;
             },
             // Returns a new track marker with a new track ID,
             // as an object with a single key (the new track ID)
@@ -180,9 +263,10 @@ function grain_view(options) {
                     draggable: true,
                     riseOnHover: true,
                     className: 'jhe-fissionTrack-' + track_id
-                }).on('click', function(e) {
-                    e.preventDefault()
-                    e.stopPropagation()
+                }).on('click', function() {
+                    if (deleter) {
+                        deleter.selectMarker(Object.keys(mks)[0]);
+                    }
                 }).on('dragstart', function(e) {
                     dragged_out = false;
                     startLatLng = e.target.getLatLng();
@@ -209,22 +293,26 @@ function grain_view(options) {
                         undo.withUndo(moveMarker(mk, startLatLng, e.target.getLatLng()));
                     }
                 });
-                mks[track_id] = mk;
+                mks[track_id] = {
+                    marker: mk,
+                    category: 'track',
+                    comment: ''
+                };
                 track_id++;
                 return mks;
             },
             addToMap: function(markersToAdd) {
                 for (var k in markersToAdd) {
                     mk = markersToAdd[k];
-                    mk.setIcon(normalIcon);
-                    mk.addTo(map);
+                    mk.marker.setIcon(normalIcon);
+                    mk.marker.addTo(map);
                     markers[k] = mk;
-                    track_num = track_num + 1;
+                    track_num += 1;
                 }
             },
             removeFromMap: function(markersToRemove) {
                 for (var k in markersToRemove) {
-                    map.removeLayer(markersToRemove[k]);
+                    map.removeLayer(markersToRemove[k].marker);
                     delete markers[k];
                     track_num = track_num - 1;
                 }
@@ -232,20 +320,33 @@ function grain_view(options) {
             removeAllFromMap: function() {
                 var mks = {};
                 for (var k in markers) {
-                    mks[k] = markers[k];
+                    mks[k] = markers[k].marker;
                 }
                 removeFromMap(mks);
                 return mks;
             },
             getLatLngs: function() {
                 var latlngs = new Array();
-                var j = 0;
                 for (var i in markers) {
-                    latlng = markers[i].getLatLng();
-                    latlngs[j] = [latlng.lat, latlng.lng];
-                    j++;
+                    latlng = markers[i].marker.getLatLng();
+                    latlngs.push( [latlng.lat, latlng.lng] );
                 }
                 return latlngs;
+            },
+            getPoints: function() {
+                var ps = new Array();
+                var width = grain_info.image_width;
+                var height = grain_info.image_height;
+                for (var i in markers) {
+                    latlng = markers[i].marker.getLatLng();
+                    ps.push({
+                        'x_pixels': latlng.lng * width,
+                        'y_pixels': height - latlng.lat * width,
+                        'category': markers[i].category,
+                        'comment': markers[i].comment
+                    });
+                }
+                return ps;
             },
             trackCount: function() {
                 return track_num;
@@ -297,6 +398,12 @@ function grain_view(options) {
     var deleter = null;
     var markers = makeMarkers(map);
     var deleter = markers.makeDeleter();
+    var category_select = document.getElementById('category');
+    if (category_select) {
+        category_select.onchange = function() {
+            deleter.setCategory(category_select.value)
+        };
+    }
     var buttons = {
         'homeView': {
             icon: 'fa-arrows-alt',
@@ -747,7 +854,6 @@ function grain_view(options) {
     }
 
     function doSave(url, go_to) {
-        var latlngs = markers.getLatLngs();
         var xhr = new XMLHttpRequest();
         xhr.open('POST', url);
         xhr.onload = function() {
@@ -769,7 +875,8 @@ function grain_view(options) {
             'ft_type': grain_info.ft_type,
             'image_width': grain_info.image_width,
             'image_height': grain_info.image_height,
-            'marker_latlngs': latlngs
+            'marker_latlngs': markers.getLatLngs(),
+            'points': markers.getPoints(),
         }));
     }
 

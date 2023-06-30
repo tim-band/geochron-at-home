@@ -27,6 +27,7 @@ from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 import csv
 import io
 import json
+import logging
 import os
 
 #
@@ -991,7 +992,23 @@ def updateTFNResult(request):
             result=len(res_dic['marker_latlngs']),
         )
         fts.save()
-        addGrainPoints(fts, res_dic['marker_latlngs'])
+        if 'points' in res_dic:
+            for p in res_dic['points']:
+                category = p['category']
+                gpc = GrainPointCategory.objects.get(pk=category)
+                if gpc is None:
+                    logging.warn('No such category {0}'.format(category))
+                    gpc = GrainPointCategory.objects.get(pk='track')
+                gp = GrainPoint(
+                    result=fts,
+                    x_pixels=p['x_pixels'],
+                    y_pixels=p['y_pixels'],
+                    comment=p['comment'],
+                    category=gpc
+                )
+                gp.save()
+        else:
+            addGrainPoints(fts, res_dic['marker_latlngs'])
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
         return HttpResponse(myjson, content_type='application/json')
     else:
