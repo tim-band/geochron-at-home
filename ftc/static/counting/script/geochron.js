@@ -51,7 +51,7 @@ function grain_view(options) {
     var selectedIcon = new MarkerIcon({
         iconUrl: options.iconUrl_selected
     });
-    function makeDeleter(map, markers, updateMarkerDataFn) {
+    function makeSelector(map, markers, updateMarkerDataFn) {
         var rect = L.rectangle([
             [0., 0.],
             [0., 0.]
@@ -198,7 +198,7 @@ function grain_view(options) {
             deleteSelected: deleteSelected,
             restoreCounting: restoreCounting,
             drawRectangle: drawRectangle,
-            resetMarkers: resetMarkers,
+            stopSelecting: stopSelecting,
             selectMarkers: function(marker_indices) {
                 stopSelecting();
                 trash_mks_in = marker_indices;
@@ -251,15 +251,15 @@ function grain_view(options) {
                 }
             };
         }
-        var deleter = null;
+        var selector = null;
         return {
-            makeDeleter: function() {
-                deleter = makeDeleter(
+            makeSelector: function() {
+                selector = makeSelector(
                     map,
                     markers,
                     update_category_and_comment_fn
                 );
-                return deleter;
+                return selector;
             },
             // Returns a new track marker with a new track ID,
             // as an object with a single key (the new track ID)
@@ -275,8 +275,8 @@ function grain_view(options) {
                     riseOnHover: true,
                     className: 'jhe-fissionTrack-' + track_id
                 }).on('click', function() {
-                    if (deleter) {
-                        deleter.selectMarkers([Object.keys(mks)[0]]);
+                    if (selector) {
+                        selector.selectMarkers([Object.keys(mks)[0]]);
                     }
                 }).on('dragstart', function(e) {
                     dragged_out = false;
@@ -320,8 +320,8 @@ function grain_view(options) {
                     markers[k] = mk;
                     track_num += 1;
                 }
-                if (deleter) {
-                    deleter.selectMarkers(
+                if (selector) {
+                    selector.selectMarkers(
                         Object.keys(markersToAdd)
                     );
                 }
@@ -411,20 +411,20 @@ function grain_view(options) {
     }();
     var isEditable = false;
     var markers = null;
-    var deleter = null;
+    var selector = null;
     var markers = makeMarkers(map);
-    var deleter = markers.makeDeleter();
+    var selector = markers.makeSelector();
     var category_select = document.getElementById('category');
     if (category_select) {
         category_select.onchange = function() {
-            deleter.setCategory(category_select.value);
+            selector.setCategory(category_select.value);
         };
     }
     var comment_submit = document.getElementById('btn-comment-submit');
     var comment_text = document.getElementById('comment-text');
     if (comment_submit && comment_text) {
         comment_submit.onclick = function() {
-            deleter.setComment(comment_text.value);
+            selector.setComment(comment_text.value);
         };
     }
     var buttons = {
@@ -459,10 +459,10 @@ function grain_view(options) {
                     addClass('ftc-btn-select', 'selecting');
                     map.off('click', onMapClick);
                     map._container.style.cursor = 'crosshair';
-                    map.on('click', deleter.drawRectangle);
+                    map.on('click', selector.drawRectangle);
                 } else {
                     removeClass('ftc-btn-select', 'selecting');
-                    deleter.restoreCounting(e);
+                    selector.restoreCounting(e);
                 }
             }
         },
@@ -471,8 +471,8 @@ function grain_view(options) {
             tipText: 'delete selected fission track markers',
             className_a: 'leaflet-disabled',
             action: function(e) {
-                deleter.deleteSelected();
-                deleter.restoreCounting(e);
+                selector.deleteSelected();
+                selector.restoreCounting(e);
             }
         }
     };
@@ -569,7 +569,24 @@ function grain_view(options) {
     function createMarker(latlng, category, comment) {
         var mks = markers.make(latlng, category, comment);
         undo.withUndo(addToMap(mks));
-    };
+    }
+
+    // fn(create, v, k) takes a function create, an element v of array or object arr
+    // and the index (or key) of v in arr. If it wants to create any markers, it calls
+    // create(latlng, category, comment) as many times as it likes. All the markers
+    // are added in a single operation.
+    function forEachCreateMarker(arr, fn) {
+        var mks = {};
+        for (var k in arr) {
+            fn(function(latlng, category, comment) {
+                var mks_new = markers.make(latlng, category, comment);
+                for (var id in mks_new) {
+                    mks[id] = mks_new[id];
+                }
+            }, arr[k], k);
+        }
+        undo.withUndo(addToMap(mks));
+    }
 
     function moveMarker(mk, fromLatLng, toLatLng) {
         mk.setLatLng(toLatLng);
@@ -860,23 +877,23 @@ function grain_view(options) {
         map, grain_info.images, sliderNum, yOverX, grain_info.rois
     );
     markers = makeMarkers(map);
-    deleter = markers.makeDeleter();
+    selector = markers.makeSelector();
     if ('points' in grain_info) {
-        for (var i in grain_info.points) {
-            var points = grain_info.points[i];
-            createMarker(
-                [(height - points.y_pixels) / width, points.x_pixels / width],
-                points.category,
-                points.comment
+        forEachCreateMarker(grain_info.points, function(create, point) {
+            create(
+                [(height - point.y_pixels) / width, point.x_pixels / width],
+                point.category,
+                point.comment
             );
-        }
+        });
+        undo.reset();
     } else if ('marker_latlngs' in grain_info) {
-        for (var i in grain_info.marker_latlngs) {
-            var latlng = grain_info.marker_latlngs[i];
-            createMarker(latlng, 'track', '');
-        }
+        forEachCreateMarker(grain_info.marker_latlngs, function(create, latlng) {
+            create(latlng, 'track', '');
+        });
         undo.reset();
     }
+    selector.stopSelecting();
     fit_region_to_window(false);
 
     function setTrackCounterCallback(cb) {

@@ -918,6 +918,10 @@ class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
             self.ft_type,
             **count_my_grain_extra_links(self.request.user, pk, self.ft_type)
         ))
+        ctx.update({ 'categories': [
+            { 'name': gpc.name, 'description': gpc.description }
+            for gpc in GrainPointCategory.objects.all()
+        ]})
         return ctx
 
 class CountMyGrainMicaView(CountMyGrainView):

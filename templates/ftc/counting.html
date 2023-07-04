@@ -163,12 +163,12 @@ function setup() {
 </script>
 {% endblock %}
 
-{% block left_nav_li %}{% if 1 %}
+{% block left_nav_li %}{% if categories %}
 <select id="category" name="category">
     <option value="">-- category --</option>
-    <option value="track">Genuine fission track</option>
-    <option value="defect">Crystal defect</option>
-    <option value="surface">Surface imperfection</option>
+    {% for cat in categories %}
+    <option value="{{ cat.name }}">{{ cat.description }}</option>
+    {% endfor %}
 </select>
 <div class="btn-group">
     <button id="btn-comment" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
