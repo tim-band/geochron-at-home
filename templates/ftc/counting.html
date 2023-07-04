@@ -113,6 +113,9 @@ font-family: "ds-digitalitalic";
 <script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 <script type='text/javascript'>
 function setup() {
+    $(document.body).on('shown.bs.dropdown', function() {
+        $('[autofocus]').focus();
+    });
     var map = grain_view({
         grain_info: JSON.parse('{{ grain_info|escapejs }}'),
         atoken: '{{ csrf_token }}',
@@ -163,19 +166,19 @@ function setup() {
 </script>
 {% endblock %}
 
-{% block left_nav_li %}{% if 1 %}
+{% block left_nav_li %}{% if categories %}
 <select id="category" name="category">
     <option value="">-- category --</option>
-    <option value="track">Genuine fission track</option>
-    <option value="defect">Crystal defect</option>
-    <option value="surface">Surface imperfection</option>
+    {% for cat in categories %}
+    <option value="{{ cat.name }}">{{ cat.description }}</option>
+    {% endfor %}
 </select>
 <div class="btn-group">
     <button id="btn-comment" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
         Comment
     </button>
     <div class="dropdown-menu">
-        <input type="text" id="comment-text">
+        <input type="text" id="comment-text" autofocus="autofocus">
         <button id="btn-comment-submit" type="button" class="btn btn-default">
             submit
         </button>
