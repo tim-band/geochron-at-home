@@ -70,10 +70,12 @@ function grain_view(options) {
         function resetMarkers() {
             for (var i in trash_mks_in) {
                 var indx = trash_mks_in[i]
-                markers[indx].marker.setIcon(normalIcon);
+                if (indx in markers) {
+                    markers[indx].marker.setIcon(normalIcon);
+                }
             }
             trash_mks_in = [];
-            updateMarkerDataFn('', '');
+            updateMarkerDataFn('', '', 0);
         }
         function deleteSelected() {
             if (trash_mks_in.length !== 0) {
@@ -84,7 +86,7 @@ function grain_view(options) {
                 }
                 undo.withUndo(removeFromMap(mks));
                 trash_mks_in = [];
-                updateMarkerDataFn('', '');
+                updateMarkerDataFn('', '', 0);
             }
         }
         function stopSelecting() {
@@ -100,7 +102,9 @@ function grain_view(options) {
             var comment = null;
             for (var i in trash_mks_in) {
                 var mk = markers[trash_mks_in[i]];
-                if (category === null) {
+                if (typeof(mk) === 'undefined') {
+                    delete markers[trash_mks_in[i]];
+                } else if (category === null) {
                     category = mk.category;
                     comment = mk.comment;
                 } else {
@@ -111,12 +115,12 @@ function grain_view(options) {
                         comment = '';
                     }
                     if (category === '' && comment === '') {
-                        updateMarkerDataFn('', '');
+                        updateMarkerDataFn('', '', trash_mks_in.length);
                         return;
                     }
                 }
             }
-            updateMarkerDataFn(category, comment);
+            updateMarkerDataFn(category, comment, trash_mks_in.length);
         }
         function setDrawRectangle(e) {
             twoCorner = e.latlng;
@@ -128,6 +132,7 @@ function grain_view(options) {
             bounds = L.latLngBounds(oneCorner, twoCorner);
             map.off('mousemove', setDrawRectangle);
             map._container.style.cursor = 'crosshair';
+            stopSelecting();
             var j = 0;
             for (var i in markers) {
                 var latlng = markers[i].marker.getLatLng();
@@ -174,6 +179,14 @@ function grain_view(options) {
             stopSelecting();
             addClass('ftc-btn-delete', 'leaflet-disabled');
         }
+        function selectMarkers(marker_indices) {
+            stopSelecting();
+            trash_mks_in = marker_indices;
+            for (var i in marker_indices) {
+                markers[marker_indices[i]].marker.setIcon(selectedIcon);
+            }
+            updateMarkerData();
+        }
         var setting_keys = ['category', 'comment'];
         // data is an object whose keys are indexes into the marker array
         // and whose values are objects whose keys are a subset of
@@ -191,7 +204,7 @@ function grain_view(options) {
                     }
                 });
             }
-            updateMarkerData();
+            selectMarkers(Object.keys(data));
             return setData.bind(null, undo_data);
         }
         return {
@@ -199,14 +212,7 @@ function grain_view(options) {
             restoreCounting: restoreCounting,
             drawRectangle: drawRectangle,
             stopSelecting: stopSelecting,
-            selectMarkers: function(marker_indices) {
-                stopSelecting();
-                trash_mks_in = marker_indices;
-                for (var i in marker_indices) {
-                    markers[marker_indices[i]].marker.setIcon(selectedIcon);
-                }
-                updateMarkerData();
-            },
+            selectMarkers: selectMarkers,
             setCategory: function(category) {
                 var d = {};
                 trash_mks_in.forEach(function(i) {
@@ -220,7 +226,8 @@ function grain_view(options) {
                     d[i] = { comment: comment };
                 });
                 undo.withUndo(setData(d));
-            }
+            },
+            updateMarkerData: updateMarkerData
         }
     }
     function makeMarkers(map) {
@@ -241,13 +248,21 @@ function grain_view(options) {
         var category_select = document.getElementById('category');
         var comment_text = document.getElementById('comment-text');
         if (category_select && comment_text) {
-            update_category_and_comment_fn = function(category, comment) {
+            update_category_and_comment_fn = function(category, comment, count) {
                 category_select.value = category;
                 comment_text.value = comment;
                 if (comment === '' || comment === null) {
                     removeClass('btn-comment', 'btn-info');
                 } else {
                     addClass('btn-comment', 'btn-info');
+                }
+                var comment_button = document.getElementById('btn-comment');
+                if (count === 0) {
+                    comment_button.setAttribute('disabled', true);
+                    comment_button.setAttribute('aria-disabled', true);
+                } else {
+                    comment_button.removeAttribute('disabled');
+                    comment_button.removeAttribute('aria-disabled');
                 }
             };
         }
@@ -320,11 +335,9 @@ function grain_view(options) {
                     markers[k] = mk;
                     track_num += 1;
                 }
-                if (selector) {
-                    selector.selectMarkers(
-                        Object.keys(markersToAdd)
-                    );
-                }
+                selector.selectMarkers(
+                    Object.keys(markersToAdd)
+                );
             },
             removeFromMap: function(markersToRemove) {
                 for (var k in markersToRemove) {
@@ -332,6 +345,7 @@ function grain_view(options) {
                     delete markers[k];
                     track_num = track_num - 1;
                 }
+                selector.updateMarkerData();
             },
             removeAllFromMap: function() {
                 var mks = {};
@@ -339,6 +353,7 @@ function grain_view(options) {
                     mks[k] = markers[k].marker;
                 }
                 removeFromMap(mks);
+                selector.updateMarkerData();
                 return mks;
             },
             getLatLngs: function() {
