@@ -227,7 +227,33 @@ function grain_view(options) {
                 });
                 undo.withUndo(setData(d));
             },
-            updateMarkerData: updateMarkerData
+            updateMarkerData: updateMarkerData,
+            previousMarker: function() {
+                var ids = Object.keys(markers);
+                var n = ids.length - 1;
+                if (trash_mks_in.length !== 0) {
+                    n = ids.indexOf(trash_mks_in[0]) - 1;
+                    if (n < 0) {
+                        n = ids.length - 1;
+                    }
+                }
+                if (0 <= n) {
+                    selectMarkers([ids[n]]);
+                }
+            },
+            nextMarker: function() {
+                var ids = Object.keys(markers);
+                var n = 0;
+                if (trash_mks_in.length !== 0) {
+                    n = ids.indexOf(trash_mks_in[0]) + 1;
+                    if (n === ids.length) {
+                        n = 0;
+                    }
+                }
+                if (n < ids.length) {
+                    selectMarkers([ids[n]]);
+                }
+            }
         }
     }
     function makeMarkers(map) {
@@ -444,6 +470,12 @@ function grain_view(options) {
             ev.preventDefault();
         };
     }
+    $('#btn-prev-marker').on('click',function() {
+        selector.previousMarker();
+    });
+    $('#btn-next-marker').on('click',function() {
+        selector.nextMarker();
+    });
     var buttons = {
         'homeView': {
             icon: 'fa-arrows-alt',
