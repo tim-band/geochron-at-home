@@ -420,11 +420,13 @@ function grain_view(options) {
             selector.setCategory(category_select.value);
         };
     }
-    var comment_submit = document.getElementById('btn-comment-submit');
+    var comment_form = document.getElementById('form-comment');
     var comment_text = document.getElementById('comment-text');
-    if (comment_submit && comment_text) {
-        comment_submit.onclick = function() {
+    if (comment_form && comment_text) {
+        comment_form.onsubmit = function(ev) {
             selector.setComment(comment_text.value);
+            $('#btn-comment').dropdown('toggle');
+            ev.preventDefault();
         };
     }
     var buttons = {

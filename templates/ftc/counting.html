@@ -177,12 +177,10 @@ function setup() {
     <button id="btn-comment" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
         Comment
     </button>
-    <div class="dropdown-menu">
+    <form class="dropdown-menu" id="form-comment">
         <input type="text" id="comment-text" autofocus="autofocus">
-        <button id="btn-comment-submit" type="button" class="btn btn-default">
-            submit
-        </button>
-    </div>
+        <input id="btn-comment-submit" type="submit" value="submit">
+    </form>
 </div>
 {% endif %}{% endblock %}
 {% block right_nav_li %}{% endblock %}
