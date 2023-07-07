@@ -51,6 +51,19 @@ function grain_view(options) {
     var selectedIcon = new MarkerIcon({
         iconUrl: options.iconUrl_selected
     });
+    var shortcut_map = {};
+    document.getElementById('map').addEventListener('keydown', function(ev) {
+        if (ev.key in shortcut_map) {
+            shortcut_map[ev.key]();
+            ev.preventDefault();
+        }
+    });
+    function addShortcut(key, description, fn) {
+        shortcut_map[key] = fn;
+        var li = document.createElement('li');
+        li.textContent = key + ': ' + description;
+        document.getElementById('help-list').appendChild(li);
+    }
     function makeSelector(map, markers, updateMarkerDataFn) {
         var rect = L.rectangle([
             [0., 0.],
@@ -301,6 +314,12 @@ function grain_view(options) {
                     comment_button.removeAttribute('aria-disabled');
                 }
             };
+            addShortcut('c', 'open comment box', function() {
+                $('#btn-comment').dropdown('toggle');
+            });
+            addShortcut('t', 'select mark category', function() {
+                $('#category').focus();
+            });
         }
         var selector = null;
         return {
@@ -463,29 +482,8 @@ function grain_view(options) {
     var isEditable = false;
     var markers = null;
     var selector = null;
-    var markers = makeMarkers(map);
-    var selector = markers.makeSelector();
-    var category_select = document.getElementById('category');
-    if (category_select) {
-        category_select.onchange = function() {
-            selector.setCategory(category_select.value);
-        };
-    }
-    var comment_form = document.getElementById('form-comment');
-    var comment_text = document.getElementById('comment-text');
-    if (comment_form && comment_text) {
-        comment_form.onsubmit = function(ev) {
-            selector.setComment(comment_text.value);
-            $('#btn-comment').dropdown('toggle');
-            ev.preventDefault();
-        };
-    }
-    $('#btn-prev-marker').on('click',function() {
-        selector.previousMarker();
-    });
-    $('#btn-next-marker').on('click',function() {
-        selector.nextMarker();
-    });
+    var markers = null;
+    var selector = null;
     var buttons = {
         'homeView': {
             icon: 'fa-arrows-alt',
@@ -774,15 +772,24 @@ function grain_view(options) {
     map.attributionControl.setPrefix(''); // Don't show the 'Powered by Leaflet' text.
     map.on('click', onMapClick);
 
+    function focusUp() {
+        zStack.decrement();
+        sliders2.set(zStack.position());
+    }
+    function focusDown() {
+        zStack.increment();
+        sliders2.set(zStack.position());
+    }
     L.DomEvent.on(map.getContainer(), 'wheel', function(e) {
         if (e.deltaY < 0) {
-            zStack.decrement();
+            focusUp();
         } else {
-            zStack.increment();
+            focusDown();
         }
-        sliders2.set(zStack.position());
         return false;
     });
+    addShortcut('[', 'Focus up', focusUp);
+    addShortcut(']', 'Focus down', focusDown);
 
     var UScale = L.Control.extend({
         options: {
@@ -937,6 +944,43 @@ function grain_view(options) {
     );
     markers = makeMarkers(map);
     selector = markers.makeSelector();
+    var category_select = document.getElementById('category');
+    if (category_select) {
+        category_select.onchange = function() {
+            selector.setCategory(category_select.value);
+        };
+        category_select.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Enter') {
+                $('#map').focus();
+            }
+        });
+    }
+    var comment_form = document.getElementById('form-comment');
+    var comment_text = document.getElementById('comment-text');
+    if (comment_form && comment_text) {
+        comment_form.onsubmit = function(ev) {
+            selector.setComment(comment_text.value);
+            $('#btn-comment').dropdown('toggle');
+            $('#map').focus();
+            ev.preventDefault();
+        };
+        document.getElementById('control-comment').addEventListener('keydown', function(ev) {
+            if (ev.key === 'Escape') {
+                $('#btn-comment').dropdown('toggle');
+                $('#map').focus();
+            }
+        });
+        $('#btn-prev-marker').on('click',function() {
+            selector.previousMarker();
+            $('#map').focus();
+        });
+        $('#btn-next-marker').on('click',function() {
+            selector.nextMarker();
+            $('#map').focus();
+        });
+        addShortcut('p', 'select previous marker', selector.previousMarker);
+        addShortcut('n', 'select next marker', selector.nextMarker);
+    }
     if ('points' in grain_info) {
         forEachCreateMarker(grain_info.points, function(create, point) {
             create(

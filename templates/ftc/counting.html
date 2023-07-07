@@ -173,7 +173,7 @@ function setup() {
     <option value="{{ cat.name }}">{{ cat.description }}</option>
     {% endfor %}
 </select>
-<div class="btn-group">
+<div id="control-comment" class="btn-group">
     <button id="btn-comment" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
         Comment
     </button>
@@ -193,6 +193,16 @@ function setup() {
 {% block right_nav_fn_counting %}{% endblock %}
 
 {% block body_attributes %}onload='setup()'{% endblock %}
+
+{% block help %}
+<div class="btn-group">
+    <div type="button" class="btn navbar-link dropdown-toggle" data-toggle="dropdown">
+        <i class="fa fa-question-circle fa-lg"></i>
+    </div>
+    <ul id="help-list" class="dropdown-menu"></ul>
+    </div>
+</div>
+{% endblock %}
 
 {% block content %}
 <div id="dropdown-tracknum" class="input-group">

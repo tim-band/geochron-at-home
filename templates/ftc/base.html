@@ -88,7 +88,11 @@
                 {% endblock %}
               </ul>
             </li>
-            <li><a href="{%url 'tutorial' %}" target="_blank"><i class="fa fa-question-circle fa-lg"></i></a></li>
+            <li>
+            {% block help %}
+            <a href="{%url 'tutorial' %}" target="_blank"><i class="fa fa-question-circle fa-lg"></i></a>
+            {% endblock %}
+            </li>
           </ul>
         </div><!--/.nav-collapse -->
       </div>
