@@ -207,6 +207,12 @@ function grain_view(options) {
             selectMarkers(Object.keys(data));
             return setData.bind(null, undo_data);
         }
+        function panViewTo(id) {
+            map.panTo(markers[id].marker.getLatLng(), {
+                animate: true,
+                duration: 0.25
+            });
+        }
         return {
             deleteSelected: deleteSelected,
             restoreCounting: restoreCounting,
@@ -238,7 +244,9 @@ function grain_view(options) {
                     }
                 }
                 if (0 <= n) {
-                    selectMarkers([ids[n]]);
+                    var id = ids[n];
+                    selectMarkers([id]);
+                    panViewTo(id);
                 }
             },
             nextMarker: function() {
@@ -251,7 +259,9 @@ function grain_view(options) {
                     }
                 }
                 if (n < ids.length) {
-                    selectMarkers([ids[n]]);
+                    var id = ids[n];
+                    selectMarkers([id]);
+                    panViewTo(id);
                 }
             }
         }
