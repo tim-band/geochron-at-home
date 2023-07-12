@@ -9,12 +9,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
-import base64
 import glob
-import json
 import os
 import re
-import subprocess
 import tempfile
 import time
 
@@ -101,16 +98,32 @@ class BasePage:
             lambda d: d.find_element(By.XPATH, xpath)
         )
 
-    def click_element(self, locator, css):
-        WebDriverWait(
+    def wait_until(self, fn, timeout=2):
+        """
+        Repeatedly calls fn (with argument driver) until either
+        timeout seconds is reached (in which case an exception
+        is thrown) or fn returns a truthy value.
+        """
+        return WebDriverWait(
             self.driver,
-            timeout=2,
+            timeout=timeout,
             ignored_exceptions=[
                 exceptions.StaleElementReferenceException,
-                exceptions.ElementNotInteractableException
+                exceptions.ElementNotInteractableException,
+                exceptions.WebDriverException,
             ]
-        ).until(
-            lambda d: maybe_click(d.find_element(locator, css))
+        ).until(fn)
+
+    def get(self, url):
+        def get_fn(driver):
+            driver.get(url)
+            return True
+        self.wait_until(get_fn)
+        return self
+
+    def click_element(self, by, locator):
+        self.wait_until(
+            lambda d: maybe_click(d.find_element(by, locator))
         )
 
     def click_by_id(self, id):
@@ -119,10 +132,25 @@ class BasePage:
     def click_by_css(self, css):
         self.click_element(By.CSS_SELECTOR, css)
 
+    def send_keys_by(self, by, locator, keys):
+        def send_keys(driver):
+            e = driver.find_element(by, locator)
+            if not e:
+                return False
+            e.send_keys(keys)
+            return True
+        self.wait_until(send_keys)
+
+    def send_keys_to_id(self, id, keys):
+        self.send_keys_by(By.ID, id, keys)
+
+    def send_keys_to_css(self, css, keys):
+        self.send_keys_by(By.CSS_SELECTOR, css, keys)
+
 
 class HomePage(BasePage):
     def go(self):
-        self.driver.get(self.url + "/ftc")
+        self.get(self.url + "/ftc")
         return self
 
     def join(self):
@@ -132,7 +160,7 @@ class HomePage(BasePage):
     def become_guest(self):
         # log on as guest. ProfilePage is returned, which will be wrong if
         # the guest has already done the tutorial (then it will be CountingPage)
-        self.driver.get(self.url + "/ftc/counting/guest")
+        self.get(self.url + "/ftc/counting/guest")
         return ProfilePage(self.driver, self.url)
 
 
@@ -149,11 +177,11 @@ class JoinPage(BasePage):
         return self
 
     def fill_in(self, user):
-        self.driver.find_element(By.ID, "id_username").send_keys(user.identity)
-        self.driver.find_element(By.ID, "id_email").send_keys(user.email)
-        self.driver.find_element(By.ID, "id_password1").send_keys(user.password)
-        self.driver.find_element(By.ID, "id_password2").send_keys(user.password)
-        self.driver.find_element(By.CLASS_NAME, "btn-primary").click()
+        self.send_keys_to_id("id_username", user.identity)
+        self.send_keys_to_id("id_email", user.email)
+        self.send_keys_to_id("id_password1", user.password)
+        self.send_keys_to_id("id_password2", user.password)
+        self.click_element(By.CLASS_NAME, "btn-primary")
         return VerifyPage(self.driver, self.url)
 
 
@@ -176,7 +204,7 @@ class ConfirmPage(BasePage):
         m = re.search(r'http://[a-zA-Z0-9_.:\-@+/]+', mail_body)
         assert(m)
         verification_link = m.group(0)
-        self.driver.get(verification_link)
+        self.get(verification_link)
         return self
 
     def check(self, user):
@@ -191,7 +219,7 @@ class ConfirmPage(BasePage):
 
 class SignInPage(BasePage):
     def go(self):
-        self.driver.get(self.url + "/accounts/login")
+        self.get(self.url + "/accounts/login")
         return self
 
     def sign_in(self, user):
@@ -255,7 +283,7 @@ class ProfilePage(BasePage):
         return self.driver.find_element(By.CLASS_NAME, 'fa-user').text
 
     def go(self):
-        self.driver.get(self.url + "/accounts/profile")
+        self.get(self.url + "/accounts/profile")
         return self
 
     def get_counting_link(self):
@@ -296,7 +324,7 @@ class CountingPage(BasePage):
         return self
 
     def go(self):
-        self.driver.get(self.url + "/ftc/counting")
+        self.get(self.url + "/ftc/counting")
         return self
 
     def count(self):
@@ -356,11 +384,11 @@ class CountingPage(BasePage):
         return self
 
     def undo(self):
-        self.driver.find_element(By.ID, "ftc-btn-undo").click()
+        self.click_by_id("ftc-btn-undo");
         return self
 
     def redo(self):
-        self.driver.find_element(By.ID, "ftc-btn-redo").click()
+        self.click_by_id("ftc-btn-redo");
         return self
 
     def undo_available(self):
@@ -370,34 +398,34 @@ class CountingPage(BasePage):
         return not self.element_is_disabled("ftc-btn-redo")
 
     def submit(self):
-        self.driver.find_element(By.ID, "btn-tracknum").click()
-        self.driver.find_element(By.ID, "tracknum-submit").click()
+        self.click_by_id("btn-tracknum")
+        self.click_by_id("tracknum-submit")
         Alert(self.driver).accept()
         return self
 
     def save(self):
-        self.driver.find_element(By.ID, "btn-tracknum").click()
-        self.driver.find_element(By.ID, "tracknum-save").click()
+        self.click_by_id("btn-tracknum")
+        self.click_by_id("tracknum-save")
         Alert(self.driver).accept()
         return self
 
     def previous(self, confirm=False):
-        self.driver.find_element(By.ID, "btn-tracknum").click()
-        self.driver.find_element(By.ID, "tracknum-previous").click()
+        self.click_by_id("btn-tracknum")
+        self.click_by_id("tracknum-previous")
         if confirm:
             Alert(self.driver).accept()
         return self
 
     def next(self, confirm=False):
-        self.driver.find_element(By.ID, "btn-tracknum").click()
-        self.driver.find_element(By.ID, "tracknum-next").click()
+        self.click_by_id("btn-tracknum")
+        self.click_by_id("tracknum-next")
         if confirm:
             Alert(self.driver).accept()
         return self
 
     def cancel(self, confirm=False):
-        self.driver.find_element(By.ID, "btn-tracknum").click()
-        self.driver.find_element(By.ID, "tracknum-cancel").click()
+        self.click_by_id("btn-tracknum")
+        self.click_by_id("tracknum-cancel")
         if confirm:
             Alert(self.driver).accept()
         return SamplePage(self.driver, self.url)
@@ -452,7 +480,7 @@ class NavBar(BasePage):
                     'a[href="/accounts/logout/"]'
                 )
                 return logout.is_displayed() and logout
-        WebDriverWait(self.driver, 3).until(DropsDown(self)).click()
+        self.wait_until(DropsDown(self), timeout=3).click()
         return HomePage(self.driver, self.url)
 
     def go_manage_projects(self):
@@ -502,7 +530,7 @@ class ReportPage(BasePage):
 
 class ProjectsPage(BasePage):
     def go(self):
-        self.driver.get(self.url + '/ftc/projects/')
+        self.get(self.url + '/ftc/projects/')
         return self
 
     def check(self):
@@ -535,7 +563,7 @@ class ProjectCreatePage(BasePage):
 
 class ProjectPage(BasePage):
     def create_sample(self):
-        self.driver.find_element(By.ID, 'create-sample').click()
+        self.click_by_id('create-sample')
         return SampleCreatePage(self.driver, self.url)
 
     def go_sample(self, name):
@@ -568,7 +596,7 @@ class SamplePage(BasePage):
         return self
 
     def go(self, pk):
-        self.driver.get(self.url + "/ftc/sample/{0}/".format(pk))
+        self.get(self.url + "/ftc/sample/{0}/".format(pk))
         return self
 
     def create_grain(self):
@@ -1365,8 +1393,9 @@ class WithOneGrainUploaded(SeleniumTests):
         counting.submit()
 
         # see this result, as project admin
-        navbar.logout()
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
+        navbar.logout().check()
+        profile = SignInPage(self.driver, self.live_server_url).go()
+        profile.check().sign_in(self.project_user)
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
@@ -1383,13 +1412,15 @@ class WithTwoGrainsUploaded(SeleniumTests):
 
     def test_count_link(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
-        counting = samples.go_sample('s1').go_count(1)
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
+        counting = samples.go_sample('s1').check().go_count(1)
         counting.check()
 
     def test_revisit_own_count(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
         counting = samples.go_sample('s1').go_count(1)
         self.assertFalse(counting.undo_available())
         self.assertFalse(counting.redo_available())
@@ -1410,7 +1441,8 @@ class WithTwoGrainsUploaded(SeleniumTests):
 
     def test_can_count_mica(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1)
         counting.click_at(0.6, 0.35)
         counting.click_at(0.5, 0.25)
@@ -1447,7 +1479,8 @@ class WithTwoGrainsUploaded(SeleniumTests):
         })
         assert r.status_code < 400
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1).check()
         # This position is not within the shifted ROI
         counting.click_at(0.75, 0.7)
@@ -1495,14 +1528,16 @@ class OneGrainWithoutMica(SeleniumTests):
 
     def test_mica_count_goes_past_grain_with_no_mica_images(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
         counting = samples.go_sample('s1').go_count(1).check()
         assert self.driver.current_url.endswith('/1/')
         counting.next().check()
         assert self.driver.current_url.endswith('/3/')
         counting.next().check()
         assert self.driver.current_url.endswith('/5/')
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1).check()
         assert self.driver.current_url.endswith('/1/')
         counting.next().check()
@@ -1520,14 +1555,16 @@ class OneGrainWithoutMineral(SeleniumTests):
 
     def test_mineral_count_goes_past_grain_with_no_mineral_images(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1).check()
         assert self.driver.current_url.endswith('/1/')
         counting.next().check()
         assert self.driver.current_url.endswith('/4/')
         counting.next().check()
         assert self.driver.current_url.endswith('/5/')
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
         counting = samples.go_sample('s1').go_count(1).check()
         assert self.driver.current_url.endswith('/1/')
         counting.next().check()
@@ -1569,11 +1606,13 @@ class GrainsWithDifferentlySizedRegions(SeleniumTests):
 
     def test_region_is_zoomed_to_fit(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
         counting = samples.go_sample('s1').go_count(1).check()
         assert self.driver.current_url.endswith('/1/')
         self.assert_all_markers_are_close_to_edge(counting)
-        samples = ProjectsPage(self.driver, self.live_server_url).go().go_project('p1')
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
         counting = samples.go_sample('s1').go_count(6).check()
         assert self.driver.current_url.endswith('/6/')
         self.assert_all_markers_are_close_to_edge(counting)

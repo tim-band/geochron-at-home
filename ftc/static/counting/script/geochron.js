@@ -60,9 +60,12 @@ function grain_view(options) {
     });
     function addShortcut(key, description, fn) {
         shortcut_map[key] = fn;
-        var li = document.createElement('li');
-        li.textContent = key + ': ' + description;
-        document.getElementById('help-list').appendChild(li);
+        var help_list = document.getElementById('help-list');
+        if (help_list) {
+            var li = document.createElement('li');
+            li.textContent = key + ': ' + description;
+            help_list.appendChild(li);
+        }
     }
     function makeSelector(map, markers, updateMarkerDataFn) {
         var rect = L.rectangle([
@@ -95,7 +98,7 @@ function grain_view(options) {
                 var mks = {};
                 for (var i in trash_mks_in) {
                     var indx = trash_mks_in[i]
-                    mks[indx] = markers[indx].marker;
+                    mks[indx] = markers[indx];
                 }
                 undo.withUndo(removeFromMap(mks));
                 trash_mks_in = [];
@@ -337,9 +340,8 @@ function grain_view(options) {
             // value can be passed into addToMap as is.
             make: function(latlng, category, comment) {
                 var mks = {};
-                var mk;
                 var startLatLng = null;
-                mk = new L.marker(latlng, {
+                var mk = new L.marker(latlng, {
                     icon: normalIcon,
                     draggable: true,
                     riseOnHover: true,
@@ -382,6 +384,10 @@ function grain_view(options) {
                 track_id++;
                 return mks;
             },
+            /**
+             * Add markers to map.
+             * @param markersToRemove map from track_id to object with a `marker` key
+             */
             addToMap: function(markersToAdd) {
                 for (var k in markersToAdd) {
                     mk = markersToAdd[k];
@@ -394,6 +400,10 @@ function grain_view(options) {
                     Object.keys(markersToAdd)
                 );
             },
+            /**
+             * Remove markers from map.
+             * @param markersToRemove map from track_id to object with a `marker` key
+             */
             removeFromMap: function(markersToRemove) {
                 for (var k in markersToRemove) {
                     map.removeLayer(markersToRemove[k].marker);
@@ -405,7 +415,7 @@ function grain_view(options) {
             removeAllFromMap: function() {
                 var mks = {};
                 for (var k in markers) {
-                    mks[k] = markers[k].marker;
+                    mks[k] = markers[k];
                 }
                 removeFromMap(mks);
                 selector.updateMarkerData();
