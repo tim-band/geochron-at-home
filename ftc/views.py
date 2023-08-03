@@ -19,7 +19,8 @@ from ftc.apiviews import request_roiss
 from ftc.get_image_size import get_image_size_from_handle
 from ftc.load_rois import get_rois
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
-    TutorialResult, Region, Vertex, GrainPoint, GrainPointCategory)
+    TutorialResult, Region, Vertex, GrainPoint, GrainPointCategory,
+    TutorialPage)
 from ftc.parse_image_name import parse_upload_name
 from geochron.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
@@ -532,6 +533,18 @@ class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
         return reverse('grain_images', kwargs={'pk': self.object.pk})
 
 @csrf_protect
+def tutorialPage(request, pk):
+    tp = TutorialPage.objects.get(pk=pk)
+    ctx = get_grain_info(
+        request,
+        tp.marks.grain.pk,
+        'S',
+        object=tp
+    )
+    addGrainPointCategories(ctx)
+    return render(request, 'ftc/tutorial_page.html', ctx)
+
+@csrf_protect
 @user_passes_test(user_is_staff)
 def grain_update_roi(request, pk):
     grain = Grain.objects.get(pk=pk)
@@ -905,6 +918,12 @@ class ImageDeleteView(CreatorOrSuperuserMixin, DeleteView):
     def get_success_url(self):
         return reverse('grain_images', args=[self.object.grain_id])
 
+def addGrainPointCategories(ctx):
+    ctx.update({ 'categories': [
+        { 'name': gpc.name, 'description': gpc.description }
+        for gpc in GrainPointCategory.objects.all()
+    ]})
+
 class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
     ft_type = 'S'
     model = Grain
@@ -918,10 +937,7 @@ class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
             self.ft_type,
             **count_my_grain_extra_links(self.request.user, pk, self.ft_type)
         ))
-        ctx.update({ 'categories': [
-            { 'name': gpc.name, 'description': gpc.description }
-            for gpc in GrainPointCategory.objects.all()
-        ]})
+        addGrainPointCategories(ctx)
         return ctx
 
 class CountMyGrainMicaView(CountMyGrainView):

@@ -295,3 +295,19 @@ class GrainPoint(models.Model):
     y_pixels = models.IntegerField()
     category = models.ForeignKey(GrainPointCategory, on_delete=models.CASCADE)
     comment = models.TextField()
+
+class TutorialPage(models.Model):
+    """
+    A page of the tutorial
+    """
+    PAGE_TYPE = (
+        ('E', 'Explain category'),
+        ('C', 'Choose category test'),
+        ('I', 'Find category test with immediate result'),
+        ('S', 'Find category test with results after submit')
+    )
+    marks = models.ForeignKey(FissionTrackNumbering, on_delete=models.CASCADE)
+    category = models.ForeignKey(GrainPointCategory, on_delete=models.CASCADE)
+    page_type = models.CharField(max_length=1, null=True, choices=PAGE_TYPE)
+    limit = models.IntegerField(null=True, blank=True)
+    message = models.TextField()

@@ -105,6 +105,21 @@ font-family: "ds-digitalitalic";
     );
 }
 
+#description {
+    position: fixed;
+    background: white;
+    border: 1px solid black;
+    z-index: 500;
+    left: 60%;
+    width: 35%;
+    top: 65%;
+    height: 30%;
+    overflow: auto;
+}
+
+#description .text {
+    margin: 10px;
+}
 </style>
 <script src="{% static 'Leaflet-1.9.3/leaflet.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
@@ -119,13 +134,14 @@ function setup() {
     var map = grain_view({
         grain_info: JSON.parse('{{ grain_info|escapejs }}'),
         atoken: '{{ csrf_token }}',
-        iconUrl_normal: "{% static 'counting/images/circle.png' %}",
-        iconUrl_selected: "{% static 'counting/images/redCircle.png' %}",
-        iconSize: 6,
-        iconAnchor: [3, 3],
-        iconPopup: [0, 0]
+        iconUrl_normal: "{% static 'counting/images/basic-box.svg' %}",
+        iconUrl_selected: "{% static 'counting/images/basic-box.svg' %}",
+        iconUrl_comment: "{% static 'counting/images/highlight-box.svg' %}",
+        iconSize: 40,
+        iconAnchor: [20, 20],
+        iconPopup: [20, 0]
     });
-    map.setTrackCounterElement(document.getElementById('tracknum'));
+    /* map.setTrackCounterElement(document.getElementById('tracknum'));
     document.getElementById('tracknum-submit').onclick = function() {
         var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
         map.submitTrackCount("{% url 'updateTFNResult'%}", submit_url);
@@ -137,61 +153,32 @@ function setup() {
             map.saveTrackCount("{% url 'saveWorkingGrain'%}", null);
         };
     }
-    var prev_grain = document.getElementById('tracknum-previous');
-    if (prev_grain) {
-        prev_grain.onclick = function() {
-            map.saveTrackCountIfNecessary(
-                "{% url 'saveWorkingGrain'%}",
-                "{{prev_url}}"
-            );
-        };
-    }
-    var next_grain = document.getElementById('tracknum-next');
-    if (next_grain) {
-        next_grain.onclick = function() {
-            map.saveTrackCountIfNecessary(
-                "{% url 'saveWorkingGrain' %}",
-                "{{next_url}}"
-            );
-        };
-    }
-    var cancel = document.getElementById('tracknum-cancel');
-    if (cancel) {
-        cancel.onclick = function() {
-            map.cancelWithConfirm(
-                "{% url 'sample' sample_id %}"
-            );
-        };
-    }
-    map.resetUndo();
+    map.resetUndo(); */
+    {% if object.page_type == "S" or object.page_type == "I" %}
     map.enableEditing();
+    {% endif %}
 }
 </script>
 {% endblock %}
 
-{% block left_nav_li %}{% if categories %}
+{% block left_nav_li %}
+{% if object.page_type == "C" %}
 <select id="category" name="category">
     <option value="">-- category --</option>
     {% for cat in categories %}
     <option value="{{ cat.name }}">{{ cat.description }}</option>
     {% endfor %}
 </select>
-<div id="control-comment" class="btn-group">
-    <button id="btn-comment" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
-        Comment
-    </button>
-    <form class="dropdown-menu" id="form-comment">
-        <input type="text" id="comment-text" autofocus="autofocus">
-        <input id="btn-comment-submit" type="submit" value="submit">
-    </form>
-</div>
-<button type="button" id="btn-prev-marker">
-    <i class="fa fa-caret-left"></i>
+<button type="button" id="btn-submit">
+    Submit answer
 </button>
-<button type="button" id="btn-next-marker">
-    <i class="fa fa-caret-right"></i>
+{% endif %}
+{% if object.page_type == "E" %}
+<button type="button" id="btn-next-page">
+    Next Page
 </button>
-{% endif %}{% endblock %}
+{% endif %}
+{% endblock %}
 {% block right_nav_li %}{% endblock %}
 {% block right_nav_fn_counting %}{% endblock %}
 
@@ -210,42 +197,25 @@ function setup() {
 {% block content %}
 <div id="dropdown-tracknum" class="input-group">
 <div class="btn-group">
+  {% if object.page_type == "S" or object.page_type == "I" %}
   <input id="tracknum" class="form-control" type="text" value="000" readonly>
   <button id="btn-tracknum" type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
     <span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
   </button>
   <ul class="dropdown-menu">
-    {% if user.username != "guest"  %}
-    <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>save intermediate result</a></li>
-    {% endif %}
     <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>submit result</a></li>
     <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>restart counting</a></li>
-    {% if cancel_url %}
-    <li><a id="tracknum-cancel" href="#"><i class="fa fa-eject"></i>cancel counting</a></li>
-    {% endif %}
-    {% if prev_url %}
-    <li><a id="tracknum-previous" href="#"><i class="fa fa-angle-left"></i>previous grain</a></li>
-    {% endif %}
-    {% if next_url %}
-    <li><a id="tracknum-next" href="#"><i class="fa fa-angle-right"></i>next grain</a></li>
-    {% endif %}
   </ul>
+  {% endif %}
 </div>
 </div>
-<!-- ========================== -->
-        <div style="clear:both;"></div>
-    {% if messages %}
-    <div>
-      {% for message in messages %}
-      <div class="alert alert-{{message.tags}} alert-dismissible" role="alert">
-        <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-        <strong>{{ message.tags }}</strong> {{ message }}
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
+<div style="clear:both;"></div>
 
-    <div id="map" style="cursor: crosshair; position: absolute; top: 50px; bottom: 0; width: 100%; "></div>
+<div id="map" style="cursor: crosshair; position: absolute; top: 50px; bottom: 0; width: 100%; "></div>
+
+<div id="description">
+    <div class="text">{{ object.message }}</div>
+</div>
 
 {% endblock %}
 

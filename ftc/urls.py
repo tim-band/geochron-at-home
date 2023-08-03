@@ -13,7 +13,7 @@ from ftc.views import (home, signmeup, report, getTableData,
     ImageDeleteView, tutorial, saveTutorialResult,
     CountMyGrainView, CountMyGrainMicaView, getJsonResults,
     download_rois, download_roiss,
-    getCsvResults, GrainDeleteView)
+    getCsvResults, GrainDeleteView, tutorialPage)
 from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
@@ -62,6 +62,7 @@ urlpatterns = [
     path('tutorial_result/', saveTutorialResult, name='tutorial_result'),
     path('rois/<pk>/', download_rois, name='download_grain_rois'),
     path('rois/', download_roiss, name='download_roiss'),
+    path('tutorialpage/<pk>/', tutorialPage, name='tutorial_page'),
 
     path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get_jwt_token'),
     path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh_jwt_token'),

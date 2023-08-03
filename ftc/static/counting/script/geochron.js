@@ -1,6 +1,6 @@
 /* geochron v0.1 (c) 2014 Jiangping He */
 /**
- * Creates a pannable, focussable viewer of a grain z-stack.
+ * Creates a pannable, focusable viewer of a grain z-stack.
  * @param {*} options Options:
  * grain_info.image_height The height in pixels of the image
  * grain_info.image_width The width in pixels of the image
@@ -17,8 +17,14 @@
  * grain_info.rois Array of regions of interest, each of which is an array
  *   of vertex positions [lat,lng] (that is, [(height - y_pixels)/width,
  *   x_pixels/width])
- * iconUrl_normal Url of marker image
- * iconUrl_selected Url of selected marker image
+ * iconUrl_normal.url Url of marker image
+ * iconSize size of marker image in pixels
+ * iconAnchor [x, y] position of anchor on marker image in pixels
+ * iconPopup [x, y] position of anchor of popups on marker image in pixels
+ * iconUrl_selected url of selected marker image, should be the same size
+ *   and shape as iconUrl_normal.
+ * iconUrl_comment (optional) marker image with comment tooltip, same size
+ *   and shape as iconUrl_normal.
  * atoken CSRF token
  * @returns {*} An object giving functions to add functionality to the viewer
  * setTrackCounterCallback: Sets a function that takes the current number of
@@ -28,10 +34,14 @@
  * submitTrackCount: Takes two URLs, submitUrl and newGrainUrl, POSTs the
  *  current marker set to submitUrl and redirects to newGrainUrl
  * saveTrackCount: Takes a URL and POSTs the current marker set to it
+ * saveTrackCountIfNecessary: as for saveTrackCount except will do nothing
+ *  if the undo stack is in the same state as it was since the last save
+ *  (implying that nothing has been changed since then).
  * restartTrackCount: Deletes all the markers and reset the track counter
  * enableEditing: Creates the editing buttons and allows clicking to add markers
  * map: The Leaflet map
  * roisLayer: The Leaflet layer containing the region polygons
+ * resetUndo: Deletes the contents of the undo and redo stacks.
  */
 function grain_view(options) {
     // default tile size in Leaflet is 256x256
@@ -40,9 +50,9 @@ function grain_view(options) {
     var mapZoom = 11;
     var MarkerIcon = L.Icon.extend({
         options: {
-            iconSize: [6, 6],
-            iconAnchor: [3, 3],
-            popupAnchor: [0, 0]
+            iconSize: options.iconSize,
+            iconAnchor: options.iconAnchor,
+            popupAnchor: options.iconPopup
         }
     });
     var normalIcon = new MarkerIcon({
@@ -51,6 +61,12 @@ function grain_view(options) {
     var selectedIcon = new MarkerIcon({
         iconUrl: options.iconUrl_selected
     });
+    var commentIcon = null;
+    if ('iconUrl_comment' in options) {
+        commentIcon = new MarkerIcon({
+            iconUrl: options.iconUrl_comment
+        })
+    }
     var shortcut_map = {};
     document.getElementById('map').addEventListener('keydown', function(ev) {
         if (ev.key in shortcut_map) {
@@ -87,7 +103,11 @@ function grain_view(options) {
             for (var i in trash_mks_in) {
                 var indx = trash_mks_in[i]
                 if (indx in markers) {
-                    markers[indx].marker.setIcon(normalIcon);
+                    var icon = normalIcon;
+                    if (markers[indx].marker.options.title) {
+                        icon = commentIcon;
+                    }
+                    markers[indx].marker.setIcon(icon);
                 }
             }
             trash_mks_in = [];
@@ -282,6 +302,7 @@ function grain_view(options) {
             }
         }
     }
+    var isEditable = false;
     function makeMarkers(map) {
         var track_id = 0;
         var track_num = 0;
@@ -341,13 +362,20 @@ function grain_view(options) {
             make: function(latlng, category, comment) {
                 var mks = {};
                 var startLatLng = null;
+                var icon = normalIcon;
+                var title = '';
+                if (commentIcon && comment) {
+                    icon = commentIcon;
+                    title = comment;
+                }
                 var mk = new L.marker(latlng, {
-                    icon: normalIcon,
-                    draggable: true,
+                    icon: icon,
+                    draggable: isEditable,
                     riseOnHover: true,
-                    className: 'jhe-fissionTrack-' + track_id
+                    className: 'jhe-fissionTrack-' + track_id,
+                    title: title
                 }).on('click', function() {
-                    if (selector) {
+                    if (selector && isEditable) {
                         selector.selectMarkers([Object.keys(mks)[0]]);
                     }
                 }).on('dragstart', function(e) {
@@ -386,7 +414,7 @@ function grain_view(options) {
             },
             /**
              * Add markers to map.
-             * @param markersToRemove map from track_id to object with a `marker` key
+             * @param markersToAdd map from track_id to object with a `marker` key
              */
             addToMap: function(markersToAdd) {
                 for (var k in markersToAdd) {
@@ -489,7 +517,6 @@ function grain_view(options) {
             );
         }
     }();
-    var isEditable = false;
     var markers = null;
     var selector = null;
     var markers = null;
