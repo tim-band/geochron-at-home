@@ -105,20 +105,39 @@ font-family: "ds-digitalitalic";
     );
 }
 
-#description {
+.overlay-box {
     position: fixed;
     background: white;
     border: 1px solid black;
     z-index: 500;
+    overflow: auto;
+}
+
+.overlay-response {
+    display: none;
+    left: 5%;
+    width: 30%;
+    top: 70%;
+    height: 20%;
+}
+
+.visible {
+    display: block;
+}
+
+#description {
     left: 60%;
     width: 35%;
     top: 65%;
     height: 30%;
-    overflow: auto;
 }
 
-#description .text {
+.overlay-box .text {
     margin: 10px;
+}
+
+#correction {
+    font-weight: bold;
 }
 </style>
 <script src="{% static 'Leaflet-1.9.3/leaflet.js' %}"></script>
@@ -127,16 +146,59 @@ font-family: "ds-digitalitalic";
 <script type='text/javascript' src="{% static 'noUiSlider-14.6.3/nouislider.min.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 <script type='text/javascript'>
+var question_number = 0;
+var map = null;
+var categories = {
+{% for cat in categories %}{{ cat.name }}:"{{ cat.description }}",
+{% endfor %}
+};
+function submit_category() {
+    var category = document.getElementById('category');
+    if (category.value == "") {
+        return;
+    }
+    var answer = map.getData().category;
+    console.log(category.value + " =? " + answer);
+    var correct = answer == category.value;
+    var box = document.getElementById(correct? 'response-correct' : 'response-incorrect');
+    if (!correct) {
+        document.getElementById('correction').textContent = categories[answer];
+    }
+    box.classList.add('visible');
+    var submit = document.getElementById('submit-button');
+    submit.classList.add('disabled');
+}
+
+function next_category() {
+    var submit = document.getElementById('submit-button');
+    submit.classList.remove('disabled');
+    var box = document.getElementById('response-correct');
+    box.classList.remove('visible');
+    var box = document.getElementById('response-incorrect');
+    box.classList.remove('visible');
+    ++question_number;
+    if (!map.nextMarker()) {
+        // Go to the next page!
+        //...
+    }
+}
+
 function setup() {
     $(document.body).on('shown.bs.dropdown', function() {
         $('[autofocus]').focus();
     });
-    var map = grain_view({
+    map = grain_view({
         grain_info: JSON.parse('{{ grain_info|escapejs }}'),
         atoken: '{{ csrf_token }}',
+        {% if object.page_type == "E" %}
         iconUrl_normal: "{% static 'counting/images/basic-box.svg' %}",
         iconUrl_selected: "{% static 'counting/images/basic-box.svg' %}",
         iconUrl_comment: "{% static 'counting/images/highlight-box.svg' %}",
+        {% else %}
+        iconUrl_normal: "{% static 'counting/images/null.svg' %}",
+        iconUrl_selected: "{% static 'counting/images/highlight-box.svg' %}",
+        iconUrl_comment: "{% static 'counting/images/null.svg' %}",
+        {% endif %}
         iconSize: 40,
         iconAnchor: [20, 20],
         iconPopup: [20, 0]
@@ -157,6 +219,10 @@ function setup() {
     {% if object.page_type == "S" or object.page_type == "I" %}
     map.enableEditing();
     {% endif %}
+    {% if object.page_type == "C" %}
+    map.map.setZoom(map.map.getMaxZoom());
+    setTimeout(map.firstMarker, 800);
+    {% endif %}
 }
 </script>
 {% endblock %}
@@ -169,7 +235,7 @@ function setup() {
     <option value="{{ cat.name }}">{{ cat.description }}</option>
     {% endfor %}
 </select>
-<button type="button" id="btn-submit">
+<button type="button" id="submit-button" class="btn btn-submit" onclick="submit_category()">
     Submit answer
 </button>
 {% endif %}
@@ -213,8 +279,21 @@ function setup() {
 
 <div id="map" style="cursor: crosshair; position: absolute; top: 50px; bottom: 0; width: 100%; "></div>
 
-<div id="description">
+<div id="description" class="overlay-box">
     <div class="text">{{ object.message }}</div>
+</div>
+
+<div id="response-correct" class="overlay-box overlay-response">
+    <div class="text">Correct!</div>
+    <div id="correct-dismiss" class="btn btn-default text" onclick="next_category()">OK</div>
+</div>
+
+<div id="response-incorrect" class="overlay-box overlay-response">
+    <div class="text">
+        Sorry, that is the wrong answer. The correct answer was
+        <span id="correction"></span>
+    </div>
+    <div id="correct-dismiss" class="btn btn-default text" onclick="next_category()">OK</div>
 </div>
 
 {% endblock %}

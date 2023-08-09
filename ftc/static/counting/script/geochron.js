@@ -41,7 +41,10 @@
  * enableEditing: Creates the editing buttons and allows clicking to add markers
  * map: The Leaflet map
  * roisLayer: The Leaflet layer containing the region polygons
- * resetUndo: Deletes the contents of the undo and redo stacks.
+ * resetUndo: Deletes the contents of the undo and redo stacks
+ * firstMarker: Selects and pans to the first marker
+ * nextMarker: Selects and pans to the marker after the one selected, returning
+ *  true if there is another one, false if not.
  */
 function grain_view(options) {
     // default tile size in Leaflet is 256x256
@@ -243,11 +246,33 @@ function grain_view(options) {
             selectMarkers(Object.keys(data));
             return setData.bind(null, undo_data);
         }
+        // Gets the data (category and comment) from each selected element.
+        // If the markers disagree the appropriate data values will be null.
+        function getData() {
+            var out = {};
+            for (tmi in trash_mks_in) {
+                var m = markers[trash_mks_in[tmi]];
+                setting_keys.forEach(function(k) {
+                    if (k in m) {
+                        if (!(k in out)) {
+                            out[k] = m[k];
+                        } else if (m[k] !== out[k]) {
+                            out[k] = null;
+                        }
+                    }
+                });
+            }
+            return out;
+        }
         function panViewTo(id) {
             map.panTo(markers[id].marker.getLatLng(), {
                 animate: true,
                 duration: 0.25
             });
+        }
+        function selectAndPan(id) {
+            selectMarkers([id]);
+            panViewTo(id);
         }
         return {
             deleteSelected: deleteSelected,
@@ -280,10 +305,10 @@ function grain_view(options) {
                     }
                 }
                 if (0 <= n) {
-                    var id = ids[n];
-                    selectMarkers([id]);
-                    panViewTo(id);
+                    selectAndPan(ids[n]);
+                    return true;
                 }
+                return false;
             },
             nextMarker: function() {
                 var ids = Object.keys(markers);
@@ -295,11 +320,20 @@ function grain_view(options) {
                     }
                 }
                 if (n < ids.length) {
-                    var id = ids[n];
-                    selectMarkers([id]);
-                    panViewTo(id);
+                    selectAndPan(ids[n]);
+                    return true;
                 }
-            }
+                return false;
+            },
+            firstMarker: function() {
+                var ids = Object.keys(markers);
+                if (0 < ids.length) {
+                    selectAndPan([ids[0]]);
+                    return true;
+                }
+                return false;
+            },
+            getData: getData
         }
     }
     var isEditable = false;
@@ -517,8 +551,6 @@ function grain_view(options) {
             );
         }
     }();
-    var markers = null;
-    var selector = null;
     var markers = null;
     var selector = null;
     var buttons = {
@@ -1124,6 +1156,15 @@ function grain_view(options) {
         roisLayer: zStack.rois_layer,
         resetUndo: function() {
             undo.reset();
+        },
+        firstMarker: function() {
+            return selector.firstMarker();
+        },
+        nextMarker: function() {
+            return selector.nextMarker();
+        },
+        getData: function() {
+            return selector.getData();
         }
     }
 }
