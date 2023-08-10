@@ -1019,8 +1019,6 @@ def grainPointCount(res_dic):
 @login_required
 @transaction.atomic
 def updateTFNResult(request):
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    sep = '~'
     if request.user.is_active:
         json_str = request.body.decode(encoding='UTF-8')
         res_dic = json.loads(json_str)

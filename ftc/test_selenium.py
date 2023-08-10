@@ -93,8 +93,11 @@ class BasePage:
             lambda d: d.find_element(By.CSS_SELECTOR, css)
         )
 
-    def find_by_xpath(self, xpath):
-        return WebDriverWait(self.driver, timeout=2).until(
+    def find_by_xpath(self, xpath, timeout=3):
+        return WebDriverWait(
+            self.driver,
+            timeout=timeout
+        ).until(
             lambda d: d.find_element(By.XPATH, xpath)
         )
 

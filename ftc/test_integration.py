@@ -1,10 +1,12 @@
-from django.test import Client, TestCase, tag
+from django.test import TestCase, tag
 from django.urls import reverse
 
 import csv
 import io
 import json
 from random import uniform
+
+from ftc.models import TutorialPage
 
 def gen_latlng():
   return [
@@ -43,7 +45,7 @@ class GahCase(TestCase):
 
 class CountingCase(GahCase):
   def count_grain(self, sample, grain, count):
-    self.client.post(
+    r = self.client.post(
       reverse('updateTFNResult'),
       {
         'sample_id': sample,
@@ -53,6 +55,7 @@ class CountingCase(GahCase):
       },
       content_type='application/json'
     )
+    self.assertEqual(r.status, 200)
 
   def complete_tutorial(self):
     self.client.get(reverse('tutorial'))
@@ -73,7 +76,7 @@ class CountingCase(GahCase):
       ] },
       content_type='application/json'
     )
-    assert(r.status_code == 200)
+    self.assertEqual(r.status_code, 200)
     j = json.loads(r.content)
     total = 0
     for [project, sample, index, ft_type, track_count, user, datetime, area] in j['aaData']:
@@ -97,12 +100,12 @@ class TestGuestCounts(CountingCase):
     self.login_admin()
     total = self.get_total_track_count()
     # should get the results from sample 1 which is owned by admin
-    assert(total == guest_count * s1count)
+    self.assertEqual(total, guest_count * s1count)
     self.logout()
     self.login_super()
     total = self.get_total_track_count()
     # should get the results from all samples
-    assert(total == guest_count * (s1count + s2count))
+    self.assertEqual(total, guest_count * (s1count + s2count))
 
 
 class TestCountJsonDownload(CountingCase):
@@ -289,3 +292,32 @@ class RegionCase(GahCase):
       [183, 7],
       [6, 7]
     ], rois[6]['regions'][0]["vertices"])
+
+class TutorialPageCase(GahCase):
+  fixtures = [
+    'essential.json',
+    'users.json',
+    'projects.json',
+    'samples.json',
+    'grains.json',
+    'tutorial_pages.json'
+  ]
+  def test_modifying_results_does_not_delete_tutorial_page(self):
+    self.login_super()
+    tps = TutorialPage.objects.all()
+    self.assertEqual(len(tps), 1, 'precondition failed, should be one tutorial page')
+    tp_pk = tps[0].pk
+    r = self.client.post(
+      reverse('updateTFNResult'),
+      {
+        'sample_id': 1,
+        'grain_num': 1,
+        'ft_type': 'S',
+        'marker_latlngs': gen_latlngs(4)
+      },
+      content_type='application/json'
+    )
+    self.assertEqual(r.status_code, 200)
+    tps = TutorialPage.objects.all()
+    self.assertEqual(len(tps), 1, 'should still be one tutorial page')
+    self.assertEqual(tps[0].pk, tp_pk, 'tutorial page changed')
