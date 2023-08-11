@@ -30,8 +30,8 @@ def transform_grainpoints_to_latlngs(apps, schema_editor):
         ftn = gp.result
         grain = ftn.grain
         c = latlngss.get(ftn.pk, [])
-        lat = gp.x_pixels / grain.image_width
-        lng = (grain.image_height - gp.y_pixels) / grain.image_width
+        lng = gp.x_pixels / grain.image_width
+        lat = (grain.image_height - gp.y_pixels) / grain.image_width
         c.append([lat, lng])
         latlngss[ftn.pk] = c
     for ftn in FissionTrackNumbering.objects.using(db_alias).all():
