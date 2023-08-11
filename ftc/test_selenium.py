@@ -515,7 +515,7 @@ class ReportPage(BasePage):
         return self
 
     def result_now(self, grain_number):
-        rows = self.driver.find_elements(By.CSS_SELECTOR, "#mytable tbody tr")
+        rows = self.driver.find_elements(By.CSS_SELECTOR, "#results-table tbody tr")
         for r in rows:
             tds = r.find_elements(By.CSS_SELECTOR, "td")
             if 5 <= len(tds) and tds[2].text == grain_number:

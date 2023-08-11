@@ -144,7 +144,7 @@ footer {
             <button type="button" class="btn btn-primary btn-xs" data-toggle="offcanvas">Toggle nav</button>
           </p>
           <h1 class="sub-header" style="margin-top: 0px; padding-bottom: 0px;">Results</h1>
-          <table id="mytable" class="table table-striped table-bordered" cellspacing="0" width="100%">
+          <table id="results-table" class="table table-striped table-bordered" cellspacing="0" width="100%">
             <thead>
               <tr>
                 <th>Project</th>
@@ -203,7 +203,7 @@ $(function(){
   }});
 
   var dataTable; //reference to your dataTable
-  dataTable = $('#mytable').dataTable({
+  dataTable = $('#results-table').dataTable({
     "jQueryUI": true,
     "dom": 'T<"clear">lfrtip',
     "tableTools": {

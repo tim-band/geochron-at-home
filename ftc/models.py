@@ -150,7 +150,7 @@ class Grain(models.Model):
         scale_y = self.scale_y
         if scale_x is None or scale_y is None:
             return None
-        return scale_x * scale_y * self.roi_area_pixels()
+        return scale_x * scale_y * self.roi_area_pixels() * 1e6
 
 #
 class Region(models.Model):
