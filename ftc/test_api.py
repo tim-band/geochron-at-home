@@ -597,7 +597,7 @@ class ApiCount(JwtTestCase):
         ]
         logged_in = self.client.login(username='counter', password='counter_password')
         self.assertTrue(logged_in, 'failed to log in')
-        r = self.client.post('/ftc/updateTFNResult/', {
+        r = self.client.post('/ftc/updateFtnResult/', {
             'marker_latlngs': self.latlngs,
             'sample_id': 1,
             'grain_num': 1,

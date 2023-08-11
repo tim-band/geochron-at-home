@@ -46,7 +46,7 @@ class GahCase(TestCase):
 class CountingCase(GahCase):
   def count_grain(self, sample, grain, count):
     r = self.client.post(
-      reverse('updateTFNResult'),
+      reverse('updateFtnResult'),
       {
         'sample_id': sample,
         'grain_num': grain,
@@ -55,7 +55,7 @@ class CountingCase(GahCase):
       },
       content_type='application/json'
     )
-    self.assertEqual(r.status, 200)
+    self.assertEqual(r.status_code, 200)
 
   def complete_tutorial(self):
     self.client.get(reverse('tutorial'))
@@ -308,7 +308,7 @@ class TutorialPageCase(GahCase):
     self.assertEqual(len(tps), 1, 'precondition failed, should be one tutorial page')
     tp_pk = tps[0].pk
     r = self.client.post(
-      reverse('updateTFNResult'),
+      reverse('updateFtnResult'),
       {
         'sample_id': 1,
         'grain_num': 1,

@@ -1018,7 +1018,7 @@ def grainPointCount(res_dic):
 
 @login_required
 @transaction.atomic
-def updateTFNResult(request):
+def updateFtnResult(request):
     if request.user.is_active:
         json_str = request.body.decode(encoding='UTF-8')
         res_dic = json.loads(json_str)
@@ -1027,19 +1027,40 @@ def updateTFNResult(request):
             index=res_dic['grain_num']
         )
         ft_type = res_dic['ft_type']
+        fts = None
         if request.user.username != 'guest':
-            # Remove any previous or partial save state
+            has_backref_tutorial_page = TutorialPage.objects.filter(
+                marks=OuterRef('pk')
+            )
+            # Remove any previous or partial save state that does not
+            # have an attached TutorialPage
             FissionTrackNumbering.objects.filter(
+                ~Q(Exists(has_backref_tutorial_page)),
                 grain=grain,
                 worker=request.user,
                 ft_type=ft_type
             ).delete()
-        fts = FissionTrackNumbering(
-            grain=grain,
-            ft_type=ft_type,
-            worker=request.user,
-            result=grainPointCount(res_dic),
-        )
+            # Remove all but one remaining previous or partial save states
+            ftss = FissionTrackNumbering.objects.filter(
+                grain=grain,
+                worker=request.user,
+                ft_type=ft_type
+            )
+            count = ftss.count()
+            if 1 < count:
+                ftss.limit(count - 1).delete()
+            if 0 < count:
+                fts = ftss.first()
+        result = grainPointCount(res_dic)
+        if fts is None:
+            fts = FissionTrackNumbering(
+                grain=grain,
+                ft_type=ft_type,
+                worker=request.user,
+                result=result,
+            )
+        else:
+            fts.result = result
         fts.save()
         addGrainPoints(fts, res_dic)
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)

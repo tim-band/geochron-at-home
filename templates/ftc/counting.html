@@ -128,7 +128,7 @@ function setup() {
     map.setTrackCounterElement(document.getElementById('tracknum'));
     document.getElementById('tracknum-submit').onclick = function() {
         var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
-        map.submitTrackCount("{% url 'updateTFNResult'%}", submit_url);
+        map.submitTrackCount("{% url 'updateFtnResult'%}", submit_url);
     };
     document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
     var save = document.getElementById('tracknum-save');

@@ -3,7 +3,7 @@ from django.urls import path
 from rest_framework_simplejwt import views as jwt_views
 
 from ftc.views import (home, signmeup, report, getTableData,
-    count_grain, updateTFNResult, counting, saveWorkingGrain,
+    count_grain, updateFtnResult, counting, saveWorkingGrain,
     get_image, projects, ProjectCreateView,
     ProjectDetailView, ProjectUpdateView,
     SampleDetailView, SampleUpdateView, SampleCreateView,
@@ -49,7 +49,8 @@ urlpatterns = [
     path('getTableData/', getTableData, name='getTableData'),
     path('getJsonResults/', getJsonResults, name='getJsonResults'),
     path('getCsvResults/', getCsvResults, name='getCsvResults'),
-    path('updateTFNResult/', updateTFNResult, name='updateTFNResult'),
+    path('updateFtnResult/', updateFtnResult, name='updateFtnResult'),
+    path('updateTFNResult/', updateFtnResult, name='updateFtnResult'), # deprecated, remove soon!
     path('counting/guest/', counting, name='guest_counting', kwargs={ 'uname': 'guest' }),
     path('counting/', counting, name='counting'),
     path('count/<pk>/', count_grain, name='count'),
