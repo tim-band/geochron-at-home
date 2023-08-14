@@ -25,6 +25,7 @@
  *   and shape as iconUrl_normal.
  * iconUrl_comment (optional) marker image with comment tooltip, same size
  *   and shape as iconUrl_normal.
+ * only_category only consider points if their category matches this.
  * atoken CSRF token
  * @returns {*} An object giving functions to add functionality to the viewer
  * setTrackCounterCallback: Sets a function that takes the current number of
@@ -1051,12 +1052,21 @@ function grain_view(options) {
         addShortcut('n', 'select next marker', selector.nextMarker);
     }
     if ('points' in grain_info) {
+        var point_filter = function(point) { return true; };
+        if ('only_category' in options) {
+            var cat = options.only_category;
+            point_filter = function(point) {
+                return point.category == cat;
+            };
+        }
         forEachCreateMarker(grain_info.points, function(create, point) {
-            create(
-                [(height - point.y_pixels) / width, point.x_pixels / width],
-                point.category,
-                point.comment
-            );
+            if (point_filter(point)) {
+                create(
+                    [(height - point.y_pixels) / width, point.x_pixels / width],
+                    point.category,
+                    point.comment
+                );
+            }
         });
         undo.reset();
     } else if ('marker_latlngs' in grain_info) {

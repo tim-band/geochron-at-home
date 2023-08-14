@@ -158,7 +158,6 @@ function submit_category() {
         return;
     }
     var answer = map.getData().category;
-    console.log(category.value + " =? " + answer);
     var correct = answer == category.value;
     var box = document.getElementById(correct? 'response-correct' : 'response-incorrect');
     if (!correct) {
@@ -189,6 +188,9 @@ function setup() {
     });
     map = grain_view({
         grain_info: JSON.parse('{{ grain_info|escapejs }}'),
+        {% if object.category %}
+        only_category: "{{ object.category.name }}",
+        {% endif %}
         atoken: '{{ csrf_token }}',
         {% if object.page_type == "E" %}
         iconUrl_normal: "{% static 'counting/images/basic-box.svg' %}",
@@ -280,7 +282,7 @@ function setup() {
 <div id="map" style="cursor: crosshair; position: absolute; top: 50px; bottom: 0; width: 100%; "></div>
 
 <div id="description" class="overlay-box">
-    <div class="text">{{ object.message }}</div>
+    <div class="text">{{ object.message | linebreaks }}</div>
 </div>
 
 <div id="response-correct" class="overlay-box overlay-response">

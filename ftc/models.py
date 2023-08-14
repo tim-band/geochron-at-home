@@ -307,7 +307,7 @@ class TutorialPage(models.Model):
         ('S', 'Find category test with results after submit')
     )
     marks = models.ForeignKey(FissionTrackNumbering, on_delete=models.CASCADE)
-    category = models.ForeignKey(GrainPointCategory, on_delete=models.CASCADE)
+    category = models.ForeignKey(GrainPointCategory, on_delete=models.CASCADE, null=True, blank=True)
     page_type = models.CharField(max_length=1, null=True, choices=PAGE_TYPE)
     limit = models.IntegerField(null=True, blank=True)
     message = models.TextField()
