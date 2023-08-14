@@ -17,7 +17,7 @@ echo 'DB_PORT environment variable not set, are we in pipenv shell?'
 exit 2
 else
 # escape single quotes
-pass=$(echo ${POSTGRES_PASSWORD} | sed "s/'/\\\\'/g")
+pass=$(echo ${POSTGRES_PASSWORD} | sed "s/'/''/g")
 # if we are the postgres user wanting the DB on localhost, we'll use peer authentication
 if [ "x$(whoami)" = "xpostgres" -a "${DB_HOST}" = "localhost" ]
 then
