@@ -2,37 +2,27 @@
 
 {% load static %}
 {% load order_by %}
+{% load si_mag %}
 
 {% block head %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<link rel="stylesheet" href="{% static 'Leaflet-1.7.1/leaflet.css' %}" />
+<link rel="stylesheet" href="{% static 'Leaflet-1.9.3/leaflet.css' %}" />
 <link rel="stylesheet" href="{% static 'noUiSlider-14.6.3/nouislider.min.css' %}" />
 <style>
 #heading-row {
-    width: 100%;
+    display: contents;
 }
 
 #heading {
     width: 100%;
 }
 
-#edit, #save {
-    display: inline;
-    float: right;
-    margin-left: 5px;
-    margin-right: 5px;;
+table.metadata {
+    padding: 1px 10px;
 }
 
-button {
-    border: #888;
-    border-radius: 4px;
-    padding: 2px 20px;
-    margin: 3px;
-}
-
-button:disabled {
-    background: #eee;
-    color: #bbb;
+table.metadata td:nth-child(odd) {
+    background-color: #ccc;
 }
 
 #edit-container {
@@ -41,7 +31,7 @@ button:disabled {
 
 #map {
     position: absolute;
-    top: 80px;
+    top:144px;
     bottom: 0;
     width: 100%;
 }
@@ -86,10 +76,18 @@ button:disabled {
     border: none;
     line-height: 140%;
 }
+
+#metadata-bar {
+    float: left
+}
 </style>
-<script type='text/javascript' src="{% static 'Leaflet-1.7.1/leaflet.js' %}"></script>
+<script type='text/javascript' src="{% static 'Leaflet-1.9.3/leaflet.js' %}"></script>
 <script type='text/javascript' src="{% static 'noUiSlider-14.6.3/nouislider.min.js' %}"></script>
-<script>var static_ring_svg_url="{% static 'home/ring.svg' %}";</script>
+<script>
+var static_ring_svg_url="{% static 'home/ring.svg' %}";
+var static_pin_url="{% static 'Leaflet-1.9.3/images/marker-icon.png' %}"
+var static_pin_url_2x="{% static 'Leaflet-1.9.3/images/marker-icon-2x.png' %}"
+</script>
 <script type='text/javascript' src="{% static 'projects/script/grain.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
 <script>
@@ -97,35 +95,42 @@ var crystal_control;
 function makeGrainMap() {
     var image_height = {{ object.image_height }};
     var image_width = {{ object.image_width }};
-    var rois = [
-        //{% for region in object.region_set.all %}
-        [
-            //{% for v in region.vertex_set.all|order_by:"id" %}
-            [(image_height - {{v.y}}) / image_width, {{v.x}} / image_width],
-            //{% endfor %}
-        ],
-        //{% endfor %}
-    ]
+    var rois = {{ regions }};
+    var shift_x = {{ shift_x }};
+    var shift_y = {{ shift_y }};
+    var shift_lat = -shift_y / image_width;
+    var shift_lng = shift_x / image_width;
+    var shifted_rois = rois.map(function(region) {
+        return region.map(function(vertex) {
+            return [
+                vertex[0] + shift_lat,
+                vertex[1] + shift_lng
+            ];
+        });
+    });
     var view = grain_view({
         grain_info: {
             image_width: image_width,
             image_height: image_height,
-            // scale_x
             images: [
-                //{% for i in object.get_images %}
+                //{% for i in images %}
                 "{% url 'get_image' i.pk %}",
                 //{% endfor %}
             ],
-            rois: rois
+            rois: shifted_rois
         },
         atoken: '{{ csrf_token }}'
     });
     return {
+        image_width: image_width,
+        image_height: image_height,
         map: view.map,
         region_layer: view.roisLayer,
         marker_layer: L.layerGroup().addTo(view.map),
         mid_marker_layer: L.layerGroup().addTo(view.map),
         region_points: rois,
+        shift_x: shift_x,
+        shift_y: shift_y
     };
 }
 window.addEventListener('load', function() {
@@ -143,18 +148,42 @@ window.addEventListener('load', function() {
         in sample <a href="{% url 'sample' object.sample.pk %}">{{ object.sample.sample_name }}</a>,
         in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
     </span>
-    <!--got to figure out how to fix this-->
-    <button id="edit" onclick="beginEdit(crystal_control)">Edit</button>
-    <button id="save" onclick="save(crystal_control, &quot;{% url 'grain_update' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</button>
+    <a id="count" class="btn btn-default" href="{% url 'count_my' object.pk %}">Count</a>
+    <a id="count-mica" class="btn btn-default" href="{% url 'count_my_mica' object.pk %}">Count Mica</a>
+    <a id="images" class="btn btn-default" href="{% url 'grain_images' object.pk %}">View Image Stack Info</a>
+    <a id="meta" class="btn btn-default" href="{% url 'grain_update_meta' object.pk %}">Edit Metadata</a>
+    {% if ft_type == 'S' %}
+    <a id="go_mica" class="btn btn-default" href="{% url 'mica' object.pk %}">View Mica</a>
+    {% else %}
+    <a id="go_grain" class="btn btn-default" href="{% url 'grain' object.pk %}">View Grain</a>
+    {% endif %}
+    {% if ft_type == 'S' %}
+    <a id="edit" href="#" class="btn btn-default" onclick="beginEdit(crystal_control)">Edit Region</a>
+    <a id="save" href="#" class="btn btn-default" onclick="save(crystal_control, &quot;{% url 'grain_update_roi' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</a>
+    {% else %}
+    <a id="edit_shift" href="#" class="btn btn-default" onclick="beginShiftEdit(crystal_control)">Adjust Shift</a>
+    <a id="save_shift" href="#" class="btn btn-default" onclick="saveShift(crystal_control, &quot;{% url 'grain_update_shift' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</a>
+    {% endif %}
+    <a id="cancel_edit" href="#" class="btn btn-default" onclick="cancelEdit(crystal_control)" disabled>Cancel Edit</a>
 </div>
-
+<div id="metadata-bar">
+    <table id="metadata">
+        <tr><td>Image size:</td><td id="image-size">
+            {{ object.image_width }}&#x00D7;{{ object.image_height }}
+        </td></tr>
+        <tr><td>Pixel size:</td><td id="pixel-size">
+            {% si_mag object.scale_x unit='m' none='?' %}&#x00D7;{% si_mag object.scale_y unit='m' none='?' %}
+        </td></tr>
+        <tr><td>Stage position:</td><td id="stage-position">
+            {% if ft_type == 'S' %}
+            {{ object.stage_x }}&#x00D7;{{ object.stage_y }}
+            {% else %}
+            {{ object.mica_stage_x }}&#x00D7;{{ object.mica_stage_y }}
+            {% endif %}
+        </td></tr>
+    </table>
+</div>
 <div id="map"></div>
-
-<ul>
-    {% for i in images %}
-    <img src="{% url 'get_image' i.pk %}">
-    {% endfor %}
-</ul>
 
 <form id="empty-form" style="display: none;">
     {% csrf_token %}

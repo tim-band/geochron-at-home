@@ -1,12 +1,33 @@
 [
     {
         "model": "auth.user",
+        "pk": 99,
+        "fields": {
+            "username": "guest",
+            "password": "pbkdf2_sha256$390000$9Mho3cp1V6KY5uf5ZNKfGb$fF2mLeTRWL1xjjwz7E3R3uRFZZn65s0fNYeVv5LiY7s=",
+            "is_staff": false,
+            "is_superuser": false
+        }
+    },
+    {
+        "model": "auth.user",
         "pk": 101,
         "fields": {
             "username": "super",
             "password": "pbkdf2_sha256$260000$PdJVbDs0zWsgJUNwxcZGK7$sgbglpQKIOl/EjgZpHUQMNogdZK0l4766Cv3Zpj0Uag=",
+            "email": "super@uni.ac.uk",
             "is_staff": true,
             "is_superuser": true
+        }
+    },
+    {
+        "model": "account.emailaddress",
+        "pk": 101,
+        "fields": {
+            "email": "super@uni.ac.uk",
+            "user_id": 101,
+            "primary": true,
+            "verified": true
         }
     },
     {
@@ -15,8 +36,19 @@
         "fields": {
             "username": "admin",
             "password": "pbkdf2_sha256$260000$sqA0M0f2LgzSoUby1C7jgN$dbrRRC7OHau7izV+QIy1LfXMd22bJrmLv0i14Ly+1Zo=",
+            "email": "admin@uni.ac.uk",
             "is_staff": true,
             "is_superuser": false
+        }
+    },
+    {
+        "model": "account.emailaddress",
+        "pk": 102,
+        "fields": {
+            "email": "admin@uni.ac.uk",
+            "user_id": 102,
+            "primary": true,
+            "verified": true
         }
     },
     {

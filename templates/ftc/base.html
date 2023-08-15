@@ -25,7 +25,11 @@
 <script src="{% static 'jquery/jquery-1.12.4.min.js' %}" type="text/javascript"></script>
 <script src="{% static 'jquery-ui-1.12.1/jquery-ui.min.js' %}" type="text/javascript"></script>
 <script src="{% static 'bootstrap-3.4.1-dist/js/bootstrap.min.js' %}"></script>
-
+<style>
+.no-stretch {
+  width: max-content;
+}
+</style>
 {% block head %}
 {% endblock %}
 
@@ -53,22 +57,37 @@
             <li><div><a class='btn btn-primary navbar-btn' href="{% url 'signmeup' %}">Sign Up</a></div></li>
             <li>&nbsp;&nbsp;&nbsp;</li>
             {% endif %}
-            <li class="dropdown active">
+            <li class="dropdown active" id="account-dropdown">
               <a href="#" class="dropdown-toggle" data-toggle="dropdown">
                 <i class="fa fa-user fa-lg"></i>&nbsp; {{ user.username | default:"User"}} &nbsp;<span class="caret"></span></a>
               <ul class="dropdown-menu" role="menu">
                 {% if user.is_authenticated %}
-                    <li><a href="{% url 'profile'%}"><i class="fa fa-cogs"></i> &nbsp;Site dashboard</a></li>
-                    <li class="divider"></li>
-                    <li><a href="{% url 'logout' %}"><i class="fa fa-sign-out"></i> &nbsp;Logout</a></li>
-                    {% if user.username != "guest"  %}
-                    <li><a href="{% url 'account_change_password'%}"><i class="fa fa-key"></i> &nbsp;Change password</a></li>
-                    {% endif %}
+                  <li><a href="{% url 'profile' %}"><i class="fa fa-cogs"></i>Site dashboard</a></li>
+                  <li class="divider"></li>
+                  <li><a href="{% url 'logout' %}"><i class="fa fa-sign-out"></i>Logout</a></li>
+                  {% if user.username != "guest"  %}
+                    <li><a href="{% url 'account_change_password' %}"><i class="fa fa-key"></i>Change password</a></li>
+                  {% endif %}
+                  <li class="divider"></li>
                 {% else %}
-                    <li><a href="{% url 'account_login'%}"><i class="fa fa-sign-in"></i> &nbsp;Sign in</a></li>
+                    <li><a href="{% url 'account_login' %}"><i class="fa fa-sign-in"></i>Sign in</a></li>
                 {% endif %}
-                <!-- <li class="dropdown-header">admin your projects</li>  -->
-                {% block right_nav_functon_li %}{% endblock %}
+                {% block right_nav_fn_counting %}
+                  {% if user.is_authenticated %}
+                    <li><a href="{% url 'counting' %}"><i class="fa fa-rotate-90 fa-sliders"></i>fission track counting</a></li>
+                  {% endif %}
+                {% endblock %}
+                {% block right_nav_fn_edit %}
+                  {% if user.is_staff or user.is_superuser %}
+                    <li><a id='projects-link' href="{% url 'projects' %}"><i class="fa fa-flash"></i>Edit your projects</a></li>
+                  {% endif %}
+                {% endblock %}
+                {% block right_nav_fn_results %}
+                  {% if user.is_staff %}
+                    <li class="divider"></li>
+                    <li><a href="{% url 'report' %}"><i class="fa fa-cubes"></i>Get the results</a></li>
+                  {% endif %}
+                {% endblock %}
               </ul>
             </li>
             <li><a href="{%url 'tutorial' %}" target="_blank"><i class="fa fa-question-circle fa-lg"></i></a></li>

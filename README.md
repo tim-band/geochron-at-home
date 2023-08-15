@@ -1,6 +1,6 @@
 # Geochron@Home
 
-Copyright 2014-2022 Jiangping He (geochron.home@gmail.com)
+Copyright 2014-2023 Jiangping He (geochron.home@gmail.com)
 and Tim Band.
 
 This work was in part funded by the Natural Environment Research Council
@@ -48,7 +48,7 @@ You can set up a pipenv to run Geochron@home like so (after installing Python 3)
 
 ```sh
 $ pip install pipenv
-$ pipenv install
+$ pipenv install --dev
 ```
 
 Now you can enter the pipenv shell like this:
@@ -114,7 +114,13 @@ $ docker-compose exec django ./site_init.sh
 Run the server with:
 
 ```sh
-(geochron-at-home) $ python manage.py runserver
+$ pipenv run server
+```
+
+or from the pipenv shell you can also use:
+
+```sh
+(geochron-at-home) $ ./manage.py runserver
 ```
 
 And you can now browse to `localhost:8000/ftc`
@@ -128,10 +134,11 @@ directory at the URL `/geochron_at_home/static/`. Ensure the following are set i
 your .env file:
 
 ```
-STATIC_ROOT=/var/www/html/geochron_at_home/static/
-STATIC_URL=/geochron_at_home/static/
+SCRIPT_NAME=/geochron_at_home
+WWW_ROOT=/var/www/html
 SSL_ONLY=false
 DB_HOST=localhost
+DB_PORT=5432
 DJANGO_DEBUG=false
 ```
 
@@ -142,40 +149,101 @@ as if users trying to log in are failing authentication with Geochron@home,
 when what is really happening is that Django is failing to authenticate with
 the email server.
 
-Let's say you wanted to serve your Geochron@home at `/gah/`, using port 3841 for
-your Django instance:
-
-Set the following in the http `server` block of your nginx config:
+Let's say you wanted to serve your Geochron@home at `/geochron_at_home/`,
+using port 3830 for your Django instance and ports 3851 and 3852 for
+prometheus metrics, set the following in the http `server` block of your
+nginx config:
 
 ```
-location /gah/static/ {
-    root /var/www/html/geochron_at_home/static;
+location /geochron@home/static/ {
+  root /home/wwwrunner/html;
 }
-location /gah/metrics {
-    deny all;
-    access_log off;
-    error_log off;
+location /geochron@home/metrics/1 {
+  access_log off;
+  error_log off;
+  proxy_pass http://127.0.0.1:34982/;
 }
-location /gah/ {
-    ###
-    ### Different depending on whether we are redirecting to https or not
+location /geochron@home/metrics/2 {
+  access_log off;
+  error_log off;
+  proxy_pass http://127.0.0.1:39481/;
+}
+location /geochron@home/ {
+  proxy_pass http://127.0.0.1:39401/;
+  proxy_http_version 1.1;
+  proxy_set_header Host $http_host;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
 }
 ```
 
-Run 2 workers with:
+Let's clone the database into directory `/var/www/repos/geochron-at-home`.
+You need to install the pip environment as the user you want to run as:
 
-```sh
-(geochron-at-home) $ gunicorn -b 127.0.0.1:3841 --workers=2 geochron.wsgi
+```
+cd /var/www/repos/geochron-at-home
+sudo find . -exec chown wwwrunner:wwwrunner {} +
+sudo -u wwwrunner python3 -m pipenv --python 3.9
+sudo -u wwwrunner python3 -m pipenv install
 ```
 
-Whenever any static files (anything in the `ftc/static` directory) have changed
-you will need to run:
+Then you can make a systemd configuration file `/etc/systemd/system/geochron-at-home.service`:
 
-```sh
-(gechron-at-home) $ python manage.py collectstatic
+```
+[Unit]
+Description=Geochron@Home
+After=network.target
+
+[Service]
+Type=simple
+User=wwwrunner
+WorkingDirectory=/var/www/repos/geochron-at-home
+ExecStartPre=/usr/bin/python3 -m pipenv run collect
+ExecStartPre=/usr/bin/python3 -m pipenv run migrate
+ExecStart=/usr/bin/python3 -m pipenv run gunicorn --log-level info --bind 127.0.0.1:39401 --workers=2 geochron.wsgi
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-so that these changes are reflected when running behind nginx.
+Then do the set up. Firstly copy the file `production_env` to `.env`
+and edit it as required. Ensure that you add:
+
+```
+STATIC_ROOT=/home/wwwrunner/html/geochron@home/static
+DB_HOST=127.0.0.1
+DB_PORT=5432
+PROMETHEUS_METRICS_EXPORT_PORT_RANGE=39480-39499
+SCRIPT_NAME=/geochron@home
+SITE_NAME=geochron@home
+SITE_DOMAIN=your.domain.ac.uk
+```
+
+Make sure you have set the postgres password and know what it is
+(`sudo -u postgres psql` then `ALTER USER postgres PASSWORD 'mysupersecurepassword';`)
+
+Then:
+
+```
+sudo -u wwwrunner pipenv install
+sudo -u wwwrunner pipenv shell
+mkdir ~/html
+exit
+sudo systemctl start geochron-at-home.service
+pipenv --python 3.9
+pipenv shell
+sudo -Eu postgres ./init_db.sh
+exit
+sudo -u wwwrunner pipenv run ./site_init.sh
+```
+
+and start with `sudo systemctl start geochron-at-home`.
+
+If you update the code, you can redeploy with `sudo systemctl restart geochron-at-home`.
+
+And you can look at the logs with `journalctl -eu geochron-at-home`.
+
 
 ## Running in production with docker-compose
 
@@ -196,8 +264,8 @@ Multiple hosts can be specified in `ALLOWED_HOSTS` as a
 comma-separated list. Any host can be allowed with `ALLOWED_HOSTS='*'`.
 The `localhost,` setting is needed if you want any local access, for
 example a local prometheus collecting metrics.
-You can ignore (or delete) the settings for `DB_HOST` and `STATIC_ROOT`
-as these are overridden in the compose file.
+You can ignore (or delete) the settings for `DB_HOST`,
+`DB_PORT` and `STATIC_ROOT` as these are overridden in the compose file.
 
 Now you can build it with `docker-compose build` and run it with
 `docker-compose up -d`. Or you can do both with at once with
@@ -224,7 +292,7 @@ As with running without Docker, whenever any static files (anything
 in the `ftc/static` directory) have changed you will need to run:
 
 ```sh
-(gechron-at-home) $ python manage.py collectstatic
+(geochron-at-home) $ python manage.py collectstatic
 ```
 
 ### nginx stanza
@@ -240,11 +308,6 @@ location /geochron@home/ {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_redirect off;
-        location /geochron@home/static/ {
-                # This is necessary because the static files are not
-                # served under /geochron@home within the app
-                proxy_pass http://127.0.0.1:3830/static/;
-        }
 }
 ```
 
@@ -332,7 +395,8 @@ the new samples.
 From the pipenv shell:
 
 ```sh
-(geochron-at-home) $ pipenv lock -r >requirements.txt
+(geochron-at-home) $ pipenv requirements >requirements.txt
+(geochron-at-home) $ ./manage.py collectstatic
 (geochron-at-home) $ ./manage.py test
 ```
 
@@ -340,6 +404,32 @@ You can test only the API tests by adding the option `--tag api` or
 only the selenium test by adding the option `--tag selenium`.
 
 At present there are only these two types of test.
+
+### Running the tests with a different browser
+
+The default browser is Chromium, but you can choose Chrome or Firefox
+instead as follows:
+
+```sh
+(geochron-at-home) $ BROWSER=chrome ./manage.py test
+```
+
+...for Chrome (make sure you have `chromedriver` installed and it has the
+same version number as Chrome), or
+
+```sh
+(geochron-at-home) $ BROWSER=firefox ./manage.py test
+```
+
+...for Firefox (make sure you have `geckodriver` installed on your path, at
+least version 0.32)
+
+Instead of `./manage.py test` within pipenv shell, you can use the
+following command in a normal shell:
+
+```sh
+$ pipenv run test
+```
 
 ### Troubleshooting image upload
 
@@ -363,7 +453,7 @@ Before using the API you must initialize the JWT. Also,
 periodically, or if you susupect the JWT might have leaked
 you should also re-initialize the JWT.
 
-Firstly, remove any lines beginning `JWT_` from your
+Firstly, remove any settings beginning `JWT_` from your
 `.env` file (for local development) or `production.env`
 (for production). Then, from the Pipenv shell:
 
@@ -396,12 +486,20 @@ $ docker-compose up -d --build
 
 ### Using the API
 
-You can use the `./gah.py` script from any machine that
+You can use the `./geochron/gah.py` script from any machine that
 can see the API endpoints. But first, you have to tell it where
-the endpoints are:
+the endpoints are (here we are running it from the `geochron`
+directory):
 
 ```sh
 (geochron-at-home) $ ./gah.py set url https://my.domain.com/geochron@home
+```
+
+Alternatively, from the root of the project you can use `pipenv run gah`
+(anytime you see `./gah.py` you can use this formulation instead):
+
+```sh
+$ pipenv run gah set url https://my.domain.com/geochron@home
 ```
 
 Do not include any `/ftc` or `/api`. This produces a file
@@ -445,7 +543,7 @@ function:
 
 ```sh
 (geochron-at-home) $ ./gah.py sample new Sample123 2 T 20 50
-b'{"id":199,"sample_name":"Sample123","in_project":2,"sample_property":"T","total_grains":0,"priority":20,"min_contributor_num":50,"completed":false}'
+b'{"id":199,"sample_name":"Sample123","in_project":2,"sample_property":"T","priority":20,"min_contributor_num":50,"completed":false}'
 (geochron-at-home) $ ./gah.py grain upload 199 /path/to/directory/of/grains
 Created new grain 28
 Uploaded image /path/to/directory/of/grains/Grain01/Stack-09.jpg as image 469
@@ -468,6 +566,71 @@ names for the images are:
 * `MicaReflStackFlat.jpg` for reflected light apatite image
 * as above, but `.jpeg` instead of `.jpg`
 * as above, but `.png` instead of `.jpg` (for PNG image)
+
+## Localization
+
+Text is internationalized by including the text:
+
+```
+{& load i18n %}
+```
+
+at the top of a template, then either using the tag
+`{% translate "text to translate" %}` or the block tags:
+
+```
+{% blocktranslate %}
+Text to translate, which can
+include {{ context_variables }}
+and multiple lines.
+{% endblocktranslate %}
+```
+
+These translations are stored in `.mo` files. You can create
+these by ensuring that you have the `gettext` package installed
+on your system and typing (from the pipenv shell):
+
+```
+(geochron-at-home) $ mkdir locale
+(geochron-at-home) $ ./manage.py makemessages -l zh_HANS
+```
+
+This one makes or updates the file for Simplified Chinese, called
+`locale/zh_HANS/LC_MESSAGES/django.po`. Localization tools such as
+Weblate understand this file format.
+
+## Troubleshooting Geochron@Home development
+
+You can run a Python shell that can call the app's functions directly with:
+
+```sh
+$ pipenv run shell
+```
+
+Or, for a less pleasant experience, but one that prints out the SQL commands
+that are going to the database, try:
+
+```sh
+$ pipenv run debug
+```
+
+`django.test.Client` and `django.urls.reverse` are already imported
+for you in the `run debug` shell, and you have an instance of `Client`
+called `cli` and functions `get` and `post` that are shortcuts for
+`cli.get` and `cli.post`.
+
+To start with you are logged in as the site admin, but you can change
+this with `login(username, password)`.
+
+As an example, here is a way to see how many database commands are
+issued when downloading JSON results:
+
+```
+(Pdb) get(reverse('getJsonResults'))
+```
+
+Remember that you exit a `Pdb` shell by typing `c` and pressing
+return.
 
 #### TODO:
 

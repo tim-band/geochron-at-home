@@ -7,8 +7,6 @@
 {% block head_title %}{% trans "Sign In" %}{% endblock %}
 
 {% block extra_head %}
-<link href="{% static 'font-awesome-4.7.0/css/font-awesome.min.css' %}" rel="stylesheet">
-<link href="{% static 'bootstrap-3.4.1-dist/css/bootstrap.min.css' %}" rel="stylesheet">
 <style type="text/css">
 body {
   padding-top: 0px;
@@ -76,11 +74,11 @@ body {
   <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
 {% endif %}
 
-<div class="checkbox">
+<div class="checkbox row">
   <label class="pull-left">
-     <input type="checkbox" value="remember-me"> Remember me
+    <input type="checkbox" value="remember-me"> Remember me
   </label>
-<a class="forgot pull-right" href="{% url 'account_reset_password' %}">{% trans "Forgot Password?" %}</a>
+  <a class="forgot pull-right" href="{% url 'account_reset_password' %}">{% trans "Forgot Password?" %}</a>
 </div>
 <a href="{{ signup_url }}">Need an account? Sign up free.</a>
 </form>

@@ -1,21 +1,28 @@
 from django.contrib.auth.models import User
-from django.db.models import F
 from django.db.models.aggregates import Max
-from django.shortcuts import get_object_or_404
-from rest_framework import exceptions
 import json
-from rest_framework import generics, serializers, status
-from rest_framework.authentication import TokenAuthentication
+import logging
+from rest_framework import exceptions
+from rest_framework import generics, serializers
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import exception_handler
 
-from ftc.get_image_size import get_image_size_from_handle
-from ftc.load_rois import get_rois
-from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering
-from ftc.parse_image_name import parse_image_name
+from ftc.load_rois import get_rois, get_roiss
+from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering, Transform2D
+from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
+
+
+def explicit_exception_handler(exc, context):
+    if isinstance(exc, exceptions.ValidationError):
+        logging.info(exc)
+        return Response(
+            { 'failed_validations': exc.detail },
+            status=400
+        )
+    return exception_handler(exc, context)
 
 
 def models_owned(model_class, request):
@@ -89,9 +96,8 @@ class SampleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sample
         fields = ['id', 'sample_name', 'in_project', 'sample_property',
-            'total_grains', 'priority', 'min_contributor_num', 'completed']
+            'priority', 'min_contributor_num', 'completed']
 
-    total_grains = serializers.IntegerField(required=False, read_only=True)
     completed = serializers.BooleanField(required=False, read_only=True)
 
 
@@ -114,8 +120,7 @@ class SampleListView(ListCreateView):
         if (not self.request.user.is_superuser and
             serializer.validated_data['in_project'].get_owner() != self.request.user):
             raise exceptions.PermissionDenied
-        serializer.save(total_grains=0, completed=False)
-
+        serializer.save(completed=False)
 
 class SampleInfoView(RetrieveUpdateDeleteView):
     model = Sample
@@ -127,7 +132,8 @@ class GrainSerializer(serializers.ModelSerializer):
         model = Grain
         fields = [
             'id', 'sample', 'index', 'image_width', 'image_height',
-            'scale_x', 'scale_y', 'stage_x', 'stage_y'
+            'scale_x', 'scale_y', 'stage_x', 'stage_y', 'shift_x', 'shift_y',
+            'mica_stage_x', 'mica_stage_y'
         ]
 
     index = serializers.IntegerField(required=False, read_only=False)
@@ -147,6 +153,19 @@ class GrainSerializer(serializers.ModelSerializer):
         if index == None:
             max_index = sample.grain_set.aggregate(Max('index'))['index__max'] or 0
             index = max_index + 1
+        region_first = rois['regions'][0]
+        transform = None
+        rois_transform = rois.get('mica_transform')
+        if rois_transform and type(rois_transform) is list and len(rois_transform) == 2:
+            transform = Transform2D(
+                x0=rois_transform[0][0],
+                y0=rois_transform[0][1],
+                t0=rois_transform[0][2],
+                x1=rois_transform[1][0],
+                y1=rois_transform[1][1],
+                t1=rois_transform[1][2]
+            )
+            transform.save()
         grain = self.save(
             index = index,
             sample = sample,
@@ -156,6 +175,11 @@ class GrainSerializer(serializers.ModelSerializer):
             scale_y=rois.get('scale_y'),
             stage_x=rois.get('stage_x'),
             stage_y=rois.get('stage_y'),
+            mica_stage_x=rois.get('mica_stage_x'),
+            mica_stage_y=rois.get('mica_stage_y'),
+            shift_x=region_first['shift'][0] if region_first else 0,
+            shift_y=region_first['shift'][1] if region_first else 0,
+            mica_transform_matrix=transform
         )
         save_rois_regions(rois, grain)
 
@@ -201,9 +225,34 @@ class GrainInfoView(RetrieveUpdateDeleteView):
 
 @api_view()
 @permission_classes([IsAuthenticated])
-def download_rois(request, pk):
+def get_grain_rois(request, pk):
     grain = Grain.objects.get(id=pk)
     return Response(get_rois(grain))
+
+def request_roiss(request):
+    gq = Grain.objects.all()
+    if 'grains[]' in request.GET:
+        gq = gq.filter(
+            id__in=request.GET.getlist('grains[]')
+        )
+    if 'samples[]' in request.GET:
+        gq = gq.filter(
+            sample__in=request.GET.getlist('samples[]')
+        )
+    if 'projects[]' in request.GET:
+        gq = gq.filter(
+            sample__in_project__in=request.GET.getlist('projects[]')
+        )
+    return get_roiss(gq.prefetch_related(
+        'sample__in_project',
+        'region_set__vertex_set',
+        'mica_transform_matrix'
+    ))
+
+@api_view()
+@permission_classes([IsAuthenticated])
+def get_many_roiss(request):
+    return Response(request_roiss(request))
 
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -226,7 +275,7 @@ class ImageSerializer(serializers.ModelSerializer):
             grain.get_owner() != request.user):
             raise exceptions.PermissionDenied
         filename = self.initial_data['data'].name
-        info = parse_image_name(filename)
+        info = parse_upload_name(filename)
         data = self.initial_data['data'].read()
         self.save(
             index=info['index'],
@@ -273,8 +322,10 @@ class ImageInfoView(RetrieveUpdateDeleteView):
                 raise exceptions.PermissionDenied
         if 'data' in serializer.initial_data:
             filename = serializer.initial_data['data'].name
-            info = parse_image_name(filename)
-            kwargs.update(info)
+            info = parse_upload_name(filename)
+            kwargs['ft_type'] = info['ft_type']
+            kwargs['index'] = info['index']
+            kwargs['format'] = info['format']
             kwargs['data'] = serializer.initial_data['data'].read().decode('utf-8')
         serializer.save(**kwargs)
 
@@ -291,8 +342,8 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FissionTrackNumbering
-        fields = ['id', 'in_sample', 'grain', 'ft_type',
-            'worker', 'result', 'create_date', 'latlngs']
+        fields = ['id', 'grain', 'ft_type', 'worker',
+            'result', 'create_date', 'latlngs']
 
 
 class FissionTrackNumberingView(generics.ListAPIView):
@@ -305,7 +356,7 @@ class FissionTrackNumberingView(generics.ListAPIView):
         if 'all' not in params:
             qs = qs.filter(result__gte=0)
         if 'sample' in params:
-            qs = qs.filter(in_sample=params['in_sample'])
+            qs = qs.filter(grain__sample=params['in_sample'])
         if 'grain' in params:
-            qs = qs.filter(grain=params['grain'])
-        return qs.order_by('in_sample', 'grain')
+            qs = qs.filter(grain__index=params['grain'])
+        return qs.order_by('grain__sample', 'grain__index').select_related('worker')

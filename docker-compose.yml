@@ -1,8 +1,5 @@
 version: "2.0"
 
-volumes:
-  web_static:
-
 services:
   db:
     image: postgres:13.1-alpine
@@ -13,17 +10,6 @@ services:
     env_file:
       - production.env
     restart: unless-stopped
-  web:
-    image: nginx:1.19.6-alpine
-    ports:
-      - 3830:80
-      - 3831:8081
-    volumes:
-      - "./nginx/conf.d:/etc/nginx/conf.d:ro"
-      - "web_static:/var/www/static:ro"
-    restart: unless-stopped
-    depends_on:
-      - django
   django:
     build: .
     env_file:
@@ -31,13 +17,15 @@ services:
     environment:
       - STATIC_ROOT=/code/static
       - DB_HOST=db
+      - DB_PORT=5432
       - PROMETHEUS_METRICS_EXPORT_PORT_RANGE=8001-8019
       - DJANGO_DEBUG=0
     ports:
+      - 3830:80
       - "3851-3869:8001-8019"
     volumes:
       - "./user_upload:/code/user_upload"
-      - "web_static:/code/static/"
+      - "/var/www/html/geochron@home/static/:/code/static/"
       - "./vendor:/code/vendor"
     restart: unless-stopped
     depends_on:

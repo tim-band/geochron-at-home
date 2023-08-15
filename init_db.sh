@@ -11,6 +11,9 @@ echo 'POSTGRES_USER environment variable not set, are we in pipenv shell?'
 elif [ -z "${DB_HOST}" ]
 then
 echo 'DB_HOST environment variable not set, are we in pipenv shell?'
+elif [ -z "${DB_PORT}" ]
+then
+echo 'DB_PORT environment variable not set, are we in pipenv shell?'
 exit 2
 else
 # escape single quotes
@@ -22,7 +25,7 @@ conn=""
 else
 conn="-h ${DB_HOST}"
 fi
-psql -v PW=\'${pass}\' -v DB=${POSTGRES_DB} -v GUSER=${POSTGRES_USER} ${conn}<<SQL
+psql -v PW=\'${pass}\' -v DB=${POSTGRES_DB} -v GUSER=${POSTGRES_USER} ${conn} -p ${DB_PORT}<<SQL
 drop database if exists :DB;
 create role :GUSER with login encrypted password :PW;
 alter role :GUSER with CREATEDB;

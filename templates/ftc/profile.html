@@ -77,19 +77,6 @@ footer {
 </style>
 {% endblock %}
 
-{% block right_nav_functon_li %}
-    {% if user.is_authenticated %}
-        <li class="divider"></li>
-        <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i> &nbsp;Fission track counting</a></li>
-        {% if user.is_staff %}
-        <li><a href="{% url 'report'%}"><i class="fa fa-cubes"></i> &nbsp;Manage your projects</a></li>
-        {% endif %}
-        {% if user.is_staff or user.is_superuser %}
-        <li><a id='projects-link' href="{% url 'projects'%}"><i class="fa fa-flash"></i> &nbsp;Edit your projects</a></li>
-        {% endif %}
-    {% endif %}
-{% endblock %}
-
 {% block content %}
 
     {% if messages %}
@@ -120,39 +107,37 @@ footer {
             <div class="col-6 col-sm-6 col-lg-4">
               <h2>How to</h2>
               <!--<p>A tutorial on how to count tracks.</p>-->
-              <p><a id="tutorial-link" class="btn btn-default" href="{%url 'tutorial' %}" role="button">Tutorial &raquo;</a></p>
-            </div><!--/span-->
+              <p><a id="tutorial-link"
+                class="btn btn-default{% if not tutorial_completed %} btn-primary{% endif %}"
+                href="{%url 'tutorial' %}" role="button">Tutorial &raquo;</a></p>
+            </div>
             <div class="col-6 col-sm-6 col-lg-4">
               <h2>Start counting</h2>
               <!--<p>Counting the tracks</p>-->
-              <p><a id="start-counting-link" class="btn btn-default" role="button"
-                {% if tutorial_completed %} href="{% url 'counting' %}"{% else %}disabled{% endif %}
+              <p><a id="start-counting-link"
+                class="btn btn-default{% if tutorial_completed %} btn-primary{% endif %}"
+                role="button"
+                {% if tutorial_completed %}href="{% url 'counting' %}"{% else %}disabled{% endif %}
                 >Go &raquo;</a></p>
-            </div><!--/span-->
-            <div class="col-6 col-sm-6 col-lg-4">
-              <h2>Site statistics</h2>
-              <!--<p>View your site statistics.</p>-->
-              <p><a id="site-statistics-link" class="btn btn-default" href="#" role="button">View details &raquo;</a></p>
-            </div><!--/span-->
+            </div>
             {% if user.is_staff %}
             <div class="col-6 col-sm-6 col-lg-4">
-              <h2>Set up a project</h2>
-              <p>Learn how to set up a proper project. Preparing the folder structure and use the proper naming rules for file and directories.</p>
-              <p><a class="btn btn-default" href="#" role="button">View details &raquo;</a></p>
+              <h2>Administration</h2>
+              <p><a id="admin-link" class="btn btn-default" href="{% url 'admin:index' %}" role="button">View details &raquo;</a></p>
             </div>
             <div class="col-6 col-sm-6 col-lg-4">
               <h2>Get the results</h2>
               <p>Download your project results. Download the results for offline analysis.</p>
-              <p><a class="btn btn-default" href="{% url 'report'%}" role="button">View details &raquo;</a></p>
+              <p><a class="btn btn-default" href="{% url 'report'%}" role="button">View results &raquo;</a></p>
             </div>
             <div class="col-6 col-sm-6 col-lg-4">
-                <h2>Manage projects</h2>
-                <p>Add, remove and update your projects; upload crystal stacks.</p>
-                <p><a class="btn btn-default" href="{% url 'projects'%}" role="button">View details &raquo;</a></p>
-              </div>
-              {% endif%}
-          </div><!--/row-->
-        </div><!--/span-->
+              <h2>Manage projects</h2>
+              <p>Add, remove and update your projects; upload crystal stacks.</p>
+              <p><a id="manage-link" class="btn btn-default" href="{% url 'projects'%}" role="button">Manage &raquo;</a></p>
+            </div>
+            {% endif%}
+          </div>
+        </div>
 
         <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
           <div class="list-group">
@@ -161,16 +146,15 @@ footer {
             <a href="{% url 'account_change_password'%}" class="list-group-item">Change password</a>
             {% endif %}
           </div>
-        </div><!--/span-->
-      </div><!--/row-->
+        </div>
+      </div>
 
       <hr>
-
       <footer>
         <p>&copy; Jiangping He 2014 - 2021</p>
       </footer>
 
-    </div><!--/.container-->
+    </div>
 <!-- ========== -->
 
 {% endblock %}

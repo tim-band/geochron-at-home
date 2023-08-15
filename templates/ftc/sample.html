@@ -1,6 +1,13 @@
 {% extends "ftc/base.html" %}
 
 {% load static %}
+{% load order_by %}
+
+{% block head %}
+{% endblock %}
+
+{% block right_nav_fn_edit %}
+{% endblock %}
 
 {% block content %}
 
@@ -11,22 +18,79 @@
         {{object.in_project.project_name}}
     </a>
 </h1>
-<div class="details">
-    <table>
+<div>
+    <table class="table no-stretch">
         <tr><td>Property</td><td>{{object.get_sample_property_display}}</td></tr>
-        <tr><td>Total grains</td><td>{{object.total_grains}}</td></tr>
+        <tr><td>Total grains</td><td>{{object.grain_set.count}}</td></tr>
         <tr><td>Priority</td><td>{{object.priority}}</td></tr>
         <tr><td>Minimum contributor number</td><td>{{object.min_contributor_num}}</td></tr>
         <tr><td>Completed?</td><td>{{object.completed}}</td></tr>
+        <tr><td>Project owner</td><td>{{object.get_owner}}</td></tr>
     </table>
-    <a href="{% url 'sample_update' object.pk %}">Edit</a>
+    <a id="edit-sample" href="{% url 'sample_update' object.pk %}">Edit</a>
 </div>
 <div><a id="create-grain" href="{% url 'grain_create' object.pk %}">Create new grain</a></div>
 <h2>Grains</h2>
-<ul>
-    {% for g in object.grain_set.all %}
-    <li><a href="{% url 'grain' g.pk %}">{{ g.index }}</a></li>
-    {% endfor %}
-</ul>
+<table class="table" id="grain-set">
+    <thead>
+        <tr>
+            <th></th>
+            <th colspan="2">Images</th>
+            <th></th>
+            <th colspan="2">Owner's track count</th>
+            <th colspan="2">Count</th>
+            <th></th>
+            <th></th>
+        </tr>
+        <tr>
+            <th>Grain</th>
+            <th>Minerals</th>
+            <th>Mica</th>
+            <th>Number of results</th>
+            <th>Minerals</th>
+            <th>Mica</th>
+            <th>Minerals</th>
+            <th>Mica</th>
+            <th>ROI</th>
+            <th>Delete</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for g in object.grain_set.all|order_by:"index" %}
+        <tr>
+            <td><a href="{% url 'grain_images' g.pk %}">{{ g.index }}</a></td>
+            <td>{{ g.count_images_crystal }}</td>
+            <td>{{ g.count_images_mica }}</td>
+            <td>{{ g.count_results }}</td>
+            <td>
+                {% with result=g.owners_result %}
+                {% if result == None %}
+                    Not started
+                {% elif result < 0 %}
+                    Not submitted
+                {% else %}
+                    {{ result }}
+                {% endif %}
+                {% endwith %}
+            </td>
+            <td>
+                {% with result=g.owners_result_mica %}
+                {% if result == None %}
+                    Not started
+                {% elif result < 0 %}
+                    Not submitted
+                {% else %}
+                    {{ result }}
+                {% endif %}
+                {% endwith %}
+            </td>
+            <td><a id="count-link-{{ g.index }}" href="{% url 'count_my' g.pk %}">Count</a></td>
+            <td><a id="count-mica-link-{{ g.index }}" href="{% url 'count_my_mica' g.pk %}">Count Mica</a></td>
+            <td><a id="download-rois" href="{% url 'download_grain_rois' g.pk %}" download="rois.json">Download ROI</a></td>
+            <td><a href="{% url 'grain_delete' g.pk %}">Delete</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
 {% endblock %}

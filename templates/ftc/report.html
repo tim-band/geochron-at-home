@@ -126,322 +126,172 @@ footer {
     top: 0;
     width: 50%; /* 6 columns */
   }
-
+}
 </style>
 
 {% endblock %}
 
-            {% block left_nav_li %}{% endblock %}
-            {% block right_nav_li %}{% endblock %}
-
-            {% block right_nav_functon_li %}
-                {% if user.is_staff %}
-                    <li class="divider"></li>
-                    <li><a href="{% url 'counting'%}"><i class="fa fa-rotate-90 fa-sliders"></i> &nbsp;fission track counting</a></li>
-                {% endif %}
-                {% if user.is_staff or user.is_superuser %}
-                    <li><a id='projects-link' href="{% url 'projects'%}"><i class="fa fa-flash"></i> &nbsp;Edit your projects</a></li>
-                {% endif %}
-            {% endblock %}
+{% block right_nav_fn_results %}{% endblock %}
+{% block left_nav_li %}{% endblock %}
+{% block right_nav_li %}{% endblock %}
 
 {% block content %}
    <div class="container">
 
       <div class="row row-offcanvas row-offcanvas-right">
-<!--
-       <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
-          <ul class="nav nav-sidebar">
-            <li class="active"><a href="#">Projects</a></li>
-          </ul>
-          <div id="tree">
-            <ul>
-             {% for project in projects.all %}
-             <li id="p{{ project.id }}" class="folder">{{ project.project_name }}
-                <ul>
-                {% for sample in project.sample_set.all %}
-                  <li id="{{ sample.id }}"> {{ sample.sample_name }} </li>
-                {% endfor %}
-                </ul>
-             </li>
-             {% endfor %}
-            </ul>
-          </div>
-        </div>
--->
         <div class="col-xs-12 col-sm-9">
           <p class="pull-right visible-xs">
             <button type="button" class="btn btn-primary btn-xs" data-toggle="offcanvas">Toggle nav</button>
           </p>
           <h1 class="sub-header" style="margin-top: 0px; padding-bottom: 0px;">Results</h1>
-            <table id="mytable" class="table table-striped table-bordered" cellspacing="0" width="100%">
-              <thead>
-                  <tr>
-                      <th>Project</th>
-                      <th>Sample</th>
-                      <th>Grain #</th>
-                      <th>Type</th>
-                      <th>Result</th>
-                      <th>Worker</th>
-                      <th>Submit Date</th>
-                  </tr>
-              </thead>
+          <table id="mytable" class="table table-striped table-bordered" cellspacing="0" width="100%">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Sample</th>
+                <th>Grain #</th>
+                <th>Type</th>
+                <th>Result</th>
+                <th>Worker</th>
+                <th>Submit Date</th>
+                <th>ROI Area (&#x00B5;m&#x00B2;)</th>
+              </tr>
+            </thead>
+            <tfoot>
+              <tr>
+                <th>Project</th>
+                <th>Sample</th>
+                <th>Grain #</th>
+                <th>Type</th>
+                <th>Result</th>
+                <th>Worker</th>
+                <th>Submit Date</th>
+                <th>ROI Area (&#x00B5;m&#x00B2;)</th>
+              </tr>
+            </tfoot>
+          </table>
+          <a id="json-download" class="btn btn-default"
+            href="{% url 'getJsonResults' %}" download="results.json">
+            Download JSON
+          </a>
+          <a id="csv-download" class="btn btn-default"
+            href="{% url 'getCsvResults' %}" download="results.csv">
+            Download CSV
+          </a>
+        </div>
 
-              <tfoot>
-                  <tr>
-                      <th>Project</th>
-                      <th>Sample</th>
-                      <th>Grain #</th>
-                      <th>Type</th>
-                      <th>Result</th>
-                      <th>Worker</th>
-                      <th>Submit Date</th>
-                  </tr>
-              </tfoot>
-            </table>
-
-      </div>
-
-                    <!--
-                    <div style="cursor: default;"> {{ sample.sample_name }}&nbsp;
-                    <a href="{{ project.id }}/{{ sample.id }}/{{ sample.total_grains }}"><i class="fa fa-stethoscope"></i></a></div>
-                    -->
-
-       <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
+        <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
           <div>
             <h1 class="sub-header bg-primary" style="margin-top: 0px; padding-bottom: 0px;">Projects</h1>
           </div>
           <h5 class="text-muted"><small>Check to view the results or Select to count a grain:</small></h5>
-          <div id="tree">
-            <ul>
-             {% for project in projects.all %}
-             <li id="p{{ project.id }}" class="folder">{{ project.project_name }}
-                <ul>
-                {% for sample in project.sample_set.all %}
-                  <li id="{{ sample.id }}_{{ sample.total_grains }}_{{ sample.sample_property }}">{{ sample.sample_name }}</li>
-                {% endfor %}
-                </ul>
-             </li>
-             {% endfor %}
-            </ul>
-          </div>
+          <div id="tree"></div>
         </div>
-
-        <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
-          <div class="modal-dialog modal-sm">
-            <div class="modal-content">
-              <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                <h4 class="modal-title" id="exampleModalLabel">Choose a grain for FTC</h4>
-              </div>
-              <div class="modal-body">
-              <div class="container-fluid">
-                <form id="request-grain">
-                  <div class="form-group">
-                    <label for="recipient-name" class="control-label">Project:</label>
-                    <input type="text" class="form-control" id="recipient-name" readonly>
-                  </div>
-                  <div class="form-group">
-                    <label for="message-text" class="control-label">Sample:</label>
-                    <input type="text" class="form-control" id="message-text" readonly>
-                  </div>
-                  <div class="row">
-                    <div class="col-md-6">
-                      <label for="message-text" class="control-label">Grain No.:</label>
-                      <input type="text" class="form-control" id="grain_no_txt" value="1" readonly>
-                      <input type="range" name="grain_num" id="grain_no" value="1" step="1" oninput="updateTextInput(this.value);">
-                    </div>
-                    <div class="col-md-6">
-                      <label for="message-text" class="control-label">Type:</label>
-                      <div class="radio"><label><input type="radio" name="ft_type" id='induced' value="I">Induced</label></div>
-                      <div class="radio"><label><input type="radio" name="ft_type" id='spontaneous' value="S" checked>Spontaneous</label></div>
-                    </div>
-                  </div>
-                  <div>
-                    <div class="form-group">
-                      <input type="hidden" name="proj_id" id="proj_id" value="">
-                      <input type="hidden" name="sample_id" id="sample_id" value="">
-                    </div>
-                  </div>
-                </form>
-              </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                <button type="submit" class="btn btn-primary" id="count_grain">Start</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
     </div> <!-- /container -->
 
 <script type="text/javascript">
-  $(function(){
+$(function(){
 
   $('[data-toggle="offcanvas"]').click(function () {
     $('.row-offcanvas').toggleClass('active')
   });
 
-    // https://coderwall.com/p/cxwg_g
-    // pass csrf tokens to Django
-    $.ajaxSetup({beforeSend: function(xhr, settings){
+  // https://coderwall.com/p/cxwg_g
+  // pass csrf tokens to Django
+  $.ajaxSetup({beforeSend: function(xhr, settings){
+    xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+  }});
 
-        xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
-
-    }});
-
-    var dataTable; //reference to your dataTable
-    dataTable = $('#mytable').dataTable({
-                    "jQueryUI": true,
-                    "dom": 'T<"clear">lfrtip',
-                    "tableTools": {
-                          "sSwfPath": "{% static 'DataTables-1.10.2/extensions/TableTools/swf/copy_csv_xls_pdf.swf' %}"
-                    },
-/*
-                    "columns": [
-                       { "width": "15%" },
-                       { "width": "15%" },
-                       { "width": "5%" },
-                       { "width": "2%" },
-                       { "width": "5%" },
-                       { "width": "15%" },
-                       { "width": "15%" },
-                    ]
-*/
-                });
-    //new $.fn.dataTable.FixedHeader( dataTable );
-
-    // Create the tree inside the <div id="tree"> element.
-    $("#tree").fancytree({
-     /* extensions: ["childcounter"],
-        childcounter: {
-            deep: true,
-            hideZeros: true,
-            hideExpanded: true,
-        }, */
-        checkbox: true,
-        persist: true,
-        selectMode: 3, // 1:single, 2:multi, 3:multi-hier
-        renderNode: function (event, data) {
-           var node = data.node;
-           leaf_node = $(node.span).not('.fancytree-has-children')
-           if((leaf_node.length != 0) && !(leaf_node.children().hasClass('label-as-badge')) ) {
-               var btn_html = '<span class="label label-primary label-as-badge" data-toggle="modal"'
-                            + ' data-proj=' + node.parent.title
-                            + ' data-proj_id=' + node.parent.key
-                            + ' data-sample=' + node.title
-                            + ' data-sample_id=' + node.key
-                            + ' data-toggle="modal" data-target="#exampleModal">count</span>'
-               var countButton = $(btn_html); 
-               countButton.css('cursor','pointer');
-               leaf_node.append(countButton);
-               countButton.hide();
-               leaf_node.hover(function () {
-                  // mouse over
-                  countButton.show();
-                  }, function () {
-                  // mouse out
-                  countButton.hide();
-               });
-           } // end lead_node setting
-        },
-        select: function(event, data) {
-            // Get a list of all selected nodes
-            var selectedNodes = data.tree.getSelectedNodes();
-            // ... and convert to a key array:
-            var selectedKeys = $.map(selectedNodes, function(node){
-               return (node.key.charAt(0).toLowerCase() == 'p') ? null : node.key.split('_')[0];
-            });
-            $.ajax({
-                url: "{% url 'getTableData'%}",
-                type: 'POST',
-                //contentType: 'application/json; charset=utf-8',
-                dataType: 'json',
-                data: JSON.stringify({
-                         client_response: selectedKeys,
-                         //csrfmiddlewaretoken: '{{ csrf_token }}' 
-                      }),
-                success: function(result) {
-                             //console.log(dataTable);
-                             //console.log(result);
-                             if (result.aaData.length > 0) {
-                                 dataTable.fnClearTable();
-                                 dataTable.fnAddData(result.aaData);
-                                 dataTable.fnDraw();
-                                 //dataTable.columns.adjust().draw();
-                             } else {
-                                 dataTable.fnClearTable();
-                                 dataTable.fnDraw();
-                             }
-                         },
-                error : function(xhr,errmsg,err) {
-                             console.log(xhr.status + ": " + xhr.responseText);
-                        },
-            });
-            // ... update table data
-            // dataTable.ajax.url( '/getTableData/' ).load();
-        },
-    }); // end of tree
-
-    //modal
-    $('#exampleModal').on('show.bs.modal', function (event) {
-      var button = $(event.relatedTarget); // Button that triggered the modal
-      var proj = button.data('proj'); // Extract info from data-* attributes
-      var proj_id = button.data('proj_id');
-      var sample = button.data('sample');
-      var sample_info = button.data('sample_id').split("_");
-      var modal = $(this);
-      modal.find('.modal-body #recipient-name').val(proj);
-      modal.find('.modal-body #message-text').val(sample);
-      modal.find('.modal-body #grain_no').attr('placeholder','max: ' + sample_info[1]);
-      modal.find('.modal-body #grain_no').attr('min', 1);
-      modal.find('.modal-body #grain_no').attr('max', sample_info[1]);
-      modal.find('.modal-body #proj_id').val(proj_id.substring(1))
-      modal.find('.modal-body #sample_id').val(sample_info[0])
-      if(sample_info[2].charAt(0).toUpperCase() == 'D') {
-          modal.find('.modal-body #spontaneous').attr("disabled",true);
-      }
-    }); // end of modal
-
-    //
-    $('button#count_grain').click(function(event) {
-        var o = {};
-        var a = $('form#request-grain').serializeArray();
-        a.push({name:'num_markers', 'value':'0'});
-        a.push({name:'marker_latlngs', 'value':[]});
-        $.each(a, function() {
-            if(this.name != 'ft_type' && this.name != 'marker_latlngs') {
-                value = parseInt(this.value);
-            } else {
-                value = this.value; 
-            }
-            if (o[this.name] !== undefined) {
-                if (!o[this.name].push) {
-                    o[this.name] = [o[this.name]];
-                }
-                o[this.name].push(value);
-            } else {
-                o[this.name] = value;
-            }
-        });
-        $.ajax({
-            url: "{% url 'saveWorkingGrain'%}",
-            type: 'POST',
-            dataType: 'json',
-            data: JSON.stringify({'intermedia_res':o}),
-            success: function(result) {
-                console.log('submitted: ' + result.reply);
-                window.location = "{% url 'counting'%}";
-            },
-            error: function(xhr, errmsg, err) {
-                console.log(xhr.status + ": " + xhr.responseText);
-                alert('Failed to save your intermedia result, Please try again.');
-            }
-        });
-        event.preventDefault();
-    }); 
-    // end submit
+  var dataTable; //reference to your dataTable
+  dataTable = $('#mytable').dataTable({
+    "jQueryUI": true,
+    "dom": 'T<"clear">lfrtip',
+    "tableTools": {
+          "sSwfPath": "{% static 'DataTables-1.10.2/extensions/TableTools/swf/copy_csv_xls_pdf.swf' %}"
+    },
   });
+
+  // Create the tree inside the <div id="tree"> element.
+  $("#tree").fancytree({
+    checkbox: true,
+    persist: true,
+    selectMode: 3, // 1:single, 2:multi, 3:multi-hier
+    source: [
+      {% for project in projects.all %}
+        { title: '{{ project.project_name }}',
+          key: 'p{{ project.id }}',
+          folder: true,
+          children: [
+          {% for sample in project.sample_set.all %}
+            { title: '{{ sample.sample_name }}',
+              folder: true,
+              key: '{{ sample.id }}_{{ sample.sample_property }}',
+              data: {
+                sample_url: "{% url 'sample' sample.id %}"
+              }
+            },
+          {% endfor %}
+        ]},
+      {% endfor %}
+    ],
+    renderNode: function (event, data) {
+      var node = data.node;
+      leaf_node = $(node.span).not('.fancytree-has-children');
+      if (leaf_node.length != 0
+        && !(leaf_node.children().hasClass('label-as-badge'))) {
+        var btn_html = '<a class="label label-primary label-as-badge"'
+          + ' href="' + node.data.sample_url + '">go to</span>'
+        var countButton = $(btn_html); 
+        countButton.css('cursor','pointer');
+        leaf_node.append(countButton);
+        countButton.hide();
+        leaf_node.hover(function () {
+          countButton.show();
+        }, function () {
+          countButton.hide();
+        });
+      }
+    },
+    select: function(event, data) {
+      // Get a list of all selected nodes
+      var selectedNodes = data.tree.getSelectedNodes();
+      // ... and convert to a key array:
+      var selectedKeys = $.map(selectedNodes, function(node){
+        return (node.key.charAt(0).toLowerCase() == 'p') ? null : node.key.split('_')[0];
+      });
+      var query = ''
+      if (selectedKeys.length != 0) {
+        query = '?samples[]=' + selectedKeys.join('&samples[]=');
+      }
+      $('#json-download').attr('href', "{% url 'getJsonResults' %}" + query);
+      $('#csv-download').attr('href', "{% url 'getCsvResults' %}" + query);
+      $.ajax({
+        url: "{% url 'getTableData' %}",
+        type: 'POST',
+        //contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        data: JSON.stringify({
+          client_response: selectedKeys,
+          //csrfmiddlewaretoken: '{{ csrf_token }}' 
+        }),
+        success: function(result) {
+          if (result.aaData.length > 0) {
+            dataTable.fnClearTable();
+            dataTable.fnAddData(result.aaData);
+            dataTable.fnDraw();
+            //dataTable.columns.adjust().draw();
+          } else {
+            dataTable.fnClearTable();
+            dataTable.fnDraw();
+          }
+        },
+        error : function(xhr,errmsg,err) {
+          console.log(xhr.status + ": " + xhr.responseText);
+        },
+      });
+    },
+  }); // end of tree
+});
 </script>
 
 {% endblock %}

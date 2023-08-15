@@ -4,11 +4,14 @@
  * @param {*} options Options:
  * grain_info.image_height The height in pixels of the image
  * grain_info.image_width The width in pixels of the image
+ * grain_info.shift_x The x-difference in pixels of the Mica layers from the crystal layers
+ * grain_info.shift_y The y-difference in pixels of the Mica layers from the crystal layers
  * grain_info.scale_x Meters per pixel, if known
  * grain_info.images Array of URLs to the z-stack images
  * grain_info.marker_latlngs Array of marker positions
  * grain_info.rois Array of regions of interest, each of which is an array
- *   of vertex positions [x,y] in pixels
+ *   of vertex positions [lat,lng] (that is, [(height - y_pixels)/width,
+ *   x_pixels/width])
  * iconUrl_normal Url of marker image
  * iconUrl_selected Url of selected marker image
  * atoken CSRF token
@@ -26,19 +29,22 @@
  * roisLayer: The Leaflet layer containing the region polygons
  */
 function grain_view(options) {
+    // default tile size in Leaflet is 256x256
+    var TILE_SIZE = 256;
     var grain_info = options.grain_info;
     var mapZoom = 11;
-    var myIcon = L.Icon.extend({
+    var MarkerIcon = L.Icon.extend({
         options: {
-            //iconUrl: "{% static 'counting/images/circle.png' %}",
-            /* convert -size 81x81 xc:none -fill yellow -draw "circle 40,40 40,80" circle.png */
             iconSize: [6, 6],
             iconAnchor: [3, 3],
             popupAnchor: [0, 0]
         }
     });
-    var normalIcon = new myIcon({
+    var normalIcon = new MarkerIcon({
         iconUrl: options.iconUrl_normal
+    });
+    var selectedIcon = new MarkerIcon({
+        iconUrl: options.iconUrl_selected
     });
     function makeDeleter(map, markers) {
         var rect = L.rectangle([
@@ -52,9 +58,6 @@ function grain_view(options) {
             weight: 2,
             fill: false,
             clickable: true
-        });
-        var selectedIcon = new myIcon({
-            iconUrl: options.iconUrl_selected
         });
         var trash_mks_in = [];
         var oneCorner, twoCorner;
@@ -150,6 +153,7 @@ function grain_view(options) {
         var track_id = 0;
         var track_num = 0;
         var markers = {};
+        var dragged_out = false;
         return {
             makeDeleter: function() {
                 return makeDeleter(map, markers);
@@ -159,14 +163,42 @@ function grain_view(options) {
             // with the value as this new marker. This return
             // value can be passed into addToMap as is.
             make: function(latlng) {
-                var mk = new L.marker(latlng, {
+                var mks = {};
+                var mk;
+                var startLatLng = null;
+                mk = new L.marker(latlng, {
                     icon: normalIcon,
+                    draggable: true,
                     riseOnHover: true,
                     className: 'jhe-fissionTrack-' + track_id
                 }).on('click', function(e) {
-                    //need this to prevent event propagation
+                    e.preventDefault()
+                    e.stopPropagation()
+                }).on('dragstart', function(e) {
+                    dragged_out = false;
+                    startLatLng = e.target.getLatLng();
+                }).on('drag', function(e) {
+                    var out = dragged_out;
+                    dragged_out = !zStack.pointInRois(e.latlng.lat, e.latlng.lng);
+                    if (out) {
+                        if (!dragged_out) {
+                            mk.setOpacity(1)
+                        }
+                    } else if (dragged_out) {
+                        mk.setOpacity(0.5)
+                    }
+                }).on('dragend', function(e) {
+                    // delete if we are outside of the ROI
+                    if (dragged_out) {
+                        mk.setOpacity(1)
+                        mk.setLatLng(startLatLng);
+                        undo.withUndo(removeFromMap(mks));
+                    } else {
+                        // we already did this move, but we need to make it part of the
+                        // undo stack
+                        undo.withUndo(moveMarker(mk, startLatLng, e.target.getLatLng()));
+                    }
                 });
-                var mks = {};
                 mks[track_id] = mk;
                 track_id++;
                 return mks;
@@ -216,6 +248,40 @@ function grain_view(options) {
             }
         };
     }
+    /**
+     * Sets the position and zoom of the view so that the region(s)
+     * are as large as they can be in the window (with a little margin).
+     * fit_region_to_window(true) animates the zoom and pan, whereas
+     * fit_region_to_window(false) snaps it to the home position
+     * immediately.
+     */
+    var fit_region_to_window = function() {
+        var minx = Infinity, miny = Infinity;
+        var maxx = -Infinity, maxy = -Infinity;
+        grain_info.rois.forEach(function(roi) {
+            roi.forEach(function(v) {
+                minx = Math.min(minx, v[1]);
+                miny = Math.min(miny, v[0]);
+                maxx = Math.max(maxx, v[1]);
+                maxy = Math.max(maxy, v[0]);
+            });
+        });
+        var map_window = document.getElementById('map');
+        var scale_to_fit_height = map_window.clientHeight / (maxy - miny);
+        var scale_to_fit_width = map_window.clientWidth / (maxx - minx);
+        return function(animate) {
+            map.setView(
+                [
+                    (maxy + miny) / 2,
+                    (maxx + minx) / 2
+                ],
+                // multiplying by TILE_SIZE here feels wrong, but seems to produce
+                // decent results
+                L.CRS.zoom(Math.min(scale_to_fit_height, scale_to_fit_width) * TILE_SIZE),
+                { animate: animate }
+            );
+        }
+    }();
     var isEditable = false;
     var markers = null;
     var deleter = null;
@@ -226,8 +292,7 @@ function grain_view(options) {
             icon: 'fa-arrows-alt',
             tipText: 'fit images to window',
             action: function() {
-                var yox = grain_info.image_height / grain_info.image_width;
-                map.setView([yox / 2, 0.5], mapZoom);
+                fit_region_to_window(true);
             }
         },
         'undo': {
@@ -275,6 +340,8 @@ function grain_view(options) {
     function makeUndoStack() {
         var undoStack = [];
         var redoStack = [];
+        // length of undoStack when saved
+        var cleanState = 0;
         function execute(fromStack, toStack) {
             if (fromStack.length) {
                 var f = fromStack.pop();
@@ -306,7 +373,18 @@ function grain_view(options) {
                 redoStack = [];
                 updateUndoRedoButtons();
             },
-            updateButtons: updateUndoRedoButtons
+            updateButtons: updateUndoRedoButtons,
+            isClean: function() {
+                return cleanState == undoStack.length;
+            },
+            setClean: function() {
+                cleanState = undoStack.length;
+            },
+            reset: function() {
+                undoStack = [];
+                redoStack = [];
+                cleanState = 0;
+            }
         };
     }
     var undo = makeUndoStack();
@@ -353,6 +431,12 @@ function grain_view(options) {
         undo.withUndo(addToMap(mks));
     };
 
+    function moveMarker(mk, fromLatLng, toLatLng) {
+        mk.setLatLng(toLatLng);
+        return function() { return moveMarker(mk, toLatLng, fromLatLng); };
+    }
+
+
     function onMapClick(e) {
         L.DomEvent.preventDefault(e);
         L.DomEvent.stopPropagation(e);
@@ -361,24 +445,38 @@ function grain_view(options) {
         }
     };
 
-    function makeZStack(map, images, imageCount, yOverX, rois) {
+    function makeZStack(
+        map, images, imageCount, yOverX, rois
+    ) {
+        // Bounds elements are LatLng values, i.e. [y, x]
         var bounds = [
             [0.0, 0.0],
             [yOverX, 1.0]
         ];
         var imageOverlayers = new Array();
-        for (var i = 0; i < imageCount; i++) {
+        for (var i = 0; i < images.length; i++) {
             imageOverlayers[i] = new L.imageOverlay(
                 images[i], bounds
             ).addTo(map);
+            imageOverlayers[i].getElement().classList.add("image-crystal");
         }
-        var currentLayer = 0;
+        var layerCurrent = 0;
+        var layerRendered = 0;
+        // Try to ensure images are in the cache so appear instantly, unsure of a better solution
+        setTimeout(function() {
+            imageOverlayers.forEach(function(imageOverlay, i) {
+                if (imageOverlay && i !== layerRendered) {
+                    imageOverlay.removeFrom(map);
+                }
+            });
+        }, 1000);
         var rois_layer = L.polygon(rois, {
             color: 'white',
             opacity: 1.0,
             fill: false,
             clickable: true,
-            className: 'ftc-rect-select-area'
+            className: 'ftc-rect-select-area',
+            renderer: L.svg({ padding: 1.0 }), // Prevent SVG paths from being visibly clipped while dragging
         }).on('click', function(e) {
             L.DomEvent.preventDefault(e);
             L.DomEvent.stopPropagation(e);
@@ -405,25 +503,37 @@ function grain_view(options) {
             }
             return false;
         }
+        function add_current_layer() {
+            if (layerRendered < imageOverlayers.length) {
+                imageOverlayers[layerRendered].addTo(map);
+            }
+        }
+        function remove_current_layer() {
+            if (layerRendered < imageOverlayers.length) {
+                imageOverlayers[layerRendered].removeFrom(map);
+            }
+        }
         function refresh() {
-            imageOverlayers[currentLayer].bringToFront();
+            remove_current_layer();
+            layerRendered = layerCurrent;
+            add_current_layer();
         }
         refresh();
         return {
             set: function(position) {
-                currentLayer = position;
+                layerCurrent = position;
                 refresh();
             },
             position: function() {
-                return currentLayer;
+                return layerCurrent;
             },
             decrement: function() {
-                currentLayer = 0 < currentLayer? currentLayer - 1 : 0;
+                layerCurrent = 0 < layerCurrent? layerCurrent - 1 : 0;
                 refresh();
             },
             increment: function() {
-                var c = currentLayer + 1;
-                currentLayer = c < imageCount? c : imageCount - 1;
+                var c = layerCurrent + 1;
+                layerCurrent = c < imageCount? c : imageCount - 1;
                 refresh();
             },
             pointInRois: function(x, y) {
@@ -437,6 +547,8 @@ function grain_view(options) {
 
     var map = L.map('map', {
         center: [grain_info.image_height / grain_info.image_width / 2, 0.5],
+        zoomSnap: 0,
+        zoomDelta: 0.5,
         zoom: mapZoom,
         minZoom: mapZoom - 2,
         maxZoom: mapZoom + 3,
@@ -591,15 +703,20 @@ function grain_view(options) {
         ev.stopPropagation();
     };
 
-    var sliderNum = grain_info.images.length;
+    var sliderNum = Math.max(
+        grain_info.images.length,
+        2
+    );
     sliders2.updateOptions({
         range: {
             'min': 0,
             'max': sliderNum - 1
         }
     }, true);
-    var yox = grain_info.image_height / grain_info.image_width;
-    zStack = makeZStack(map, grain_info.images, sliderNum, yox, grain_info.rois);
+    var yOverX = grain_info.image_height / grain_info.image_width;
+    zStack = makeZStack(
+        map, grain_info.images, sliderNum, yOverX, grain_info.rois
+    );
     markers = makeMarkers(map);
     deleter = markers.makeDeleter();
     if ('marker_latlngs' in grain_info) {
@@ -608,15 +725,50 @@ function grain_view(options) {
             latlng = grain_info.marker_latlngs[i];
             createMarker(latlng);
         }
+        undo.reset();
     }
-    map.setView([yox / 2, 0.5], mapZoom);
+    fit_region_to_window(false);
 
     function setTrackCounterCallback(cb) {
         updateTrackCounter = function() {
             cb(markers.trackCount());
         };
         updateTrackCounter();
-    };
+    }
+
+    function doSave(url, go_to) {
+        var latlngs = markers.getLatLngs();
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', url);
+        xhr.onload = function() {
+            console.log('submitted: ' + xhr.responseText);
+            undo.setClean();
+            if (go_to) {
+                window.location = go_to;
+            }
+        };
+        xhr.onerror = function() {
+            console.log(xhr.status + ": " + xhr.responseText);
+            alert('Save failed, please try again.');
+        };
+        xhr.setRequestHeader('X-CSRFToken', options.atoken);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({
+            'sample_id': grain_info.sample_id,
+            'grain_num': grain_info.grain_num,
+            'ft_type': grain_info.ft_type,
+            'image_width': grain_info.image_width,
+            'image_height': grain_info.image_height,
+            'num_markers': latlngs.length,
+            'marker_latlngs': latlngs
+        }));
+    }
+
+    function saveTrackCount(url, go_to) {
+        if (confirm("Save the intermediate result to the server?")) {
+            doSave(url, go_to);
+        }
+    }
 
     return {
         setTrackCounterCallback: setTrackCounterCallback,
@@ -626,70 +778,32 @@ function grain_view(options) {
                 element.setRangeText(v, 0, 3, 'end');
             });
         },
-        submitTrackCount: function(upateUrl, newGrainUrl) {
-            if (confirm("submit the result?") == true) {
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', upateUrl);
-                xhr.onload = function() {
-                    console.log('submitted: ' + xhr.responseText);
-                    window.location.href = newGrainUrl;
-                };
-                xhr.onerror = function() {
-                    console.log(xhr.status + ": " + xhr.responseText);
-                };
-                xhr.setRequestHeader('X-CSRFToken', options.atoken);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.send(JSON.stringify({
-                    'counting_res': {
-                        'proj_id': grain_info.proj_id,
-                        'sample_id': grain_info.sample_id,
-                        'grain_num': grain_info.grain_num,
-                        'ft_type': grain_info.ft_type,
-                        'image_width': grain_info.image_width,
-                        'image_height': grain_info.image_height,
-                        'marker_latlngs': markers.getLatLngs(),
-                        'track_num': markers.trackCount()
-                    }
-                }));
+        submitTrackCount: function(update_url, new_grain_url) {
+            if (confirm("submit the result?")) {
+                doSave(update_url, new_grain_url);
             } else {
                 console.log("You pressed Cancel!");
             }
         },
-        saveTrackCount: function(saveUrl) {
-            if (confirm("Save the intermediate result to the server?") == true) {
-                var latlngs = markers.getLatLngs();
-                var xhr = new XMLHttpRequest();
-                xhr.open('POST', saveUrl);
-                xhr.onload = function() {
-                    console.log('submitted: ' + xhr.responseText);
-                };
-                xhr.onerror = function() {
-                    console.log(xhr.status + ": " + xhr.responseText);
-                    alert('Failed to save your intermediate result, Please try again.');
-                };
-                xhr.setRequestHeader('X-CSRFToken', options.atoken);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.send(JSON.stringify({
-                    'intermedia_res': {
-                        'proj_id': grain_info.proj_id,
-                        'sample_id': grain_info.sample_id,
-                        'grain_num': grain_info.grain_num,
-                        'ft_type': grain_info.ft_type,
-                        'image_width': grain_info.image_width,
-                        'image_height': grain_info.image_height,
-                        'num_markers': latlngs.length,
-                        'marker_latlngs': latlngs
-                    }
-                }));
+        saveTrackCount: saveTrackCount,
+        saveTrackCountIfNecessary: function(save_url, go_to) {
+            if (!undo.isClean()) {
+                saveTrackCount(save_url, go_to);
+            } else if (go_to) {
+                window.location = go_to;
+            }
+        },
+        cancelWithConfirm: function(go_to) {
+            if (undo.isClean() || confirm("Discard changes?")) {
+                window.location = go_to;
             }
         },
         restartTrackCount: function() {
-            if (confirm("Are you sure that you want to reset the counter for this grain?") == true) {
+            if (confirm("Are you sure that you want to reset the counter for this grain?")) {
                 if (!markers.empty()) {
                     undo.withUndo(removeAllFromMap());
                 }
-                var yox = grain_info.image_height / grain_info.image_width;
-                map.setView([yox / 2, 0.5], mapZoom);
+                fit_region_to_window(true);
             }
         },
         enableEditing: function() {
@@ -701,6 +815,9 @@ function grain_view(options) {
             undo.updateButtons();
         },
         map: map,
-        roisLayer: zStack.rois_layer
+        roisLayer: zStack.rois_layer,
+        resetUndo: function() {
+            undo.reset();
+        }
     }
 }

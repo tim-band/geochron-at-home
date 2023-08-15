@@ -4,7 +4,7 @@
 
 {% block head %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<link rel="stylesheet" href="{% static 'Leaflet-1.7.1/leaflet.css' %}" />
+<link rel="stylesheet" href="{% static 'Leaflet-1.9.3/leaflet.css' %}" />
 <link rel="stylesheet" href="{% static 'noUiSlider-14.6.3/nouislider.min.css' %}" />
 <style type="text/css">
 #map {
@@ -102,7 +102,7 @@ font-family: "ds-digitalitalic";
 }
 
 </style>
-<script src="{% static 'Leaflet-1.7.1/leaflet.js' %}"></script>
+<script src="{% static 'Leaflet-1.9.3/leaflet.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/jquery.mousewheel.js' %}"></script>
 <script type='text/javascript' src="{% static 'noUiSlider-14.6.3/nouislider.min.js' %}"></script>
@@ -117,27 +117,51 @@ function setup() {
     });
     map.setTrackCounterElement(document.getElementById('tracknum'));
     document.getElementById('tracknum-submit').onclick = function() {
-        map.submitTrackCount("{% url 'updateTFNResult'%}", "{% url 'counting' %}");
-    };
-    document.getElementById('tracknum-save').onclick = function() {
-        map.saveTrackCount("{% url 'saveWorkingGrain'%}");
+        var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
+        map.submitTrackCount("{% url 'updateTFNResult'%}", submit_url);
     };
     document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
+    var save = document.getElementById('tracknum-save');
+    if (save) {
+        save.onclick = function() {
+            map.saveTrackCount("{% url 'saveWorkingGrain'%}", null);
+        };
+    }
+    var prev_grain = document.getElementById('tracknum-previous');
+    if (prev_grain) {
+        prev_grain.onclick = function() {
+            map.saveTrackCountIfNecessary(
+                "{% url 'saveWorkingGrain'%}",
+                "{{prev_url}}"
+            );
+        };
+    }
+    var next_grain = document.getElementById('tracknum-next');
+    if (next_grain) {
+        next_grain.onclick = function() {
+            map.saveTrackCountIfNecessary(
+                "{% url 'saveWorkingGrain' %}",
+                "{{next_url}}"
+            );
+        };
+    }
+    var cancel = document.getElementById('tracknum-cancel');
+    if (cancel) {
+        cancel.onclick = function() {
+            map.cancelWithConfirm(
+                "{% url 'sample' sample_id %}"
+            );
+        };
+    }
+    map.resetUndo();
     map.enableEditing();
 }
 </script>
 {% endblock %}
 
 {% block left_nav_li %}{% endblock %}
-
 {% block right_nav_li %}{% endblock %}
-
-{% block right_nav_functon_li %}
-    {% if user.is_staff %}
-        <li class="divider"></li>
-        <li><a href="{%url 'report'%}"><i class="fa fa-cubes"></i>&nbsp;Manage your projects</a></li>
-    {% endif %}
-{% endblock %}
+{% block right_nav_fn_counting %}{% endblock %}
 
 {% block body_attributes %}onload='setup()'{% endblock %}
 
@@ -149,11 +173,20 @@ function setup() {
     <span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
   </button>
   <ul class="dropdown-menu">
-      {% if user.username != "guest"  %}
-      <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>&nbsp;save intermediate result</a></li>
-      {% endif %}
-    <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>&nbsp;submit result</a></li>
-    <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>&nbsp;restart counting</a></li>
+    {% if user.username != "guest"  %}
+    <li><a id="tracknum-save" href="#"><i class="fa fa-floppy-o"></i>save intermediate result</a></li>
+    {% endif %}
+    <li><a id="tracknum-submit" href="#"><i class="fa fa-cloud-upload"></i>submit result</a></li>
+    <li><a id="tracknum-restart" href="#"><i class="fa fa-th-list"></i>restart counting</a></li>
+    {% if cancel_url %}
+    <li><a id="tracknum-cancel" href="#"><i class="fa fa-eject"></i>cancel counting</a></li>
+    {% endif %}
+    {% if prev_url %}
+    <li><a id="tracknum-previous" href="#"><i class="fa fa-angle-left"></i>previous grain</a></li>
+    {% endif %}
+    {% if next_url %}
+    <li><a id="tracknum-next" href="#"><i class="fa fa-angle-right"></i>next grain</a></li>
+    {% endif %}
   </ul>
 </div>
 </div>

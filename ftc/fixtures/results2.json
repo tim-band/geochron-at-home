@@ -1,0 +1,62 @@
+[
+    {
+        "model": "ftc.fissiontracknumbering",
+        "pk": 4,
+        "fields": {
+            "grain": 1,
+            "ft_type": "S",
+            "worker": 101,
+            "result": 3,
+            "create_date": "2023-01-01",
+            "latlngs": "[[0.3,0.2],[0.9,0.1],[0.5,0.4]]"
+        }
+    },
+    {
+        "model": "ftc.fissiontracknumbering",
+        "pk": 5,
+        "fields": {
+            "grain": 2,
+            "ft_type": "S",
+            "worker": 101,
+            "result": 2,
+            "create_date": "2023-01-02",
+            "latlngs": "[[0.5,0.6],[0.6,0.7]]"
+        }
+    },
+    {
+        "model": "ftc.fissiontracknumbering",
+        "pk": 6,
+        "fields": {
+            "grain": 3,
+            "ft_type": "S",
+            "worker": 101,
+            "result": 2,
+            "create_date": "2023-01-02",
+            "latlngs": "[[0.53,0.63],[0.63,0.73]]"
+        }
+    },
+    {
+        "model": "ftc.fissiontracknumbering",
+        "pk": 7,
+        "fields": {
+            "grain": 4,
+            "ft_type": "S",
+            "worker": 101,
+            "result": 2,
+            "create_date": "2023-01-02",
+            "latlngs": "[[0.54,0.64],[0.64,0.74]]"
+        }
+    },
+    {
+        "model": "ftc.fissiontracknumbering",
+        "pk": 8,
+        "fields": {
+            "grain": 2,
+            "ft_type": "S",
+            "worker": 102,
+            "result": 3,
+            "create_date": "2023-02-01",
+            "latlngs": "[[0.32,0.22],[0.92,0.12],[0.52,0.42]]"
+        }
+    }
+]

@@ -1,34 +1,36 @@
 import os
 import json
-from ftc.models import Grain, Region, Vertex
+from ftc.models import Grain, Region, Vertex, Sample, Project
 
-def load_rois(project_name, sample_name, sample_property, grain_nth, ft_type):
-    grains = Grain.objects.filter(
-        index=grain_nth,
-        sample__sample_name=sample_name,
-        sample__in_project__project_name=project_name
-    )
-    grain = grains[0]
-
+def load_rois(grain, ft_type, matrix):
     w = grain.image_width
     h = grain.image_height
-
+    shift_x = 0
+    shift_y = 0
+    if ft_type == 'I':
+        if grain.shift_x:
+            shift_x = grain.shift_x / w
+        if grain.shift_y:
+            shift_y = grain.shift_y / w
     rois = list()
     for index, item in enumerate(grain.region_set.all()):
-        coords = item.vertex_set.order_by('id')
+        vertices = item.vertex_set.order_by('id')
         latlng = list()
         # only 'Induced Fission Tracks' will shift coordinates
         # positive sx or sy mean move along the image positive axis directions
-        if ft_type == 'I':
-            for coord in coords:
-                x = w - (float(coord.x) + item.shift_x)
-                y = float(coord.y) + item.shift_y
-                latlng.append([(h-y)/w, x/w])
-        else:
-            for coord in coords:
-                x = float(coord.x)
-                y = float(coord.y)
-                latlng.append([(h-y)/w, x/w])
+        #TODO: combine this logic with similar in ftc.views.MicaDetailView
+        for vertex in vertices:
+            lat = (h - vertex.y) / w
+            lng = vertex.x / w
+            if ft_type == 'I':
+                if matrix:
+                    x = lng - 0.5
+                    y = lat - 0.5
+                    lng = 0.5 + x * matrix.x0 + y * matrix.y0
+                    lat = 0.5 + x * matrix.x1 + y * matrix.y1
+                else:
+                    lng = 1 - lng
+            latlng.append([lat + shift_y, lng + shift_x])
         if len(latlng) < 1:
             return None
         else:
@@ -42,26 +44,46 @@ def indent(spaces, text):
 def rois_vertex(vertex):
     return [vertex.x, vertex.y]
 
-def rois_region(region):
-    vertices = Vertex.objects.filter(region=region).order_by('id')
+def rois_region(region, grain):
+    vertices = region.vertex_set.order_by('id')
     return {
-        "shift": [region.shift_x, region.shift_y],
-        "vertices": map(rois_vertex, vertices)
+        "shift": [grain.shift_x, grain.shift_y],
+        "vertices": list(map(rois_vertex, vertices))
     }
+
+def transform2d_as_matrix(transform):
+    if not transform:
+        return None
+    return [
+        [ transform.x0, transform.y0, transform.t0 ],
+        [ transform.x1, transform.y1, transform.t1 ]
+    ]
 
 def get_rois(grain):
     """
     Returns a python object that represents ROIs (and other
     metadata) about the Grain.
     """
-    regions = Region.objects.filter(grain=grain)
-    rjs = map(rois_region, regions)
     return {
+        "grain_id": grain.id,
         "image_width": grain.image_width,
         "image_height": grain.image_height,
         "scale_x": grain.scale_x,
         "scale_y": grain.scale_y,
         "stage_x": grain.stage_x,
         "stage_y": grain.stage_y,
-        "regions": rjs
+        "mica_stage_x": grain.mica_stage_x,
+        "mica_stage_y": grain.mica_stage_y,
+        "regions": list([
+            rois_region(region, grain)
+            for region in grain.region_set.all()
+        ]),
+        "mica_transform_matrix": transform2d_as_matrix(
+            grain.mica_transform_matrix
+        )
     }
+
+def get_roiss(grains):
+    return list([
+        get_rois(grain) for grain in grains
+    ])

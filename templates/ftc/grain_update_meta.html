@@ -1,0 +1,22 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block content %}
+
+<h1> Grain <strong>{{ object.index }}</strong>
+    of sample <a href="{% url 'sample' object.sample_id %}">{{ object.sample.sample_name }}</href>
+</h1>
+<div><a href="{% url 'grain_images' object.pk %}">Cancel</a></div>
+<div>
+    <form action="{% url 'grain_update_meta' object.pk %}" method="POST">
+        {% csrf_token %}
+        <table>
+            {{ form.as_table }}
+        </table>
+        <input type="submit" value="Save">
+    </form>
+</div>
+
+{% endblock %}
+

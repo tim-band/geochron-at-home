@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 import argparse
-import base64
+import csv
 from getpass import getpass
-from html.parser import HTMLParser
 import json
 import os.path
 import re
@@ -11,6 +10,169 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode, quote
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
+
+
+def parse_metadata_file(metadata, floats={}, texts={}):
+    root = ET.parse(metadata).getroot()
+    out = {}
+    for k,v in floats.items():
+        out[k] = float(root.find(v).text)
+    for k,v in texts.items():
+        out[k] = root.find(v).text
+    return out
+
+
+def parse_metadata_grain(metadata):
+    """
+    Loads and parses a Zeiss metadata file (so an image x.jpg might have
+    a metadata file x.jpg_metadata.xml), returning a dict with the following
+    (grain-specific) elements (any of which could be none):
+    'image_width': Image width in pixels.
+    'image_height': Image height in pixels.
+    'scale_x': width of a pixel in millimeters.
+    'scale_y': height of a pixel in millimeters.
+    'stage_x': stage X position in millimeters.
+    'stage_y': stage Y position in millimeters.
+
+    `metadata` is a filename or file object.
+    """
+    xpaths_float = {
+        'image_width': "Information/Image/SizeX",
+        'image_height': "Information/Image/SizeY",
+        'scale_x': "Scaling/Items/Distance[@Id='X']/Value",
+        'scale_y': "Scaling/Items/Distance[@Id='Y']/Value",
+        'stage_x': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisX']/Position",
+        'stage_y': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisY']/Position",
+    }
+    return parse_metadata_file(metadata, xpaths_float)
+
+
+def parse_mica_metadata_grain(metadata):
+    """
+    Loads and parses a Zeiss metadata file for a mica image
+    'stage_x': stage X position in millimeters.
+    'stage_y': stage Y position in millimeters.
+
+    `metadata` is a filename or file object.
+    """
+    xpaths_float = {
+        'mica_stage_x': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisX']/Position",
+        'mica_stage_y': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisY']/Position",
+    }
+    return parse_metadata_file(metadata, xpaths_float)
+
+
+def rlTlSwitchTranslate(lp):
+    if lp == 'RLTLSwitch.RL':
+        return 'R'
+    if lp == 'RLTLSwitch.TL':
+        return 'T'
+    return None
+
+
+def parse_metadata_image(metadata):
+    """
+    Loads and parses a Zeiss metadata file (so an image x.jpg might have
+    a metadata file x.jpg_metadata.xml), returning a dict with the following
+    (image-specific) elements (any of which could be none):
+
+    'light_path': 'R' or 'T' depending on whether the image was taken using
+    reflected or transmitted light.
+    'focus': focus (Z) position in millimeters.
+
+    `metadata` is a filename or file object.
+    """
+    xpath_text = {
+        'light_path': "HardwareSetting/ParameterCollection[@Id='MTBRLTLSwitch']/PositionName"
+    }
+    xpaths_float = {
+        'focus': "HardwareSetting/ParameterCollection[@Id='MTBFocus']/Position"
+    }
+    out = parse_metadata_file(metadata, xpaths_float, xpath_text)
+    out['light_path'] = rlTlSwitchTranslate(out['light_path'])
+    return out
+
+
+def parse_transformation(transformation):
+    r = []
+    with open(transformation, encoding='utf-8-sig') as h:
+        rows = csv.DictReader(h)
+        xh = 'x' if 'x' in rows.fieldnames else 'x::x'
+        yh = 'y' if 'y' in rows.fieldnames else 'y::y'
+        th = 't' if 't' in rows.fieldnames else 't::t'
+        for row in rows:
+            x = row[xh]
+            if x != '':
+                r.append([float(x), float(row[yh]), float(row[th])])
+    if len(r) == 2:
+        return r
+    raise Exception(
+        "File {0} does not seem to be a transformation file".format(
+            transformation
+        )
+    )
+
+
+def generate_rois_file(dir, metadata, mica_metadata, transformation):
+    vs = parse_metadata_grain(metadata)
+    if mica_metadata:
+        mmd = parse_mica_metadata_grain(mica_metadata)
+        vs.update(mmd)
+    if transformation:
+        vs['mica_transform'] = parse_transformation(transformation)
+    w = vs['image_width']
+    h = vs['image_height']
+    fname = os.path.join(dir, 'rois.json')
+    x1 = int(w * 0.1)
+    x2 = int(w * 0.9)
+    y1 = int(h * 0.1)
+    y2 = int(h * 0.9)
+    vs['regions'] = [{
+        'vertices': [[x1, y1], [x1, y2], [x2, y2], [x2, y1]],
+        'shift': [0,0]
+    }]
+    with open(fname, 'w') as h:
+        json.dump(vs, h)
+    return fname
+
+
+def generate_roiss(opts, config):
+    # Find all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files
+    meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
+    mica_meta_re = re.compile(r'Mica(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
+    matrix_name = 'mica_matrix.csv'
+    metadata_by_dir = {}
+    for root, dirs, files in os.walk(opts.path):
+        metas = [
+            os.path.join(root, f)
+            for f in files
+            if meta_re.fullmatch(f)
+        ]
+        mica_metas = [
+            os.path.join(root, f)
+            for f in files
+            if mica_meta_re.fullmatch(f)
+        ]
+        trans = os.path.join(root, matrix_name) if matrix_name in files else None
+        if (opts.overwrite or 'rois.json' not in files):
+            available = {
+                'mica_transformation': trans
+            }
+            if mica_metas:
+                available['mica_metadata']: mica_metas[0]
+            if metas:
+                available['metadata'] = metas[0]
+                metadata_by_dir[root] = available
+    for d,m in metadata_by_dir.items():
+        print(d)
+        print(m)
+        r = generate_rois_file(
+            d,
+            m.get('metadata'),
+            m.get('mica_metadata'),
+            m.get('transformation')
+        )
+        print('wrote {0}'.format(r))
 
 
 def get_values(d, ks):
@@ -43,6 +205,24 @@ def add_set_subparser(subparsers):
     set_parser.set_defaults(func=set_config)
     set_parser.add_argument('key', help="name of the config setting to set, for example 'url'")
     set_parser.add_argument('value', help="value of the config setting to set")
+
+
+def get_config(opts, config):
+    if opts.key:
+        print(config[opts.key])
+    else:
+        for (k, v) in config.items():
+            if k not in ['refresh', 'access']:
+                print("{0}: {1}".format(k, v))
+
+
+def add_get_subparser(subparsers):
+    set_parser = subparsers.add_parser('get')
+    set_parser.set_defaults(func=get_config)
+    set_parser.add_argument(
+        '--key',
+        help="name of the config setting to get, for example 'url'; the default is all of them except JWT tokens"
+    )
 
 
 def refresh_token(config):
@@ -118,6 +298,11 @@ def add_login_subparser(subparsers):
     login_parser.add_argument('--user', help='name of the user to log in as')
 
 
+def add_headers(req, config):
+    req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
+    req.add_header('Accept', 'application/json')
+
+
 def api_verb(verb, config, *args, **kwargs):
     url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args))
     if kwargs:
@@ -125,7 +310,7 @@ def api_verb(verb, config, *args, **kwargs):
     else:
         url += '/'
     req = Request(url, method=verb)
-    req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
+    add_headers(req, config)
     return urlopen(req)
 
 
@@ -137,7 +322,7 @@ def api_post(config, *args, **kwargs):
     url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args)) + '/'
     data = urlencode(kwargs)
     req = Request(url, data=data.encode('ascii'), method='POST')
-    req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
+    add_headers(req, config)
     return urlopen(req)
 
 
@@ -211,6 +396,26 @@ def project_new(opts, config):
     with api_post(config, 'project', **o) as response:
         print(response.read())
 
+def add_json_options(parser, id_help):
+    parser.add_argument('id', help=id_help, type=int)
+    parser.add_argument(
+        '--file',
+        help='output file (default standard out)',
+        type=argparse.FileType('w', encoding='utf-8'),
+        default=sys.stdout
+    )
+    parser.add_argument(
+        '--indent',
+        help='how many spaces to use as the indent (default 2)',
+        type=int,
+        default=2
+    )
+    parser.add_argument(
+        '--compact',
+        help='use compact representation',
+        action='store_true'
+    )
+
 
 def add_project_subparser(subparsers):
     # project has verbs list, info, new, update and delete
@@ -241,6 +446,9 @@ def add_project_subparser(subparsers):
         help='This project will not be shown to counters',
         action='store_true',
     )
+    rois = verbs.add_parser('rois', help='download a ROI file for the grains in a project')
+    rois.set_defaults(func=project_rois_download)
+    add_json_options(rois, 'project ID')
 
 
 @token_refresh
@@ -267,7 +475,12 @@ def sample_new(opts, config):
         'priority',
         'min_contributor_num'
     ])) as response:
-        print(response.read())
+        result = json.loads(response.read())
+        if 'id' in result:
+            id = result['id']
+            print('Created new sample with ID: {0}'.format(id))
+            return id
+        return None
 
 
 @token_refresh
@@ -275,6 +488,19 @@ def sample_info(opts, config):
     with api_get(config, 'sample', opts.id) as response:
         body = response.read()
         print(body)
+
+
+@token_refresh
+def sample_upload(opts, config):
+    if opts.sample_name == None:
+        (dir0, name) = os.path.split(opts.dir)
+        if name == '':
+            (dir1, name) = os.path.split(dir0)
+        bad_char = re.compile(r'[^0-9a-zA-Z_\- #/\(\):@]')
+        opts.sample_name = re.sub(bad_char, '_', name)
+    id = sample_new(opts, config)
+    opts.sample = id
+    grain_upload(opts, config)
 
 
 def add_sample_subparser(subparsers):
@@ -318,6 +544,51 @@ def add_sample_subparser(subparsers):
         default=1,
         type=int
     )
+    upload = verbs.add_parser('upload', help='create a new sample (uploading grains from a directory)')
+    upload.set_defaults(func=sample_upload)
+    upload.add_argument(
+        '-k',
+        '--keep-going',
+        dest='keepgoing',
+        action='store_true',
+        help='keep going if some grains cannot be uploaded'
+    )
+    upload.add_argument(
+        '--sample_name',
+        dest='sample_name',
+        metavar='name',
+        help='Sample name (default is to use the directory name)',
+    )
+    upload.add_argument(
+        'in_project',
+        metavar='project_id',
+        help='Numeric project ID the sample is part of'
+    )
+    upload.add_argument(
+        'sample_property',
+        metavar='property',
+        help='[T]est Sample, [A]ge Standard Sample, or [D]osimeter Sample',
+        choices=['T', 'A', 'D'],
+    )
+    upload.add_argument(
+        'priority',
+        help='Priority in showing the sample to the user (higher number means users will see it earlier)',
+        default=0,
+        type=int
+    )
+    upload.add_argument(
+        'min_contributor_num',
+        help='Number of user contributions required',
+        default=1,
+        type=int
+    )
+    upload.add_argument(
+        'dir',
+        help='Directory containing the grains'
+    )
+    rois = verbs.add_parser('rois', help='download a ROI file for the grains in a sample')
+    rois.set_defaults(func=sample_rois_download)
+    add_json_options(rois, 'sample ID')
 
 
 @token_refresh
@@ -346,13 +617,36 @@ def grain_new(opts, config):
         return id
 
 
+def output_json(opts, object):
+    v = json.loads(object)
+    indent = None if opts.compact else opts.indent
+    print(json.dumps(v, indent=indent), file=options.file)
+
+
+@token_refresh
+def project_rois_download(opts, config):
+    with api_get(
+        config,
+        'rois',
+        **{ 'project[]': opts.id }
+    ) as response:
+        output_json(opts, response.read())
+
+
+@token_refresh
+def sample_rois_download(opts, config):
+    with api_get(
+        config,
+        'rois',
+        **{ 'sample[]': opts.id }
+    ) as response:
+        output_json(opts, response.read())
+
+
 @token_refresh
 def grain_rois_download(opts, config):
     with api_get(config, 'grain', opts.id, 'rois') as response:
-        body = response.read()
-        v = json.loads(body)
-        indent = None if opts.compact else opts.indent
-        print(json.dumps(v, indent=indent), file=options.file)
+        output_json(opts, response.read())
 
 
 @token_refresh
@@ -370,7 +664,6 @@ def grain_info(opts, config):
             v.get('scale_x'), v.get('scale_y'),
             v.get('stage_x'), v.get('stage_y'),
         ))
-
 
 def add_grain_subparser(subparsers):
     grain_parser = subparsers.add_parser('grain', help='operations on grains')
@@ -410,24 +703,7 @@ def add_grain_subparser(subparsers):
     info.add_argument('id', help='grain ID', type=int)
     rois = verbs.add_parser('rois', help='download a ROI file for a grain')
     rois.set_defaults(func=grain_rois_download)
-    rois.add_argument('id', help='grain ID', type=int)
-    rois.add_argument(
-        '--file',
-        help='o,utput file (default standard out)',
-        type=argparse.FileType('w', encoding='utf-8'),
-        default=sys.stdout
-    )
-    rois.add_argument(
-        '--indent',
-        help='how many spaces to use as the indent (default 2)',
-        type=int,
-        default=2
-    )
-    rois.add_argument(
-        '--compact',
-        help='use compact representation',
-        action='store_true'
-    )
+    add_json_options(rois, 'grain ID')
 
 
 @token_refresh
@@ -646,83 +922,6 @@ def add_count_subparser(subparsers):
     list_counts.add_argument('--grain', help='only report the grain with this index')
 
 
-def parse_metadata_file(metadata, floats={}, texts={}):
-    root = ET.parse(metadata).getroot()
-    out = {}
-    for k,v in floats.items():
-        out[k] = float(root.find(v).text)
-    for k,v in texts.items():
-        out[k] = root.find(v).text
-    return out
-
-
-def parse_metadata_grain(metadata):
-    xpaths_float = {
-        'image_width': "Information/Image/SizeX",
-        'image_height': "Information/Image/SizeY",
-        'scale_x': "Scaling/Items/Distance[@Id='X']/Value",
-        'scale_y': "Scaling/Items/Distance[@Id='Y']/Value",
-        'stage_x': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisX']/Position",
-        'stage_y': "HardwareSetting/ParameterCollection[@Id='MTBStageAxisY']/Position",
-    }
-    return parse_metadata_file(metadata, xpaths_float)
-
-
-def rlTlSwitchTranslate(lp):
-    if lp == 'RLTLSwitch.RL':
-        return 'R'
-    if lp == 'RLTLSwitch.TL':
-        return 'T'
-    return None
-
-
-def parse_metadata_image(metadata):
-    xpath_text = {
-        'light_path': "HardwareSetting/ParameterCollection[@Id='MTBRLTLSwitch']/PositionName"
-    }
-    xpaths_float = {
-        'focus': "HardwareSetting/ParameterCollection[@Id='MTBFocus']/Position"
-    }
-    out = parse_metadata_file(metadata, xpaths_float, xpath_text)
-    out['light_path'] = rlTlSwitchTranslate(out['light_path'])
-    return out
-
-
-def generate_rois_file(dir, metadata):
-    vs = parse_metadata_grain(metadata)
-    w = vs['image_width']
-    h = vs['image_height']
-    fname = os.path.join(dir, 'rois.json')
-    x1 = int(w * 0.1)
-    x2 = int(w * 0.9)
-    y1 = int(h * 0.1)
-    y2 = int(h * 0.9)
-    vs['regions'] = [{
-        'vertices': [[x1, y1], [x1, y2], [x2, y2], [x2, y1]],
-        'shift': [0,0]
-    }]
-    with open(fname, 'w') as h:
-        json.dump(vs, h)
-    return fname
-
-
-def generate_roiss(opts, config):
-    # Find all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files
-    meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
-    metadata_by_dir = {}
-    for root, dirs, files in os.walk(opts.path):
-        metas = [
-            os.path.join(root, f)
-            for f in files
-            if meta_re.fullmatch(f)
-        ]
-        if metas and (opts.overwrite or 'rois.json' not in files):
-            metadata_by_dir[root] = metas[0]
-    for d,m in metadata_by_dir.items():
-        r = generate_rois_file(d, m)
-        print('wrote {0}'.format(r))
-
-
 def add_genrois_subparser(subparsers):
     parser = subparsers.add_parser(
         'genrois',
@@ -740,72 +939,76 @@ def add_genrois_subparser(subparsers):
     parser.set_defaults(func=generate_roiss)
 
 
-class ExceptionExtractor(HTMLParser):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.levels = 0
+def parse_argv():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-c',
+        '--config',
+        help='configuration file',
+        default='gah.config',
+        dest='config',
+        metavar='FILE'
+    )
+    parser.set_defaults(func=None)
+    subparsers = parser.add_subparsers(dest='command')
+    subparsers.required = True
+    add_set_subparser(subparsers)
+    add_get_subparser(subparsers)
+    add_login_subparser(subparsers)
+    add_project_subparser(subparsers)
+    add_sample_subparser(subparsers)
+    add_grain_subparser(subparsers)
+    add_image_subparser(subparsers)
+    add_count_subparser(subparsers)
+    add_genrois_subparser(subparsers)
+    return parser.parse_args()
 
-    def handle_starttag(self, tag, attrs):
-        if self.levels != 0 or ('class', 'exception_value') in attrs:
-            self.levels += 1
+def open_config(options):
+    config_mode = os.path.exists(options.config) and 'r+' or 'w+'
+    return open(options.config, config_mode)
 
-    def handle_endtag(self, tag):
-        if self.levels != 0:
-            self.levels -= 1
+def load_config(config_fh, options):
+    config_file = config_fh.read()
+    if len(config_file) == 0:
+        return {}
+    return json.loads(config_file)
 
-    def handle_data(self, data):
-        if self.levels != 0:
-            print(data)                
+def save_config(config_fh, config):
+    if config:
+        config_fh.seek(0)
+        json.dump(config, config_fh)
+        config_fh.truncate()
 
+def render_json(j, indent=''):
+    if type(j) is list:
+        new_indent = indent + '- '
+        for item in j:
+            render_json(item, new_indent)
+    elif type(j) is dict:
+        new_indent = indent + '  '
+        for k, v in j.items():
+            print('{0}{1}:'.format(indent, k))
+            render_json(v, new_indent)
+    else:
+        print('{0}{1}'.format(indent, j))
 
-usage = "usage: %prog -s SETTINGS | --settings=SETTINGS"
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    '-c',
-    '--config',
-    help='configuration file',
-    default='gah.config',
-    dest='config',
-    metavar='FILE'
-)
-parser.set_defaults(func=None)
-subparsers = parser.add_subparsers(dest='command')
-subparsers.required = True
-add_set_subparser(subparsers)
-add_login_subparser(subparsers)
-add_project_subparser(subparsers)
-add_sample_subparser(subparsers)
-add_grain_subparser(subparsers)
-add_image_subparser(subparsers)
-add_count_subparser(subparsers)
-add_genrois_subparser(subparsers)
+def perform_action(options):
+    config_fh = open_config(options)
+    config = load_config(config_fh, options)
+    try:
+        config_altered = options.func(options, config)
+        save_config(config_fh, config_altered)
+        config_fh.close()
+    except HTTPError as e:
+        print("Failed (with HTTP code {0}: {1})".format(e.code, e.reason))
+        body = e.read().decode()
+        try:
+            j = json.loads(body)
+            render_json(j)
+        except:
+            print(body)
+        exit(1)
 
-options = parser.parse_args()
-
-#if options.func is None:
-#    print(options)
-#    parser.print_help()
-#    exit(0)
-
-config_mode = os.path.exists(options.config) and 'r+' or 'w+'
-config_fh = open(options.config, config_mode)
-config_file = config_fh.read()
-config = {}
-if len(config_file) != 0:
-    config = json.loads(config_file)
-
-# Actually perform the action!
-try:
-    config_altered = options.func(options, config)
-except HTTPError as e:
-    print("Failed (with HTTP code {0}: {1})".format(e.code, e.reason))
-    body = e.read().decode()
-    ExceptionExtractor().feed(body)
-    exit(1)
-
-if config_altered:
-    config_fh.seek(0)
-    json.dump(config_altered, config_fh)
-    config_fh.truncate()
-
-config_fh.close()
+if __name__ == '__main__':
+    options = parse_argv()
+    perform_action(options)

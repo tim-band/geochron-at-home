@@ -2,17 +2,36 @@
 
 {% load static %}
 
+{% block right_nav_fn_edit %}
+{% endblock %}
+
 {% block content %}
 
 <h1>Projects</h1>
 
 <a id="create-project" href="{% url 'project_create' %}">Create new project</a>
 
-<ul>
+<table class="table no-stretch">
+  <thead>
+    <tr>
+      <th>Project</th>
+      <th>Download ROIs</th>
+    </tr>
+  </thead>
+  <tbody id="project-list">
     {% for p in projects %}
-    <li><a href="{% url 'project' p.pk %}">{{ p.project_name }}</a></li>
+    <tr>
+      <td><a href="{% url 'project' p.pk %}">{{ p.project_name }}</a></td>
+      <td><a
+        id="download-roiss"
+        href="{% url 'download_roiss' %}?projects[]={{ p.pk }}"
+        download="roiss.json"
+        >Download ROIs</a>
+      </td>
+    </tr>
     {% endfor %}
-</ul>
+  </tbody>
+</table>
 
 {% endblock %}
 

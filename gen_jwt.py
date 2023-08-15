@@ -6,6 +6,6 @@
 # to add new ones back in.
 import rsa
 (pubkey, prikey) = rsa.newkeys(4096)
-pub = pubkey.save_pkcs1().decode('ascii').replace('\n', '')
-pri = prikey.save_pkcs1().decode('ascii').replace('\n', '')
-print("JWT_PUBLIC_KEY={0}\nJWT_PRIVATE_KEY={1}".format(pub, pri))
+pub = pubkey.save_pkcs1('PEM').decode('ascii')
+pri = prikey.save_pkcs1('PEM').decode('ascii')
+print('JWT_PUBLIC_KEY="{0}"\nJWT_PRIVATE_KEY="{1}"\n'.format(pub, pri))

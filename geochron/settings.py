@@ -25,20 +25,13 @@ DEBUG = os.getenv('DJANGO_DEBUG') not in ['0', 'false', 'False', 'FALSE', 'no', 
 
 TEMPLATE_DEBUG = DEBUG
 
-allowed_hosts = os.getenv('ALLOWED_HOSTS') or '127.0.0.1,localhost'
+allowed_hosts = os.getenv('ALLOWED_HOSTS') or '127.0.0.1,localhost,testserver'
 ALLOWED_HOSTS = allowed_hosts.split(',')
 
 sslOnly = os.getenv('SSL_ONLY') in ['1', 'true', 'True', 'TRUE']
 SECURE_SSL_REDIRECT = sslOnly
 SESSION_COOKIE_SECURE = sslOnly
 CSRF_COOKIE_SECURE = sslOnly
-
-def add_newlines_to_pem(x):
-    if x == None:
-        return None
-    return x.replace(
-        'KEY-----', 'KEY-----\n').replace(
-            '-----END', '\n-----END')
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
@@ -48,8 +41,8 @@ SIMPLE_JWT = {
     'UPDATE_LAST_LOGIN': False,
 
     'ALGORITHM': 'RS256',
-    'SIGNING_KEY': add_newlines_to_pem(os.getenv('JWT_PRIVATE_KEY')),
-    'VERIFYING_KEY': add_newlines_to_pem(os.getenv('JWT_PUBLIC_KEY')),
+    'SIGNING_KEY': os.getenv('JWT_PRIVATE_KEY'),
+    'VERIFYING_KEY': os.getenv('JWT_PUBLIC_KEY'),
     'AUDIENCE': None,
     'ISSUER': None,
 
@@ -71,7 +64,8 @@ SIMPLE_JWT = {
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ]
+    ],
+    'EXCEPTION_HANDLER': 'ftc.apiviews.explicit_exception_handler'
 }
 
 # Application definition
@@ -146,10 +140,11 @@ DATABASES = {
     'default': {
         'ENGINE': 'django_prometheus.db.backends.postgresql',
         'NAME': os.getenv('POSTGRES_DB'),
+        #'NAME': 'test_geochron',  # use this to dump test data!
         'USER': os.getenv('POSTGRES_USER'),
         'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
         'HOST': os.getenv('DB_HOST'),
-        'PORT': '5432',
+        'PORT': int(os.getenv('DB_PORT') or 5432),
     }
 }
 
@@ -171,7 +166,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = os.getenv('STATIC_URL') or 'static/'
-STATIC_ROOT = os.getenv('STATIC_ROOT') or 'static'
+www_root = os.getenv('WWW_ROOT')
+static_path = [www_root] if www_root else []
+static_path.append('static')
+STATIC_ROOT = os.getenv('STATIC_ROOT') or os.path.join(*static_path)
 STATICFILES_DIRS = [
   os.path.join(BASE_DIR, 'vendor'),
 ]
@@ -244,6 +242,7 @@ LOGGING = {
     'root': {
         'handlers': ['console'],
         'level': 'INFO',
+#        'level': 'DEBUG',  # use this to see HTTP requests and responses
     },
 }
 

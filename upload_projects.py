@@ -1,21 +1,21 @@
 import os, sys, shutil
 from optparse import OptionParser
 from django.db import transaction
-from ftc.parse_image_name import parse_image_name
+from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
 import json
 
 
 def copyimages(src, grain):
     for n in sorted(os.listdir(src)):
-        v = parse_image_name(n)
+        v = parse_upload_name(n)
         srcname = os.path.join(src, n)
-        if os.path.isfile(srcname) and v != None:
+        if os.path.isfile(srcname) and v != None and v['is_image']:
             with open(srcname, mode='rb') as f:
                 Image(
                     grain=grain,
                     format=v['format'],
-                    ft_type='S',
+                    ft_type=v['ft_type'],
                     index=v['index'],
                     data=f.read()
                 ).save()
@@ -28,6 +28,19 @@ def creategrain(src, sample, grain_nth):
     with open(p, mode='r') as j:
         print(p)
         rois = json.load(j)
+    region_first = rois['regions'][0]
+    transform = None
+    rois_transform = rois.get('mica_transform')
+    if rois_transform and type(rois_transform) is list and len(rois_transform) == 2:
+        tranform = Transform2D(
+            x0=rois_transform[0][0],
+            y0=rois_transform[0][1],
+            t0=rois_transform[0][2],
+            x1=rois_transform[1][0],
+            y1=rois_transform[1][1],
+            t1=rois_transform[1][2]
+        )
+        transform.save()
     g = Grain(
         sample=sample,
         index=grain_nth,
@@ -37,6 +50,11 @@ def creategrain(src, sample, grain_nth):
         scale_y=rois.get('scale_y'),
         stage_x=rois.get('stage_x'),
         stage_y=rois.get('stage_y'),
+        mica_stage_x=rois.get('stage_x'),
+        mica_stage_y=rois.get('stage_y'),
+        shift_x=region_first['shift'][0] if region_first else 0,
+        shift_y=region_first['shift'][1] if region_first else 0,
+        mica_transform_matrix=transform
     )
     g.save()
     save_rois_regions(rois, g)
@@ -46,7 +64,6 @@ def creategrain(src, sample, grain_nth):
 def copygrains(src, sample):
     # create sample
     folders = next(os.walk(src))[1]
-    total_grain = 0
     names = sorted(os.listdir(src))
     for name in names:
         try:
@@ -57,8 +74,6 @@ def copygrains(src, sample):
         if os.path.isdir(srcname) and name[0:5] == 'Grain':
             grain = creategrain(srcname, sample, grain_nth)
             copyimages(srcname, grain)
-            total_grain += 1
-    sample.total_grains = total_grain
     sample.save()
 
 
@@ -68,7 +83,7 @@ def copysamples(src, project):
         srcname = os.path.join(src, name)
         if os.path.isdir(srcname):
             sample = project.sample_set.create(sample_name=name,
-                sample_property='T', total_grains=0, completed=False)
+                sample_property='T', completed=False)
             copygrains(srcname, sample)
 
 
@@ -104,7 +119,7 @@ import django
 django.setup()
 
 from django.contrib.auth.models import User
-from ftc.models import Project, Sample, Grain, Image
+from ftc.models import Project, Sample, Grain, Image, Transform2D
 
 # get user id based on username
 input_source_path = options.input or '/code/user_upload/'
