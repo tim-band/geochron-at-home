@@ -1,4 +1,7 @@
 from django.contrib.auth.models import User
+from django.core.exceptions import (
+    ObjectDoesNotExist, MultipleObjectsReturned
+)
 from django.db.models.aggregates import Max
 import json
 import logging
@@ -92,6 +95,23 @@ class ProjectInfoView(RetrieveUpdateDeleteView):
     serializer_class = ProjectSerializer
 
 
+class ProjectField(serializers.PrimaryKeyRelatedField):
+    def get_queryset(self):
+        return Project.objects.all()
+
+    def to_internal_value(self, data):
+        if data.isnumeric():
+            return super().to_internal_value(data)
+        try:
+            return self.get_queryset().get(project_name__iexact=data)
+        except ObjectDoesNotExist:
+            self.fail('does_not_exist', name=data)
+        except MultipleObjectsReturned:
+            self.fail('multiple_projects_match', name=data)
+        except (TypeError, ValueError):
+            self.fail('incorrect_type', data_type=type(data).__name__)
+
+
 class SampleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sample
@@ -99,6 +119,7 @@ class SampleSerializer(serializers.ModelSerializer):
             'priority', 'min_contributor_num', 'completed']
 
     completed = serializers.BooleanField(required=False, read_only=True)
+    in_project = ProjectField()
 
 
 class SampleListView(ListCreateView):

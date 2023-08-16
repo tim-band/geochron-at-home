@@ -113,7 +113,7 @@ def parse_transformation(transformation):
     )
 
 
-def generate_rois_file(dir, metadata, mica_metadata, transformation):
+def generate_rois_object(metadata, mica_metadata, transformation):
     vs = parse_metadata_grain(metadata)
     if mica_metadata:
         mmd = parse_mica_metadata_grain(mica_metadata)
@@ -122,7 +122,6 @@ def generate_rois_file(dir, metadata, mica_metadata, transformation):
         vs['mica_transform'] = parse_transformation(transformation)
     w = vs['image_width']
     h = vs['image_height']
-    fname = os.path.join(dir, 'rois.json')
     x1 = int(w * 0.1)
     x2 = int(w * 0.9)
     y1 = int(h * 0.1)
@@ -131,18 +130,24 @@ def generate_rois_file(dir, metadata, mica_metadata, transformation):
         'vertices': [[x1, y1], [x1, y2], [x2, y2], [x2, y1]],
         'shift': [0,0]
     }]
+    return vs
+
+
+def generate_rois_file(dir, metadata, mica_metadata, transformation):
+    vs = generate_rois_object(metadata, mica_metadata, transformation)
+    fname = os.path.join(dir, 'rois.json')
     with open(fname, 'w') as h:
         json.dump(vs, h)
     return fname
 
 
-def generate_roiss(opts, config):
+def find_grains_in_directories(path):
     # Find all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files
     meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
     mica_meta_re = re.compile(r'Mica(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
     matrix_name = 'mica_matrix.csv'
     metadata_by_dir = {}
-    for root, dirs, files in os.walk(opts.path):
+    for root, dirs, files in os.walk(path):
         metas = [
             os.path.join(root, f)
             for f in files
@@ -154,25 +159,37 @@ def generate_roiss(opts, config):
             if mica_meta_re.fullmatch(f)
         ]
         trans = os.path.join(root, matrix_name) if matrix_name in files else None
-        if (opts.overwrite or 'rois.json' not in files):
-            available = {
-                'mica_transformation': trans
-            }
-            if mica_metas:
-                available['mica_metadata']: mica_metas[0]
-            if metas:
-                available['metadata'] = metas[0]
-                metadata_by_dir[root] = available
+        rois = None
+        if 'rois.json' in files:
+            rois = os.path.join(root, 'rois.json')
+        available = {
+            'rois': rois,
+            'mica_transformation': trans
+        }
+        if mica_metas:
+            available['mica_metadata']: mica_metas[0]
+        if metas:
+            available['metadata'] = metas[0]
+        if metas or rois:
+            metadata_by_dir[root] = available
+    return metadata_by_dir
+
+
+def generate_roiss(opts, config):
+    metadata_by_dir = find_grains_in_directories(opts.path)
     for d,m in metadata_by_dir.items():
-        print(d)
-        print(m)
-        r = generate_rois_file(
-            d,
-            m.get('metadata'),
-            m.get('mica_metadata'),
-            m.get('transformation')
-        )
-        print('wrote {0}'.format(r))
+        if ('metadata' in m
+            and (opts.overwrite or not m.get('rois'))
+        ):
+            print(d)
+            print(m)
+            r = generate_rois_file(
+                d,
+                m.get('metadata'),
+                m.get('mica_metadata'),
+                m.get('transformation')
+            )
+            print('wrote {0}'.format(r))
 
 
 def get_values(d, ks):
@@ -491,6 +508,15 @@ def sample_info(opts, config):
 
 
 @token_refresh
+def sample_delete(opts, config):
+    with api_verb('DELETE', config, 'sample', opts.id) as response:
+        if response.status < 200 or 300 <= response.status:
+            print('Failed with code {0}'.format(response.status))
+            body = response.read()
+            print(body)
+
+
+@token_refresh
 def sample_upload(opts, config):
     if opts.sample_name == None:
         (dir0, name) = os.path.split(opts.dir)
@@ -514,6 +540,9 @@ def add_sample_subparser(subparsers):
     info = verbs.add_parser('info', help='return information on the given sample')
     info.set_defaults(func=sample_info)
     info.add_argument('id', help="ID of the project to return", type=int)
+    delete = verbs.add_parser('delete', help='delete the given sample')
+    delete.set_defaults(func=sample_delete)
+    delete.add_argument('id', help="ID of the project to delete", type=int)
     create = verbs.add_parser('new', help='create a new sample (with no grains yet)')
     create.set_defaults(func=sample_new)
     create.add_argument(
@@ -585,6 +614,18 @@ def add_sample_subparser(subparsers):
     upload.add_argument(
         'dir',
         help='Directory containing the grains'
+    )
+    upload.add_argument(
+        '--genrois',
+        choices=['yes', 'no', 'always'],
+        default='yes',
+        help=(
+            'should rois.json files be generated automatically?'
+            + " 'yes' (default) will result in the upload of all the grains"
+            + " with metadata, 'no' will result in the upload of only grains"
+            + " that already have rois.json files, 'always' will result in"
+            + " any existing rois.json files being regenerated."
+        )
     )
     rois = verbs.add_parser('rois', help='download a ROI file for the grains in a sample')
     rois.set_defaults(func=sample_rois_download)
@@ -698,6 +739,18 @@ def add_grain_subparser(subparsers):
         action='store_true',
         help='keep going if some grains cannot be uploaded'
     )
+    upload.add_argument(
+        '--genrois',
+        choices=['yes', 'no', 'always'],
+        default='yes',
+        help=(
+            'should rois.json files be generated automatically?'
+            + " 'yes' (default) will result in the upload of all the grains"
+            + " with metadata, 'no' will result in the upload of only grains"
+            + " that already have rois.json files, 'always' will result in"
+            + " any existing rois.json files being regenerated."
+        )
+    )
     info = verbs.add_parser('info', help='show information for a grain')
     info.set_defaults(func=grain_info)
     info.add_argument('id', help='grain ID', type=int)
@@ -769,16 +822,25 @@ def get_name_index(name):
 
 @token_refresh
 def grain_upload(opts, config):
-    rois_name = 'rois.json'
     n = 0
     successful = 0
-    for root, dirs, files in os.walk(opts.dir):
-        if rois_name in files:
-            opts.rois = os.path.join(root, rois_name)
+    metadata_by_dir = find_grains_in_directories(opts.dir)
+    print(metadata_by_dir)
+    for root,m in metadata_by_dir.items():
+        opts.rois = m.get('rois')
+        if (m.get('rois') or opts.genrois == 'yes'):
+            if (not opts.rois or opts.genrois == 'always'):
+                opts.rois = generate_rois_file(
+                    root,
+                    m.get('metadata'),
+                    m.get('mica_metadata'),
+                    m.get('transformation')
+                )
             opts.index = get_name_index(root)
             try:
                 n += 1
                 grain = grain_new(opts, config)
+                files = os.listdir(root)
                 images = [os.path.join(root, f) for f in files if os.path.splitext(f)[1] in ('.jpg', '.jpeg', '.png')]
                 image_opts = argparse.Namespace(grain=grain, image=images)
                 images_upload(image_opts, config)
@@ -790,6 +852,8 @@ def grain_upload(opts, config):
                 print(opts)
                 if not opts.keepgoing or e.code < 500:
                     raise e
+        else:
+            print("rois: {0} genrois: {1} metadata: {2}".format(opts.rois, opts.genrois, m))
     print("Uploaded grain count:", successful)
 
 
