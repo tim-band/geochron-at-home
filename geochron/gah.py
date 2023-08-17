@@ -202,6 +202,11 @@ def get_values(d, ks):
     return r
 
 
+def is_ok(response):
+    status = response.status
+    return 200 <= status and status < 300
+
+
 def get_url(config):
     if 'url' in config:
         return config['url']
@@ -295,7 +300,7 @@ def login(opts, config):
 
     with urlopen(req, data=data) as response:
         #TODO: urlopen raises an HTTP Error if not-OK response is returned.
-        if response.status != 200:
+        if not is_ok(response):
             raise Exception("Token acquisition failed with status {0}".format(response.status))
         body = response.read()
         result = json.loads(body)
@@ -315,13 +320,30 @@ def add_login_subparser(subparsers):
     login_parser.add_argument('--user', help='name of the user to log in as')
 
 
+def logout(opts, config):
+    config.pop('refresh', None)
+    config.pop('access', None)
+
+
+def add_logout_subparser(subparsers):
+    logout_parser = subparsers.add_parser(
+        'logout',
+        help='Remove the login tokens from this config file'
+    )
+    logout_parser.set_defaults(func=logout)
+
+
+def quote_val(v):
+    return quote(str(v))
+
+
 def add_headers(req, config):
     req.add_header('Authorization', 'Bearer ' + config.get('access', ''))
     req.add_header('Accept', 'application/json')
 
 
 def api_verb(verb, config, *args, **kwargs):
-    url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args))
+    url = get_url(config) + '/ftc/api/' + '/'.join(map(quote_val, args))
     if kwargs:
         url += '?' + urlencode(kwargs)
     else:
@@ -336,7 +358,7 @@ def api_get(config, *args, **kwargs):
 
 
 def api_post(config, *args, **kwargs):
-    url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args)) + '/'
+    url = get_url(config) + '/ftc/api/' + '/'.join(map(quote_val, args)) + '/'
     data = urlencode(kwargs)
     req = Request(url, data=data.encode('ascii'), method='POST')
     add_headers(req, config)
@@ -345,7 +367,7 @@ def api_post(config, *args, **kwargs):
 
 def api_upload_verb(verb, config, *args, **kwargs):
     boundary = b'auf98arnu8furpaurh83ryiruhvtbt43v!'
-    url = get_url(config) + '/ftc/api/' + '/'.join(map(str, args)) + '/'
+    url = get_url(config) + '/ftc/api/' + '/'.join(map(quote_val, args)) + '/'
     data = b''
     for k,v in kwargs.items():
         if hasattr(v, 'read'):
@@ -510,7 +532,7 @@ def sample_info(opts, config):
 @token_refresh
 def sample_delete(opts, config):
     with api_verb('DELETE', config, 'sample', opts.id) as response:
-        if response.status < 200 or 300 <= response.status:
+        if not is_ok(response):
             print('Failed with code {0}'.format(response.status))
             body = response.read()
             print(body)
@@ -539,10 +561,10 @@ def add_sample_subparser(subparsers):
     list_samples.add_argument('--project', help='limit to one project')
     info = verbs.add_parser('info', help='return information on the given sample')
     info.set_defaults(func=sample_info)
-    info.add_argument('id', help="ID of the project to return", type=int)
+    info.add_argument('id', help="ID of the project to return")
     delete = verbs.add_parser('delete', help='delete the given sample')
     delete.set_defaults(func=sample_delete)
-    delete.add_argument('id', help="ID of the project to delete", type=int)
+    delete.add_argument('id', help="ID of the project to delete")
     create = verbs.add_parser('new', help='create a new sample (with no grains yet)')
     create.set_defaults(func=sample_new)
     create.add_argument(
@@ -690,9 +712,35 @@ def grain_rois_download(opts, config):
         output_json(opts, response.read())
 
 
+GRAIN_RE = None
+def match_grain_index(segment):
+    global GRAIN_RE
+    if GRAIN_RE is None:
+        GRAIN_RE = re.compile(r"grain(\d+)", re.IGNORECASE)
+    return GRAIN_RE.fullmatch(segment)
+
+
+def grain_id_to_path(id_or_path):
+    """
+    Takes a grain ID or a path to a grain on disk and returns
+    the appropriate API path that regerences that grain as
+    an array of strings.
+    """
+    if id_or_path.isnumeric():
+        return ['grain', id_or_path]
+    (s, g) = os.path.split(id_or_path)
+    if not g:
+        (s, g) = os.path.split(s)
+    grain_match = match_grain_index(g)
+    assert grain_match, "{0} did not match Grain<nn>".format(g)
+    assert s, "need to supply a numeric ID or a directory that ends <sample_name>/Grain<nn>"
+    return ['sample', os.path.basename(s), 'grain', grain_match.group(1)]
+
+
 @token_refresh
 def grain_info(opts, config):
-    with api_get(config, 'grain', opts.id) as response:
+    args = grain_id_to_path(opts.id)
+    with api_get(config, *args) as response:
         body = response.read()
         v = json.loads(body)
         print(
@@ -706,13 +754,22 @@ def grain_info(opts, config):
             v.get('stage_x'), v.get('stage_y'),
         ))
 
+
+@token_refresh
+def grain_delete(opts, config):
+    args = grain_id_to_path(opts.id)
+    with api_verb('DELETE', config, *args) as response:
+        if not is_ok(response):
+            print(response.read())
+
+
 def add_grain_subparser(subparsers):
     grain_parser = subparsers.add_parser('grain', help='operations on grains')
     verbs = grain_parser.add_subparsers(dest='grain_verb')
     verbs.required = True
     list_grains = verbs.add_parser('list', help='list grains')
     list_grains.set_defaults(func=grain_list)
-    list_grains.add_argument('sample', help='report grains for this sample ID', type=int)
+    list_grains.add_argument('sample', help='report grains for this sample ID (or sample name)')
     create = verbs.add_parser('new', help='create a new sample with a rois.json but no images yet')
     create.set_defaults(func=grain_new)
     create.add_argument('sample', help='sample ID to add this grain to', type=int)
@@ -724,10 +781,11 @@ def add_grain_subparser(subparsers):
     )
     upload = verbs.add_parser(
         'upload',
-        help='create multiple grains by uploading directories containing rois.json and image stack Jpegs'
+        help='create multiple grains by uploading directories containing rois.json'
+        + ' and image stack Jpegs. All the grains will go into the same sample.'
     )
     upload.set_defaults(func=grain_upload)
-    upload.add_argument('sample', help='Sample ID to add these grains to', type=int)
+    upload.add_argument('--sample', help='Sample ID (or name) to add these grains to (default is to guess based on the directory)')
     upload.add_argument(
         'dir',
         help='directory containing directories containing rois.json files and z-stack images'
@@ -753,10 +811,13 @@ def add_grain_subparser(subparsers):
     )
     info = verbs.add_parser('info', help='show information for a grain')
     info.set_defaults(func=grain_info)
-    info.add_argument('id', help='grain ID', type=int)
+    info.add_argument('id', help='grain ID (or file system path)')
     rois = verbs.add_parser('rois', help='download a ROI file for a grain')
     rois.set_defaults(func=grain_rois_download)
     add_json_options(rois, 'grain ID')
+    delete_grain = verbs.add_parser('delete', help='delete the grain')
+    delete_grain.set_defaults(func=grain_delete)
+    delete_grain.add_argument('id', help='grain ID (or file system path)')
 
 
 @token_refresh
@@ -812,20 +873,21 @@ def images_upload(opts, config):
     print("Last error was", last_error)
 
 
-def get_name_index(name):
-    for i in [-4, -3, -2, -1]:
-        n = name[i:]
-        if n.isnumeric():
-            return int(n)
-    return None
+def get_sample_and_index_from_path(path):
+    path = os.path.abspath(path)
+    (p1, p0) = os.path.split(path)
+    grain_match = match_grain_index(p0)
+    if grain_match:
+        return (os.path.basename(p1), grain_match.group(1))
+    return (p0, None)
 
 
 @token_refresh
 def grain_upload(opts, config):
     n = 0
     successful = 0
+    detect_sample = not opts.sample
     metadata_by_dir = find_grains_in_directories(opts.dir)
-    print(metadata_by_dir)
     for root,m in metadata_by_dir.items():
         opts.rois = m.get('rois')
         if (m.get('rois') or opts.genrois == 'yes'):
@@ -836,7 +898,10 @@ def grain_upload(opts, config):
                     m.get('mica_metadata'),
                     m.get('transformation')
                 )
-            opts.index = get_name_index(root)
+            (sample, index) = get_sample_and_index_from_path(root)
+            opts.index = index
+            if detect_sample:
+                opts.sample = sample
             try:
                 n += 1
                 grain = grain_new(opts, config)
@@ -892,7 +957,11 @@ def image_info(opts, config):
 @token_refresh
 def image_delete(opts, config):
     with api_verb('DELETE', config, 'image', opts.id) as response:
-        print('deleted')
+        if is_ok(response):
+            print('deleted')
+        else:
+            print('Failed ({0})'.format(response.status))
+            print(response.read())
 
 
 def add_image_subparser(subparsers):
@@ -1019,6 +1088,7 @@ def parse_argv():
     add_set_subparser(subparsers)
     add_get_subparser(subparsers)
     add_login_subparser(subparsers)
+    add_logout_subparser(subparsers)
     add_project_subparser(subparsers)
     add_sample_subparser(subparsers)
     add_grain_subparser(subparsers)

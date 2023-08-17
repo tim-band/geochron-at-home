@@ -3,6 +3,7 @@ from django.core.exceptions import (
     ObjectDoesNotExist, MultipleObjectsReturned
 )
 from django.db.models.aggregates import Max
+from django.shortcuts import get_object_or_404
 import json
 import logging
 from rest_framework import exceptions
@@ -143,9 +144,23 @@ class SampleListView(ListCreateView):
             raise exceptions.PermissionDenied
         serializer.save(completed=False)
 
+
+def get_sample_queryset(id_or_name):
+        if id_or_name.isnumeric():
+            return Sample.objects.filter(pk=id_or_name)
+        return Sample.objects.filter(sample_name__iexact=id_or_name)
+
+
 class SampleInfoView(RetrieveUpdateDeleteView):
     model = Sample
     serializer_class = SampleSerializer
+
+    def get_object(self):
+        assert('pk' in self.kwargs)
+        qs = get_sample_queryset(self.kwargs['pk'])
+        obj = get_object_or_404(qs)
+        self.check_object_permissions(self.request, obj)
+        return obj
 
 
 class GrainSerializer(serializers.ModelSerializer):
@@ -163,7 +178,8 @@ class GrainSerializer(serializers.ModelSerializer):
     image_height = serializers.IntegerField(required=False, read_only=False)
 
     def do_create(self, request, sample_id):
-        sample = Sample.objects.get(id=sample_id)
+        qs = get_sample_queryset(sample_id)
+        sample = get_object_or_404(qs)
         if (not request.user.is_superuser and
             sample.get_owner() != request.user):
             raise exceptions.PermissionDenied
@@ -221,12 +237,30 @@ class SampleGrainListView(ListCreateView):
     model = Grain
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        qs = qs.filter(sample=self.kwargs['sample'])
+        qs = Grain.objects.all()
+        sample = self.kwargs.get('sample')
+        if sample.isnumeric():
+            qs = qs.filter(sample=sample)
+        else:
+            qs = qs.filter(sample__sample_name=sample)
         return qs.order_by('id')
 
     def perform_create(self, serializer):
         serializer.do_create(self.request, self.kwargs['sample'])
+
+
+class SampleGrainInfoView(RetrieveUpdateDeleteView):
+    model = Grain
+    serializer_class = GrainSerializer
+
+    def get_object(self):
+        qs = Grain.objects.filter(
+            sample__sample_name__iexact=self.kwargs['sample'],
+            index=self.kwargs['index']
+        )
+        obj = get_object_or_404(qs)
+        self.check_object_permissions(self.request, obj)
+        return obj
 
 
 class GrainListView(ListCreateView):
@@ -243,6 +277,7 @@ class GrainInfoView(RetrieveUpdateDeleteView):
 
     def perform_update(self, serializer):
         serializer.do_update(self.request)
+
 
 @api_view()
 @permission_classes([IsAuthenticated])

@@ -18,7 +18,7 @@ from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
     ImageListView, GrainListView, FissionTrackNumberingView,
-    get_grain_rois, get_many_roiss)
+    get_grain_rois, get_many_roiss, SampleGrainInfoView)
 
 urlpatterns = [
     path('', home, name='home'),
@@ -72,6 +72,7 @@ urlpatterns = [
     path('api/sample/', SampleListView.as_view(), name='api_sample_list'),
     path('api/sample/<pk>/', SampleInfoView.as_view(), name='api_sample_info'),
     path('api/sample/<sample>/grain/', SampleGrainListView.as_view(), name='api_sample_grain_list'),
+    path('api/sample/<sample>/grain/<index>/', SampleGrainInfoView.as_view(), name='api_sample_grain_list'),
     path('api/grain/', GrainListView.as_view(), name='api_grain_list'),
     path('api/grain/<pk>/', GrainInfoView.as_view(), name='api_grain_info'),
     path('api/grain/<pk>/rois/', get_grain_rois, name='api_grain_rois'),
