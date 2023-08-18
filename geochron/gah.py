@@ -93,17 +93,32 @@ def parse_metadata_image(metadata):
     return out
 
 
+def trim_fieldname(fieldname):
+    s = fieldname.split('::')
+    if 1 < len(s):
+        fieldname = s[1]
+    s = fieldname.split('!!')
+    if 1 < len(s):
+        return s[0]
+    return fieldname
+
+
 def parse_transformation(transformation):
     r = []
     with open(transformation, encoding='utf-8-sig') as h:
         rows = csv.DictReader(h)
-        xh = 'x' if 'x' in rows.fieldnames else 'x::x'
-        yh = 'y' if 'y' in rows.fieldnames else 'y::y'
-        th = 't' if 't' in rows.fieldnames else 't::t'
+        headers = {}
+        for fieldname in rows.fieldnames:
+            tfn = trim_fieldname(fieldname)
+            headers[tfn] = fieldname
         for row in rows:
-            x = row[xh]
+            x = row[headers.get('x', 'x')]
             if x != '':
-                r.append([float(x), float(row[yh]), float(row[th])])
+                r.append([
+                    float(x),
+                    float(row[headers.get('y', 'y')]),
+                    float(row[headers.get('t', 't')])
+                ])
     if len(r) == 2:
         return r
     raise Exception(
@@ -156,7 +171,11 @@ def find_grains_in_directories(path):
     meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
     mica_meta_re = re.compile(r'Mica(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
     metadata_by_dir = {}
-    for root, dirs, files in os.walk(path):
+    mica_matrix_by_dir = {}
+    for root, dirs, files in os.walk(path, topdown=True):
+        mica_matrix = find_mica_transformation(root, files)
+        if mica_matrix:
+            mica_matrix_by_dir[root] = mica_matrix
         metas = [
             os.path.join(root, f)
             for f in files
@@ -172,10 +191,12 @@ def find_grains_in_directories(path):
             rois = os.path.join(root, 'rois.json')
         available = {
             'rois': rois,
-            'mica_transformation': find_mica_transformation(root, files)
         }
+        up = os.path.dirname(root)
+        if up in mica_matrix_by_dir:
+            available['mica_transformation'] = mica_matrix_by_dir[up]
         if mica_metas:
-            available['mica_metadata']: mica_metas[0]
+            available['mica_metadata'] = mica_metas[0]
         if metas:
             available['metadata'] = metas[0]
         if metas or rois:
