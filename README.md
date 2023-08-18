@@ -515,10 +515,10 @@ can use `./gah.py logout` to forget this login session.
 Now you can use the other commands of `gah`, for example:
 
 * `./gah.py` on its own lists help and commands
-* `./gah/py project -h` to get help on the project commands
+* `./gah.py project -h` to get help on the project commands
 * `./gah.py project list` lists all the project IDs
 * `./gah.py project info <ID>` gives information on project with ID `<ID>`
-* `./gah.py project create <project-name> "<description>" <priority>`
+* `./gah.py project new <project-name> "<description>" <priority>`
 * `./gah.py sample -h` to get help on the sample commands
 * `./gah.py grain upload <path>` to upload all the grains in
 the directory under `<path>`. Every directory that contains a file called
@@ -547,13 +547,17 @@ So we need project ID `2`. We'll arbitrarily pick `20` as the priority (so
 this sample will be shown before any with a lower number for the
 priority and after any with a higher number) and `50` as the number of
 contributors required to finish this sample. We will look for the
-`"id":<N>` property of the JSON returned to feed to the `grain create`
+`"id":<N>` property of the JSON returned to feed to the `grain new`
 function:
 
 ```sh
 (geochron-at-home) $ ./gah.py sample new Sample123 2 T 20 50
 b'{"id":199,"sample_name":"Sample123","in_project":2,"sample_property":"T","priority":20,"min_contributor_num":50,"completed":false}'
+<<<<<<< HEAD
 (geochron-at-home) $ ./gah.py grain upload --sample 199 /path/to/directory/of/grains
+=======
+(geochron-at-home) $ ./gah.py grain upload 199 /path/to/directory/of/grains
+>>>>>>> 80d7c0de5fc206f69ea2f9e0a5696c1c3a4e91f3
 Created new grain 28
 Uploaded image /path/to/directory/of/grains/Grain01/Stack-09.jpg as image 469
 Uploaded image /path/to/directory/of/grains/Grain01/Stack-07.jpg as image 470
