@@ -141,11 +141,20 @@ def generate_rois_file(dir, metadata, mica_metadata, transformation):
     return fname
 
 
+def find_mica_transformation(root, files):
+    for name in ['mica_matrix.csv', 'matrix.csv']:
+        if name in files:
+            return os.path.join(root, name)
+    return None
+
+
 def find_grains_in_directories(path):
-    # Find all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files
+    """
+    Finds all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files or rois.json files.
+    Returns a dict of directory paths to 
+    """
     meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
     mica_meta_re = re.compile(r'Mica(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
-    matrix_name = 'mica_matrix.csv'
     metadata_by_dir = {}
     for root, dirs, files in os.walk(path):
         metas = [
@@ -158,13 +167,12 @@ def find_grains_in_directories(path):
             for f in files
             if mica_meta_re.fullmatch(f)
         ]
-        trans = os.path.join(root, matrix_name) if matrix_name in files else None
         rois = None
         if 'rois.json' in files:
             rois = os.path.join(root, 'rois.json')
         available = {
             'rois': rois,
-            'mica_transformation': trans
+            'mica_transformation': find_mica_transformation(root, files)
         }
         if mica_metas:
             available['mica_metadata']: mica_metas[0]
@@ -187,7 +195,7 @@ def generate_roiss(opts, config):
                 d,
                 m.get('metadata'),
                 m.get('mica_metadata'),
-                m.get('transformation')
+                m.get('mica_transformation')
             )
             print('wrote {0}'.format(r))
 
@@ -506,14 +514,29 @@ def sample_list(opts, config):
 
 
 @token_refresh
-def sample_new(opts, config):
-    with api_post(config, 'sample', **get_values(opts, [
+def do_sample_new(opts, config):
+    return api_post(config, 'sample', **get_values(opts, [
         'sample_name',
         'in_project',
         'sample_property',
         'priority',
         'min_contributor_num'
-    ])) as response:
+    ]))
+
+
+def try_sample_new(opts, config):
+    with do_sample_new(opts, config) as response:
+        result = json.loads(response.read())
+        if is_ok(response):
+            return result.get('id')
+        else:
+            print("Failed to create new sample ({0})".format(response.status))
+            print(result)
+            raise Exception("Failed to create new sample: {0}".format(opts.sample_name))
+
+
+def sample_new(opts, config):
+    with do_sample_new(opts, config) as response:
         result = json.loads(response.read())
         if 'id' in result:
             id = result['id']
@@ -523,8 +546,30 @@ def sample_new(opts, config):
 
 
 @token_refresh
+def get_sample_info(config, id_or_name):
+    return api_get(config, 'sample', id_or_name)
+
+
+def sample_exists(config, id_or_name):
+    try:
+        response = get_sample_info(config, id_or_name)
+        return is_ok(response)
+    except HTTPError as e:
+        return False
+
+
+def ensure_sample(opts, config):
+    """
+    Returns None if the sample given by opts.sample_name already exists,
+    the new ID if it did not and we managed to create it, or raises an
+    exception if it did not and we failed to create it.
+    """
+    if not sample_exists(config, opts.sample_name):
+        return try_sample_new(opts, config)
+    return None
+
 def sample_info(opts, config):
-    with api_get(config, 'sample', opts.id) as response:
+    with get_sample_info(config, opts.id) as response:
         body = response.read()
         print(body)
 
@@ -538,17 +583,23 @@ def sample_delete(opts, config):
             print(body)
 
 
+def path_to_sample_name(path):
+    (dir0, name) = os.path.split(path)
+    if name == '':
+        name = os.path.basename(dir0)
+    bad_char = re.compile(r'[^0-9a-zA-Z_\- #/\(\):@]')
+    return re.sub(bad_char, '_', name)
+
+
 @token_refresh
 def sample_upload(opts, config):
-    if opts.sample_name == None:
-        (dir0, name) = os.path.split(opts.dir)
-        if name == '':
-            (dir1, name) = os.path.split(dir0)
-        bad_char = re.compile(r'[^0-9a-zA-Z_\- #/\(\):@]')
-        opts.sample_name = re.sub(bad_char, '_', name)
-    id = sample_new(opts, config)
-    opts.sample = id
-    grain_upload(opts, config)
+    opts.sample = None
+    grain_upload(
+        opts,
+        config,
+        make_sample_fn=ensure_sample,
+        explicit_sample_name=opts.sample_name
+    )
 
 
 def add_sample_subparser(subparsers):
@@ -734,7 +785,7 @@ def grain_id_to_path(id_or_path):
     grain_match = match_grain_index(g)
     assert grain_match, "{0} did not match Grain<nn>".format(g)
     assert s, "need to supply a numeric ID or a directory that ends <sample_name>/Grain<nn>"
-    return ['sample', os.path.basename(s), 'grain', grain_match.group(1)]
+    return ['sample', path_to_sample_name(s), 'grain', grain_match.group(1)]
 
 
 @token_refresh
@@ -878,14 +929,15 @@ def get_sample_and_index_from_path(path):
     (p1, p0) = os.path.split(path)
     grain_match = match_grain_index(p0)
     if grain_match:
-        return (os.path.basename(p1), grain_match.group(1))
+        return (path_to_sample_name(p1), grain_match.group(1))
     return (p0, None)
 
 
 @token_refresh
-def grain_upload(opts, config):
+def grain_upload(opts, config, make_sample_fn=None, explicit_sample_name=None):
     n = 0
     successful = 0
+    new_samples = []
     detect_sample = not opts.sample
     metadata_by_dir = find_grains_in_directories(opts.dir)
     for root,m in metadata_by_dir.items():
@@ -896,12 +948,16 @@ def grain_upload(opts, config):
                     root,
                     m.get('metadata'),
                     m.get('mica_metadata'),
-                    m.get('transformation')
+                    m.get('mica_transformation')
                 )
             (sample, index) = get_sample_and_index_from_path(root)
             opts.index = index
             if detect_sample:
                 opts.sample = sample
+                if make_sample_fn is not None:
+                    opts.sample_name = explicit_sample_name or sample
+                    if make_sample_fn(opts, config):
+                        new_samples.append(sample)
             try:
                 n += 1
                 grain = grain_new(opts, config)
@@ -919,6 +975,10 @@ def grain_upload(opts, config):
                     raise e
         else:
             print("rois: {0} genrois: {1} metadata: {2}".format(opts.rois, opts.genrois, m))
+    if 0 < len(new_samples):
+        print("New samples created:")
+        for ns in new_samples:
+            print("  {0}".format(ns))
     print("Uploaded grain count:", successful)
 
 
