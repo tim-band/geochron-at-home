@@ -283,6 +283,9 @@ class GrainPointCategory(models.Model):
     """
     Type of grain point feature (for example, track or crystal defect)
     """
+    class Meta:
+        verbose_name = 'Grain Point Category'
+        verbose_name_plural = 'Grain Point Categories'
     name = models.CharField(primary_key=True, max_length=20)
     description = models.TextField()
 
@@ -311,3 +314,5 @@ class TutorialPage(models.Model):
     page_type = models.CharField(max_length=1, null=True, choices=PAGE_TYPE)
     limit = models.IntegerField(null=True, blank=True)
     message = models.TextField()
+    active = models.BooleanField(default=True)
+    sequence_number = models.IntegerField(default=50)

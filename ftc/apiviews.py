@@ -101,7 +101,7 @@ class ProjectField(serializers.PrimaryKeyRelatedField):
         return Project.objects.all()
 
     def to_internal_value(self, data):
-        if data.isnumeric():
+        if type(data) is int or data.isnumeric():
             return super().to_internal_value(data)
         try:
             return self.get_queryset().get(project_name__iexact=data)
@@ -145,10 +145,11 @@ class SampleListView(ListCreateView):
         serializer.save(completed=False)
 
 
-def get_sample_queryset(id_or_name):
+def get_sample_queryset(id_or_name, request):
+        samples = models_owned(Sample, request)
         if id_or_name.isnumeric():
-            return Sample.objects.filter(pk=id_or_name)
-        return Sample.objects.filter(sample_name__iexact=id_or_name)
+            return samples.filter(pk=id_or_name)
+        return samples.filter(sample_name__iexact=id_or_name)
 
 
 class SampleInfoView(RetrieveUpdateDeleteView):
@@ -157,7 +158,7 @@ class SampleInfoView(RetrieveUpdateDeleteView):
 
     def get_object(self):
         assert('pk' in self.kwargs)
-        qs = get_sample_queryset(self.kwargs['pk'])
+        qs = get_sample_queryset(self.kwargs['pk'], self.request)
         obj = get_object_or_404(qs)
         self.check_object_permissions(self.request, obj)
         return obj
@@ -178,7 +179,7 @@ class GrainSerializer(serializers.ModelSerializer):
     image_height = serializers.IntegerField(required=False, read_only=False)
 
     def do_create(self, request, sample_id):
-        qs = get_sample_queryset(sample_id)
+        qs = get_sample_queryset(sample_id, request)
         sample = get_object_or_404(qs)
         if (not request.user.is_superuser and
             sample.get_owner() != request.user):

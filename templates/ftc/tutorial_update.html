@@ -1,0 +1,23 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block content %}
+<form
+    enctype="multipart/form-data"
+    action="{% url 'tutorial_update' object.pk %}"
+    method="POST">
+    <table>
+        {{ form.as_table }}
+    </table>
+    {% csrf_token %}
+    <input type="submit" value="Update Tutorial Page">
+</form>
+<form
+    enctype="multipart/form-data"
+    action="{% url 'tutorial_delete' object.pk %}"
+    method="POST">
+    {% csrf_token %}
+    <input type="submit" value="Delete Tutorial Page">
+</form>
+{% endblock %}

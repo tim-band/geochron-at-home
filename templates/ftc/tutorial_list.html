@@ -1,0 +1,39 @@
+{% extends "ftc/base.html" %}
+
+{% block content %}
+<table class="table table-sm">
+    <thead><tr>
+        <th>ID</th>
+        <th>Project</th>
+        <th>Sample</th>
+        <th>Grain Index</th>
+        <th>Category</th>
+        <th>Page Type</th>
+        <th>Limit</th>
+        <th>Message</th>
+        <th>Active</th>
+        <th>Sequence Number</th>
+    </tr></thead>
+    <tbody>
+        {% for tutorial in object_list %}
+        <tr>
+            <td><a href="{% url 'tutorial_update' tutorial.pk %}">{{ tutorial.pk }}</a></td>
+            <td>{{ tutorial.marks.grain.sample.in_project.project_name }}</td>
+            <td>{{ tutorial.marks.grain.sample.sample_name }}</td>
+            <td>{{ tutorial.marks.grain.index }}</td>
+            <td>{% if tutorial.category %}{{ tutorial.category.description }}{% else %}all{% endif %}</td>
+            <td>{{ tutorial.get_page_type_display }}</td>
+            <td>{{ tutorial.limit }}</td>
+            <td>{{ tutorial.message|linebreaks }}</td>
+            <td>{{ tutorial.active }}</td>
+            <td>{{ tutorial.sequence_number }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="10">No tutorials yet</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% for mark in marks %}
+<p><a href="{% url 'tutorial_create' %}?marks={{ mark.id }}">New tutorial page (for FissionTrackNumbering {{ mark.id }})</a></p>
+{% endfor %}
+{% endblock %}

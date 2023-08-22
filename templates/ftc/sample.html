@@ -41,6 +41,7 @@
             <th colspan="2">Count</th>
             <th></th>
             <th></th>
+            <th></th>
         </tr>
         <tr>
             <th>Grain</th>
@@ -52,18 +53,19 @@
             <th>Minerals</th>
             <th>Mica</th>
             <th>ROI</th>
+            <th>Tutorial</th>
             <th>Delete</th>
         </tr>
     </thead>
     <tbody>
         {% for g in object.grain_set.all|order_by:"index" %}
+        {% with result=g.owners_result %}
         <tr>
             <td><a href="{% url 'grain_images' g.pk %}">{{ g.index }}</a></td>
             <td>{{ g.count_images_crystal }}</td>
             <td>{{ g.count_images_mica }}</td>
             <td>{{ g.count_results }}</td>
             <td>
-                {% with result=g.owners_result %}
                 {% if result == None %}
                     Not started
                 {% elif result < 0 %}
@@ -71,10 +73,8 @@
                 {% else %}
                     {{ result }}
                 {% endif %}
-                {% endwith %}
             </td>
             <td>
-                {% with result=g.owners_result_mica %}
                 {% if result == None %}
                     Not started
                 {% elif result < 0 %}
@@ -82,13 +82,18 @@
                 {% else %}
                     {{ result }}
                 {% endif %}
-                {% endwith %}
             </td>
             <td><a id="count-link-{{ g.index }}" href="{% url 'count_my' g.pk %}">Count</a></td>
             <td><a id="count-mica-link-{{ g.index }}" href="{% url 'count_my_mica' g.pk %}">Count Mica</a></td>
-            <td><a id="download-rois" href="{% url 'download_grain_rois' g.pk %}" download="rois.json">Download ROI</a></td>
+            <td><a id="download-rois-{{ g.index }}" href="{% url 'download_grain_rois' g.pk %}" download="rois.json">Download ROI</a></td>
+            <td>
+                {% if result != None %}
+                    <a id='tutorial-page-{{ g.index }}' href="{% url 'tutorial_pages_of' g.pk object.get_owner %}">Tutorial pages</a>
+                {% endif %}
+            </td>
             <td><a href="{% url 'grain_delete' g.pk %}">Delete</a></td>
         </tr>
+        {% endwith %}
         {% endfor %}
     </tbody>
 </table>

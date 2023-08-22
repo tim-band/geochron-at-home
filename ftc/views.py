@@ -1,3 +1,4 @@
+from typing import Any, Dict
 from django.shortcuts import render, get_object_or_404
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, Subquery, Prefetch
@@ -5,8 +6,9 @@ from django.db.models.aggregates import Max
 from django.forms import (ModelForm, CharField, Textarea, FileField,
     ClearableFileInput, ValidationError)
 from django.views.decorators.csrf import csrf_protect
-from django.views.generic.edit import CreateView, UpdateView, DeleteView
 from django.views.generic import DetailView
+from django.views.generic.edit import CreateView, UpdateView, DeleteView
+from django.views.generic.list import ListView
 from django.urls import reverse
 from django.http import (HttpResponse, HttpResponseRedirect,
     HttpResponseForbidden)
@@ -29,7 +31,6 @@ import csv
 import io
 import json
 import logging
-import os
 
 #
 def home(request):
@@ -192,7 +193,6 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
             for region in self.object.region_set.order_by('id').iterator()
         ])
     def get_context_data(self, *args, **kwargs):
-        pk = self.kwargs['pk']
         ctx = super().get_context_data(*args, **kwargs)
         ctx['images'] = self.object.image_set.filter(ft_type=self.ft_type).order_by('index')
         ctx['ft_type'] = self.ft_type
@@ -504,7 +504,6 @@ class GrainDeleteView(CreatorOrSuperuserMixin, DeleteView):
     model = Grain
     template_name = "ftc/grain_delete.html"
     def get_context_data(self, *args, **kwargs):
-        pk = self.kwargs['pk']
         ctx = super().get_context_data(*args, **kwargs)
         ctx['image_count'] = self.object.image_set.count()
         ctx['region_count'] = self.object.region_set.count()
@@ -1108,3 +1107,73 @@ def saveTutorialResult(request):
         )
         tr.save()
         return HttpResponse("OK")
+
+class TutorialForm(ModelForm):
+    class Meta:
+        model = TutorialPage
+        fields = ['marks', 'category', 'page_type', 'limit', 'message', 'active', 'sequence_number']
+    message = CharField(widget=Textarea)
+    def __init__(self, initial, **kwargs):
+        super().__init__(initial=initial, **kwargs)
+
+def add_request_parameter(initial_out, request, key):
+    v = request.GET.get(key, None)
+    if v is None:
+        return
+    if type(v) is list:
+        if len(v) == 0:
+            return
+        v = v[0]
+    initial_out[key] = v
+
+class TutorialCreateView(StaffRequiredMixin, CreateView):
+    model = TutorialPage
+    form_class = TutorialForm
+    template_name = "ftc/tutorial_create.html"
+    def get_initial(self):
+        initial = {}
+        add_request_parameter(initial, self.request, 'marks')
+        return initial
+    def get_success_url(self):
+        return reverse('tutorial_pages_of', kwargs={
+            'grain_id': self.object.marks.grain.pk,
+            'user': self.object.marks.grain.sample.in_project.creator
+        })
+
+class TutorialUpdateView(StaffRequiredMixin, UpdateView):
+    model = TutorialPage
+    form_class = TutorialForm
+    template_name = "ftc/tutorial_update.html"
+    def get_success_url(self):
+        return reverse('tutorial_pages_of', kwargs={
+            'grain_id': self.object.marks.grain.pk,
+            'user': self.object.marks.grain.sample.in_project.creator
+        })
+
+class TutorialListView(StaffRequiredMixin, ListView):
+    model = TutorialPage
+    template_name = "ftc/tutorial_list.html"
+    def get_queryset(self):
+        return TutorialPage.objects.filter(
+            marks__worker__username=self.kwargs['user'],
+            marks__grain=self.kwargs['grain_id']
+        ).order_by(
+            '-active',
+            'sequence_number'
+        )
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(marks=FissionTrackNumbering.objects.filter(
+            worker__username=self.kwargs['user'],
+            grain=self.kwargs['grain_id']
+        ))
+        return ctx
+
+class TutorialDeleteView(StaffRequiredMixin, DeleteView):
+    model = TutorialPage
+    template_name = "ftc/tutorial_update.html"
+    def get_success_url(self):
+        return reverse('tutorial_pages_of', kwargs={
+            'grain_id': self.object.marks.grain.pk,
+            'user': self.object.marks.grain.sample.in_project.creator
+        })

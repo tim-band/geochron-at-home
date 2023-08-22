@@ -1,4 +1,3 @@
-from django.conf.urls import include
 from django.urls import path
 from rest_framework_simplejwt import views as jwt_views
 
@@ -13,7 +12,9 @@ from ftc.views import (home, signmeup, report, getTableData,
     ImageDeleteView, tutorial, saveTutorialResult,
     CountMyGrainView, CountMyGrainMicaView, getJsonResults,
     download_rois, download_roiss,
-    getCsvResults, GrainDeleteView, tutorialPage)
+    getCsvResults, GrainDeleteView, tutorialPage,
+    TutorialCreateView, TutorialUpdateView, TutorialListView,
+    TutorialDeleteView)
 from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
@@ -64,6 +65,10 @@ urlpatterns = [
     path('rois/<pk>/', download_rois, name='download_grain_rois'),
     path('rois/', download_roiss, name='download_roiss'),
     path('tutorialpage/<pk>/', tutorialPage, name='tutorial_page'),
+    path('tutorialpagesof/<grain_id>/<user>/', TutorialListView.as_view(), name='tutorial_pages_of'),
+    path('tutorialpage/<pk>/update/', TutorialUpdateView.as_view(), name='tutorial_update'),
+    path('tutorialpage/<pk>/delete/', TutorialDeleteView.as_view(), name='tutorial_delete'),
+    path('tutorialpage_create/', TutorialCreateView.as_view(), name='tutorial_create'),
 
     path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get_jwt_token'),
     path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh_jwt_token'),
