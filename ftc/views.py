@@ -52,7 +52,10 @@ def signmeup(request):
     return redirect('account_signup')
 
 def tutorial(request):
-    return render(request, 'ftc/tutorial.html')
+    # old style tutorial
+    #return render(request, 'ftc/tutorial.html')
+    tp = TutorialPage.objects.filter(active=True).order_by('sequence_number', 'pk').first()
+    return redirect('tutorial_page', tp.pk)
 
 # Fission tracks measuring report
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -534,14 +537,25 @@ class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
 @csrf_protect
 def tutorialPage(request, pk):
     tp = TutorialPage.objects.get(pk=pk)
+    next = TutorialPage.objects.filter(
+        Q(sequence_number__gt=tp.sequence_number) | (
+            Q(sequence_number=tp.sequence_number) & Q(pk__gt=tp.pk)
+        ),
+        active=True
+    ).first()
     ctx = get_grain_info(
         request,
         tp.marks.grain.pk,
         'S',
-        object=tp
+        object=tp,
+        next_page=next
     )
     addGrainPointCategories(ctx)
     return render(request, 'ftc/tutorial_page.html', ctx)
+
+@csrf_protect
+def tutorialEnd(request):
+    return render(request, 'ftc/tutorial_end.html')
 
 @csrf_protect
 @user_passes_test(user_is_staff)
@@ -944,6 +958,8 @@ class CountMyGrainMicaView(CountMyGrainView):
 
 from django.contrib.auth.models import User
 def tutorialCompleted(request):
+    if not TutorialPage.objects.filter(active=True).exists():
+        return True
     if request.user.username == 'guest':
         return TutorialResult.objects.filter(session=request.session.session_key).exists()
     if request.user.is_authenticated:

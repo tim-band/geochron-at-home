@@ -152,9 +152,18 @@ class BasePage:
 
 
 class HomePage(BasePage):
+    check_xpath = '//*[contains(@class,jumbotron)]/p/a[contains(.,"Join us now")]'
     def go(self):
         self.get(self.url + "/ftc")
         return self
+
+    def check(self):
+        self.find_by_xpath(self.check_xpath)
+        return self
+
+    def is_here(self):
+        es = self.driver.find_elements(By.XPATH, self.check_xpath)
+        return 0 < len(es)
 
     def join(self):
         self.driver.find_element(By.CSS_SELECTOR,  "a.btn-success").click()
@@ -240,7 +249,7 @@ class SignInPage(BasePage):
 
 class TutorialPage(BasePage):
     def check_text_contains(self, text):
-        tut_text = self.driver.find_element(By.ID, 'results').text
+        tut_text = self.driver.find_element(By.ID, 'description').text
         assert text in tut_text
         return self
 
@@ -255,11 +264,14 @@ class TutorialPage(BasePage):
         return self
 
     def get_finish_link(self):
-        return self.driver.find_element(By.ID, 'finish')
+        es = self.driver.find_elements(By.ID, 'finish')
+        if len(es) == 0:
+            return None
+        return es[0]
 
     def go_finish(self):
         self.get_finish_link().click()
-        return CountingPage(self.driver, self.url)
+        return ProfilePage(self.driver, self.url)
 
     def get_to_end_and_finish(self):
         while not self.finish_available():
@@ -268,22 +280,24 @@ class TutorialPage(BasePage):
 
     def finish_available(self):
         link = self.get_finish_link()
-        return link.get_attribute('disabled') != 'true'
+        return link is not None
 
     def check_finish_available(self):
-        link = self.get_finish_link()
-        assert link.get_attribute('disabled') != 'true'
+        assert self.finish_available()
         return self
 
     def check_finish_not_available(self):
-        link = self.get_finish_link()
-        assert link.get_attribute('disabled') == 'true'
+        assert not self.finish_available()
         return self
 
 
 class ProfilePage(BasePage):
     def login_name(self):
         return self.driver.find_element(By.CLASS_NAME, 'fa-user').text
+
+    def check(self):
+        self.find_by_xpath("//*[contains(@class,jumbotron)]/h2[contains(.,'Welcome')]")
+        return self
 
     def go(self):
         self.get(self.url + "/accounts/profile")
@@ -474,17 +488,23 @@ class NavBar(BasePage):
         return self
 
     def logout(self):
-        class DropsDown:
+        home = HomePage(self.driver, self.url)
+        class LogsOut:
             def __init__(self, nav_bar):
                 self.nav = nav_bar
             def __call__(self, driver):
+                if home.is_here():
+                    return True
                 self.nav.click_dropdown()
                 logout = driver.find_element(By.CSS_SELECTOR,
                     'a[href="/accounts/logout/"]'
                 )
-                return logout.is_displayed() and logout
-        self.wait_until(DropsDown(self), timeout=3).click()
-        return HomePage(self.driver, self.url)
+                if logout.is_displayed() and logout:
+                    logout.click()
+                    home.check()
+                    return True
+        self.wait_until(LogsOut(self), timeout=3)
+        return home
 
     def go_manage_projects(self):
         self.click_dropdown()
@@ -1026,7 +1046,50 @@ class SeleniumTests(LiveServerTestCase):
             os.rmdir(self.tmp)
 
 
-class FromClean(SeleniumTests):
+class WithTutorials(SeleniumTests):
+    fixtures = [
+        'essential.json',
+        'grain_with_images.json',
+        'tutorial_pages.json'
+    ]
+    def test_tutorial_makes_counting_possible(self):
+        # sign in as this new user
+        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
+        navbar = NavBar(self.driver, self.live_server_url)
+
+        # attempt to count, get a refusal, so do the tutorial
+        profile.check_cannot_count()
+        tutorial = profile.go_tutorial()
+        tutorial.check_text_contains('etched with acid'
+        ).check_finish_not_available().go_next(
+        ).check_finish_available().go_finish().check()
+        navbar.logout()
+
+        # do the same thing with John (checking that test_user's completion does not interfere)
+        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
+        profile.check_cannot_count().go_tutorial().get_to_end_and_finish().check()
+        profile.go().check_can_count()
+        navbar.logout()
+
+        # check guest cannot count
+        HomePage(self.driver, self.live_server_url).become_guest().check_cannot_count(
+        ).go_tutorial().get_to_end_and_finish().check()
+        # but then can
+        HomePage(self.driver, self.live_server_url).become_guest()
+        CountingPage(self.driver, self.live_server_url).check()
+        # but then cannot
+        navbar.logout()
+        HomePage(self.driver, self.live_server_url).become_guest().check_cannot_count()
+
+        # check we can still get counting after logging back in as test_user
+        navbar.logout()
+        SignInPage(self.driver, self.live_server_url).go().sign_in(
+            self.test_user
+        ).go_start_counting().check()
+
+
+
+class FromCleanWithTutorialsDone(SeleniumTests):
     fixtures = [
         'essential.json',
         'users.json'
@@ -1045,47 +1108,8 @@ class FromClean(SeleniumTests):
         join_page.check().fill_in(self.test_user).check(self.test_user)
         ConfirmPage(self.driver, self.live_server_url).go().check(self.test_user).confirm()
 
-        # sign in as this new user
         profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
-
-        # attempt to count, get a refusal, so do the tutorial
-        profile.check_cannot_count()
-        tutorial = profile.go_tutorial()
-        tutorial.check_text_contains('etched with acid'
-        ).check_finish_not_available().go_next(
-        ).check_text_contains('These are fission tracks'
-        ).go_previous().check_text_contains('etched with acid'
-        ).go_next().check_text_contains('These are fission tracks'
-        ).check_finish_not_available().go_next(
-        ).check_text_contains('too small to distinguish'
-        ).check_finish_not_available().go_next(
-        ).check_text_contains('crystal defect'
-        ).check_finish_not_available().go_next(
-        ).check_text_contains('outside the region of interest'
-        ).check_finish_available().go_finish().check()
-        navbar.logout()
-
-        # do the same thing with John
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
-        profile.check_cannot_count().go_tutorial().get_to_end_and_finish().check()
-        profile.go().check_can_count()
-        navbar.logout()
-
-        # check guest cannot count
-        HomePage(self.driver, self.live_server_url).become_guest().check_cannot_count(
-        ).go_tutorial().get_to_end_and_finish().check()
-        # but then can
-        HomePage(self.driver, self.live_server_url).become_guest()
-        CountingPage(self.driver, self.live_server_url).check()
-        # but then cannot
-        navbar.logout()
-        HomePage(self.driver, self.live_server_url).become_guest().check_cannot_count()
-
-        # check we can still get counting after logging back in
-        navbar.logout()
-        counting = SignInPage(self.driver, self.live_server_url).go().sign_in(
-            self.test_user
-        ).go_start_counting().check()
+        counting = profile.go_start_counting().check()
         self.assertEqual(uploader.get_index(counting.image_displayed_url()), 1)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.33).image_displayed_url()), 2)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.67).image_displayed_url()), 4)
@@ -1396,7 +1420,7 @@ class WithOneGrainUploaded(SeleniumTests):
         counting.submit()
 
         # see this result, as project admin
-        navbar.logout().check()
+        navbar.check().logout().check()
         profile = SignInPage(self.driver, self.live_server_url).go()
         profile.check().sign_in(self.project_user)
         report = navbar.go_manage_projects()

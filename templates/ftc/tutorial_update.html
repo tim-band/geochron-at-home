@@ -1,9 +1,23 @@
 {% extends "ftc/base.html" %}
 
-{% load static %}
+{% block head %}
+<style>
+form.left {
+    position: absolute;
+    width: 50%;
+    left: 0%;
+}
+form.right {
+    position: absolute;
+    width: 50%;
+    left: 50%;
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<form
+<span>
+<form class="left"
     enctype="multipart/form-data"
     action="{% url 'tutorial_update' object.pk %}"
     method="POST">
@@ -13,11 +27,12 @@
     {% csrf_token %}
     <input type="submit" value="Update Tutorial Page">
 </form>
-<form
+<form class="right"
     enctype="multipart/form-data"
     action="{% url 'tutorial_delete' object.pk %}"
     method="POST">
     {% csrf_token %}
     <input type="submit" value="Delete Tutorial Page">
 </form>
+</span>
 {% endblock %}

@@ -88,10 +88,15 @@ class TestGuestCounts(CountingCase):
   fixtures = [
     'essential.json',
     'users.json', 'projects.json', 'samples.json',
-    'grains.json', 'images.json'
+    'grains.json', 'images.json', 'tutorial_pages.json'
   ]
 
   def test_guest_counts_are_unlimited(self):
+    self.login_admin()
+    base_admin = self.get_total_track_count()
+    self.login_super()
+    base_super = self.get_total_track_count()
+    self.logout()
     s1count = 5
     s2count = 6
     guest_count = 5
@@ -100,12 +105,12 @@ class TestGuestCounts(CountingCase):
     self.login_admin()
     total = self.get_total_track_count()
     # should get the results from sample 1 which is owned by admin
-    self.assertEqual(total, guest_count * s1count)
+    self.assertEqual(total, base_admin + guest_count * s1count)
     self.logout()
     self.login_super()
     total = self.get_total_track_count()
     # should get the results from all samples
-    self.assertEqual(total, guest_count * (s1count + s2count))
+    self.assertEqual(total, base_super + guest_count * (s1count + s2count))
 
 
 class TestCountJsonDownload(CountingCase):

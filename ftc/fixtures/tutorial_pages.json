@@ -71,7 +71,9 @@
             "marks": 1,
             "category": "track",
             "page_type": "E",
-            "message": "Here are some tracks"
+            "message": "Here are some tracks, formed when a grain of apatite was polished and etched with acid.",
+            "active": true,
+            "sequence_number": 1
         }
     }
 ]

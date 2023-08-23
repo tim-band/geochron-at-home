@@ -167,8 +167,12 @@ function submit_category() {
     var submit = document.getElementById('submit-button');
     submit.classList.add('disabled');
 }
+``
+function next_page() {
+    window.location = "{% if next_page %}{% url "tutorial_page" next_page.pk %}{% else %}{% url "tutorial_end" %}{% endif %}";
+}
 
-function next_category() {
+function next_mark() {
     var submit = document.getElementById('submit-button');
     submit.classList.remove('disabled');
     var box = document.getElementById('response-correct');
@@ -177,8 +181,7 @@ function next_category() {
     box.classList.remove('visible');
     ++question_number;
     if (!map.nextMarker()) {
-        // Go to the next page!
-        //...
+        next_page();
     }
 }
 
@@ -242,7 +245,7 @@ function setup() {
 </button>
 {% endif %}
 {% if object.page_type == "E" %}
-<button type="button" id="btn-next-page">
+<button type="button" id="next" onclick="next_page()">
     Next Page
 </button>
 {% endif %}
@@ -287,7 +290,7 @@ function setup() {
 
 <div id="response-correct" class="overlay-box overlay-response">
     <div class="text">Correct!</div>
-    <div id="correct-dismiss" class="btn btn-default text" onclick="next_category()">OK</div>
+    <div id="correct-dismiss" class="btn btn-default text" onclick="next_mark()">OK</div>
 </div>
 
 <div id="response-incorrect" class="overlay-box overlay-response">
@@ -295,7 +298,7 @@ function setup() {
         Sorry, that is the wrong answer. The correct answer was
         <span id="correction"></span>
     </div>
-    <div id="correct-dismiss" class="btn btn-default text" onclick="next_category()">OK</div>
+    <div id="correct-dismiss" class="btn btn-default text" onclick="next_mark()">OK</div>
 </div>
 
 {% endblock %}

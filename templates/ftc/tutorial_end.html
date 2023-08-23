@@ -1,0 +1,43 @@
+{% extends "ftc/base.html" %}
+
+{% block head %}
+<style>
+.padded {
+    padding: 20px;
+}
+.page {
+    margin: 30px;
+}
+</style>
+<script type='text/javascript'>
+function save_result() {
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+        }
+    });
+    $.ajax({
+        url: "{% url 'tutorial_result' %}",
+        type: 'POST',
+        dataType: 'text',
+        success: function(result) {
+            console.log('submitted tutorial result' );
+            window.location.href = "{% url 'profile' %}";
+        },
+        error: function(xhr, errmsg, err) {
+            console.log(xhr.status + ": " + xhr.responseText);
+        }
+    });
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="page">
+    <h1>Thank you for completing the tutorial!</h1>
+    <span>
+        <a href="{% url 'tutorial' %}" id="restart" class="btn btn-default padded">&#x23ee; Restart tutorial</a>
+        <a href="#" id="finish" class="btn btn-primary padded" onclick="save_result()">Finish</a>
+    </span>
+</div>
+{% endblock %}
