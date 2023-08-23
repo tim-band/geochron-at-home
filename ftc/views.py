@@ -542,13 +542,20 @@ def tutorialPage(request, pk):
             Q(sequence_number=tp.sequence_number) & Q(pk__gt=tp.pk)
         ),
         active=True
-    ).first()
+    ).order_by('sequence_number', 'pk').first()
+    prev = TutorialPage.objects.filter(
+        Q(sequence_number__lt=tp.sequence_number) | (
+            Q(sequence_number=tp.sequence_number) & Q(pk__lt=tp.pk)
+        ),
+        active=True
+    ).order_by('-sequence_number', '-pk').first()
     ctx = get_grain_info(
         request,
         tp.marks.grain.pk,
         'S',
         object=tp,
-        next_page=next
+        next_page=next,
+        prev_page=prev
     )
     addGrainPointCategories(ctx)
     return render(request, 'ftc/tutorial_page.html', ctx)

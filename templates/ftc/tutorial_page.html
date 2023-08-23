@@ -134,11 +134,24 @@ font-family: "ds-digitalitalic";
 
 .overlay-box .text {
     margin: 10px;
+    overflow: scroll;
 }
 
 #correction {
     font-weight: bold;
 }
+
+.button {
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+.button-bar {
+    position: sticky;
+    bottom: 0;
+    padding: 7px 10px;
+}
+
 </style>
 <script src="{% static 'Leaflet-1.9.3/leaflet.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
@@ -167,9 +180,15 @@ function submit_category() {
     var submit = document.getElementById('submit-button');
     submit.classList.add('disabled');
 }
-``
+
+function previous_page() {
+    //{% if prev_page %}
+    window.location = '{% url "tutorial_page" prev_page.pk %}';
+    //{% endif %}
+}
+
 function next_page() {
-    window.location = "{% if next_page %}{% url "tutorial_page" next_page.pk %}{% else %}{% url "tutorial_end" %}{% endif %}";
+    window.location = '{% if next_page %}{% url "tutorial_page" next_page.pk %}{% else %}{% url "tutorial_end" %}{% endif %}';
 }
 
 function next_mark() {
@@ -244,11 +263,6 @@ function setup() {
     Submit answer
 </button>
 {% endif %}
-{% if object.page_type == "E" %}
-<button type="button" id="next" onclick="next_page()">
-    Next Page
-</button>
-{% endif %}
 {% endblock %}
 {% block right_nav_li %}{% endblock %}
 {% block right_nav_fn_counting %}{% endblock %}
@@ -286,6 +300,20 @@ function setup() {
 
 <div id="description" class="overlay-box">
     <div class="text">{{ object.message | linebreaks }}</div>
+    <div class="button-bar">
+        {% if object.page_type == "E" %}
+        <span>
+            {% if prev_page %}
+            <button type="button" id="previous" onclick="previous_page()" class="button">
+                Previous Page
+            </button>
+            {% endif %}
+            <button type="button" id="next" onclick="next_page()" class="button">
+                Next Page
+            </button>
+        </span>
+        {% endif %}
+    </div>
 </div>
 
 <div id="response-correct" class="overlay-box overlay-response">
