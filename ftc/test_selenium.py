@@ -254,13 +254,13 @@ class TutorialPage(BasePage):
         return self
 
     def go_next(self):
-        e = self.driver.find_element(By.ID, 'next')
+        e = self.find_by_id('next')
         self.scroll_into_view(e)
         e.click()
         return self
 
     def go_previous(self):
-        self.driver.find_element(By.ID, 'previous').click()
+        self.click_by_id('previous')
         return self
 
     def get_finish_link(self):
@@ -288,6 +288,10 @@ class TutorialPage(BasePage):
 
     def check_finish_not_available(self):
         assert not self.finish_available()
+        return self
+
+    def check_markers_shown(self):
+        assert self.find_by_css('img.leaflet-marker-icon')
         return self
 
 
@@ -1061,19 +1065,24 @@ class WithTutorials(SeleniumTests):
         profile.check_cannot_count()
         tutorial = profile.go_tutorial()
         tutorial.check_text_contains('etched with acid'
+        ).check_markers_shown(
         ).check_finish_not_available().go_next(
         ).check_finish_available().go_finish().check()
         navbar.logout()
 
         # do the same thing with John (checking that test_user's completion does not interfere)
         profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
-        profile.check_cannot_count().go_tutorial().get_to_end_and_finish().check()
+        profile.check_cannot_count().go_tutorial(
+        ).check_markers_shown(
+        ).get_to_end_and_finish().check()
         profile.go().check_can_count()
         navbar.logout()
 
         # check guest cannot count
         HomePage(self.driver, self.live_server_url).become_guest().check_cannot_count(
-        ).go_tutorial().get_to_end_and_finish().check()
+        ).go_tutorial(
+        ).check_markers_shown(
+        ).get_to_end_and_finish().check()
         # but then can
         HomePage(self.driver, self.live_server_url).become_guest()
         CountingPage(self.driver, self.live_server_url).check()

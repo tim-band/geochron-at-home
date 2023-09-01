@@ -29,7 +29,7 @@
         "fields": {
             "grain": 1,
             "ft_type": "S",
-            "worker": 101,
+            "worker": 102,
             "result": 3,
             "create_date": "2023-01-01T00:00:00Z"
         }

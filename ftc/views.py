@@ -550,7 +550,7 @@ def tutorialPage(request, pk):
         active=True
     ).order_by('-sequence_number', '-pk').first()
     ctx = get_grain_info(
-        request,
+        None,
         tp.marks.grain.pk,
         'S',
         object=tp,
@@ -814,16 +814,18 @@ def redirect_to_count(request):
     return HttpResponseRedirect(reverse('count', args=['done']))
 
 def add_grain_info_markers(info, grain, ft_type, worker):
-    save = FissionTrackNumbering.objects.filter(
-        worker=worker,
+    objects = FissionTrackNumbering.objects.filter(
         grain=grain,
         ft_type=ft_type
-    ).order_by('result').first()
+    )
+    if worker is not None:
+        objects = objects.filter(worker=worker)
+    save = objects.order_by('result').first()
     if save:
         info['marker_latlngs'] = save.get_latlngs()
         info['points'] = save.points()
 
-def get_grain_info(request, pk, ft_type, **kwargs):
+def get_grain_info(user, pk, ft_type, **kwargs):
     if pk == 'done':
         return {
             'grain_info': 'null',
@@ -861,7 +863,7 @@ def get_grain_info(request, pk, ft_type, **kwargs):
         'images': images_list,
         'rois': rois
     }
-    add_grain_info_markers(info, grain, ft_type, request.user)
+    add_grain_info_markers(info, grain, ft_type, user)
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,
@@ -875,7 +877,7 @@ def count_grain(request, pk):
     return render(
         request,
         'ftc/counting.html',
-        get_grain_info(request, pk, 'S', submit_url=reverse('counting'))
+        get_grain_info(request.user, pk, 'S', submit_url=reverse('counting'))
     )
 
 
@@ -952,7 +954,7 @@ class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
         pk = self.kwargs['pk']
         ctx = super().get_context_data(**kwargs)
         ctx.update(get_grain_info(
-            self.request,
+            self.request.user,
             pk,
             self.ft_type,
             **count_my_grain_extra_links(self.request.user, pk, self.ft_type)
