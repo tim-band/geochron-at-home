@@ -14,7 +14,7 @@ from ftc.views import (home, signmeup, report, getTableData,
     download_rois, download_roiss,
     getCsvResults, GrainDeleteView, tutorialPage, tutorialEnd,
     TutorialCreateView, TutorialUpdateView, TutorialListView,
-    TutorialDeleteView)
+    TutorialDeleteView, publicSample)
 from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
@@ -70,6 +70,7 @@ urlpatterns = [
     path('tutorialpage/<pk>/update/', TutorialUpdateView.as_view(), name='tutorial_update'),
     path('tutorialpage/<pk>/delete/', TutorialDeleteView.as_view(), name='tutorial_delete'),
     path('tutorialpage_create/', TutorialCreateView.as_view(), name='tutorial_create'),
+    path('public/<sample>/<grain>/', publicSample, name='public_sample'),
 
     path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get_jwt_token'),
     path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh_jwt_token'),

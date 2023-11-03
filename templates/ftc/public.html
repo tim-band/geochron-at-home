@@ -1,0 +1,230 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+
+{% block head %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<link rel="stylesheet" href="{% static 'Leaflet-1.9.3/leaflet.css' %}" />
+<link rel="stylesheet" href="{% static 'noUiSlider-14.6.3/nouislider.min.css' %}" />
+<style type="text/css">
+#map {
+      position: absolute;
+      top: 40px;
+      bottom: 0;
+      width: 100%;
+    }
+#dropdown-tracknum  .form-control, .dropdown-menu {
+border-radius: 0px;
+}
+
+#dropdown-tracknum .input-group-lg > .input-group-addon{
+border-radius: 0px;
+padding: 0px 6px;
+}
+
+#dropdown-tracknum .form-control {
+background-color: #fff;
+}
+.input-group-lg > .form-control {
+padding: 0px 8px;
+font-size: 44px; /*canot set too big otherwise chromium will not vartical center*/
+font-family: "ds-digitalitalic";
+}
+.input-group-addon {
+    padding: 6px 6px;
+}
+
+.noUi-base {
+    box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+    border-radius: 4px;
+}
+
+.noUi-handle {
+    cursor: default;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: none repeat scroll 0% 0% #fff;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+    text-align: center;
+    font-weight: bold;
+    font-size: large;
+}
+
+.noUi-vertical .noUi-handle:before,
+.noUi-vertical .noUi-handle:after {
+    width: 0px;
+}
+
+#tracknum {
+  width:90px;
+  height:46px;
+  line-height: 1.3px;
+  text-align: center;
+  font-family: 'ds-digitalitalic';
+  font-size: 44px;
+}
+
+#btn-tracknum {
+  width:30px;height:46px;border-radius:0;padding:6px 1px;
+}
+
+#btn-comment {
+    height: 50px;
+}
+
+.noUi-vertical .noUi-tooltip {
+    transform: none;
+    -webkit-transform: none;
+    top: 0;
+    height: 100%;
+    left: 0;
+    width: 100%;
+    border: none;
+    line-height: 140%;
+}
+
+.ftc-uscale {
+    background-color: gray;
+}
+
+.ftc-uscale-line-10 {
+    background-image: repeating-linear-gradient(
+        to right, white 0%, white 10%, gray 10%, gray 20%
+    );
+}
+
+.ftc-uscale-line-5 {
+    background-image: repeating-linear-gradient(
+        to right, white 0%, white 20%, gray 20%, gray 40%
+    );
+}
+
+.ftc-uscale-line-2 {
+    background-image: repeating-linear-gradient(
+        to right, white 0%, white 50%, gray 50%, gray 100%
+    );
+}
+
+.overlay-box {
+    position: fixed;
+    background: white;
+    border: 1px solid black;
+    z-index: 500;
+    overflow: auto;
+    left: 70%;
+    width: 25%;
+    top: 90%;
+    height: 5%;
+}
+
+.visible {
+    display: block;
+}
+
+.overlay-box .text {
+    margin: 10px;
+    overflow: scroll;
+}
+
+#correction {
+    font-weight: bold;
+}
+
+.button {
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+.button-bar {
+    position: sticky;
+    bottom: 0;
+    padding: 7px 10px;
+}
+
+</style>
+<script src="{% static 'Leaflet-1.9.3/leaflet.js' %}"></script>
+<script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
+<script type='text/javascript' src="{% static 'counting/script/jquery.mousewheel.js' %}"></script>
+<script type='text/javascript' src="{% static 'noUiSlider-14.6.3/nouislider.min.js' %}"></script>
+<script type='text/javascript' src="{% static 'counting/script/geochron.js' %}"></script>
+<script type='text/javascript'>
+var map = null;
+
+function previous_page() {
+    //{% if prev_page %}
+    window.location = '{% url "public_sample" prev_page.sample.pk prev_page.index %}';
+    //{% endif %}
+}
+
+function next_page() {
+    //{% if next_page %}
+    window.location = '{% url "public_sample" next_page.sample.pk next_page.index %}';
+    //{% endif %}
+}
+
+function setup() {
+    $(document.body).on('shown.bs.dropdown', function() {
+        $('[autofocus]').focus();
+    });
+    map = grain_view({
+        grain_info: JSON.parse('{{ grain_info|escapejs }}'),
+        atoken: '{{ csrf_token }}',
+        iconUrl_normal: "{% static 'counting/images/basic-box.svg' %}",
+        iconUrl_selected: "{% static 'counting/images/basic-box.svg' %}",
+        iconUrl_comment: "{% static 'counting/images/highlight-box.svg' %}",
+        iconSize: 40,
+        iconAnchor: [20, 20],
+        iconPopup: [20, 0]
+    });
+}
+</script>
+{% endblock %}
+
+{% block left_nav_li %}
+{% endblock %}
+{% block right_nav_li %}{% endblock %}
+{% block right_nav_fn_counting %}{% endblock %}
+
+{% block body_attributes %}onload='setup()'{% endblock %}
+
+{% block help %}
+<div class="btn-group">
+    <div type="button" class="btn navbar-link dropdown-toggle" data-toggle="dropdown">
+        <i class="fa fa-question-circle fa-lg"></i>
+    </div>
+    <ul id="help-list" class="dropdown-menu"></ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="dropdown-tracknum" class="input-group">
+<div class="btn-group">
+</div>
+</div>
+<div style="clear:both;"></div>
+
+<div id="map" style="cursor: crosshair; position: absolute; top: 50px; bottom: 0; width: 100%; "></div>
+
+{% if prev_page or next_page %}
+<div class="overlay-box">
+    <div class="button-bar">
+        <span>
+            {% if prev_page %}
+            <button type="button" id="previous" onclick="previous_page()" class="button">
+                Previous Page
+            </button>
+            {% endif %}
+            {% if next_page %}
+            <button type="button" id="next" onclick="next_page()" class="button">
+                Next Page
+            </button>
+            {% endif %}
+        </span>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block footer %}{% endblock %}

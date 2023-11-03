@@ -25,6 +25,7 @@
         <tr><td>Priority</td><td>{{object.priority}}</td></tr>
         <tr><td>Minimum contributor number</td><td>{{object.min_contributor_num}}</td></tr>
         <tr><td>Completed?</td><td>{{object.completed}}</td></tr>
+        <tr><td>Public?</td><td>{{object.public}}</td></tr>
         <tr><td>Project owner</td><td>{{object.get_owner}}</td></tr>
     </table>
     <a id="edit-sample" href="{% url 'sample_update' object.pk %}">Edit</a>
@@ -42,6 +43,7 @@
             <th></th>
             <th></th>
             <th></th>
+            <th></th>
         </tr>
         <tr>
             <th>Grain</th>
@@ -53,6 +55,7 @@
             <th>Minerals</th>
             <th>Mica</th>
             <th>ROI</th>
+            <th>Public</th>
             <th>Tutorial</th>
             <th>Delete</th>
         </tr>
@@ -86,6 +89,7 @@
             <td><a id="count-link-{{ g.index }}" href="{% url 'count_my' g.pk %}">Count</a></td>
             <td><a id="count-mica-link-{{ g.index }}" href="{% url 'count_my_mica' g.pk %}">Count Mica</a></td>
             <td><a id="download-rois-{{ g.index }}" href="{% url 'download_grain_rois' g.pk %}" download="rois.json">Download ROI</a></td>
+            <td><a id="public-{{ g.index }}" href="{% url 'public_sample' object.pk g.index %}">public</a></td>
             <td>
                 {% if result != None %}
                     <a id='tutorial-page-{{ g.index }}' href="{% url 'tutorial_pages_of' g.pk object.get_owner %}">Tutorial pages</a>
