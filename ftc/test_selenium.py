@@ -339,6 +339,14 @@ class ProfilePage(BasePage):
         return ProjectsPage(self.driver, self.url)
 
 
+class PublicPage(BasePage):
+    def track_count(self):
+        elt = self.find_by_id('track-count')
+        if elt.text.isnumeric:
+            return int(elt.text)
+        return None
+
+
 class CountingPage(BasePage):
     def check(self):
         self.find_by_id('btn-tracknum')
@@ -650,6 +658,13 @@ class SamplePage(BasePage):
             '//table[@id="grain-set"]/tbody/tr/td/a[@id="count-mica-link-{0}"]'.format(index)
         )
         return CountingPage(self.driver, self.url)
+
+    def go_public(self, index):
+        self.click_element(
+            By.XPATH,
+            '//table[@id="grain-set"]/tbody/tr/td/a[@id="public-{0}"]'.format(index)
+        )
+        return PublicPage(self.driver, self.url)
 
     def grain_present(self, pk):
         es = self.driver.find_elements(
@@ -1652,3 +1667,17 @@ class GrainsWithDifferentlySizedRegions(SeleniumTests):
         counting = samples.go_sample('s1').go_count(6).check()
         assert self.driver.current_url.endswith('/6/')
         self.assert_all_markers_are_close_to_edge(counting)
+
+class GrainsWithDifferentlySizedRegions(SeleniumTests):
+    fixtures = [
+        'essential.json',
+        'grain_with_images.json',
+        'grain_with_images_mineral_only.json',
+        'results_for_gwi_m.json'
+    ]
+    def test_public_results_count(self):
+        self.sign_in(self.project_user)
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('p1')
+        public_page = samples.go_sample('s1').go_public(3).check()
+        assert public_page.track_count() == 3

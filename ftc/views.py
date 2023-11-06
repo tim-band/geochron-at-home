@@ -14,6 +14,7 @@ from django.http import (HttpResponse, HttpResponseRedirect,
     HttpResponseForbidden)
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.core.exceptions import PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import redirect
 
@@ -172,7 +173,14 @@ class SampleCreateView(ParentCreatorOrSuperuserMixin, CreateView):
 class SampleUpdateView(CreatorOrSuperuserMixin, UpdateView):
     model = Sample
     template_name = "ftc/sample_update.html"
-    fields = ['sample_name', 'sample_property', 'priority', 'min_contributor_num', 'completed']
+    fields = [
+        'sample_name',
+        'sample_property',
+        'priority',
+        'min_contributor_num',
+        'completed',
+        'public'
+    ]
 
 
 def json_array(arr):
@@ -565,6 +573,42 @@ def tutorialEnd(request):
     return render(request, 'ftc/tutorial_end.html')
 
 @csrf_protect
+def publicSample(request, sample, grain):
+    g = Grain.objects.get(sample=sample, index=grain)
+    user = g.sample.in_project.creator
+    if not g.sample.public:
+        # it's not public, but the creator is allowed to see it
+        if not request.user.is_authenticated or user != request.user:
+            raise PermissionDenied('This sample is not public')
+    ft_type = 'S'
+    result_query = Subquery(FissionTrackNumbering.objects.filter(
+        worker=user,
+        grain=OuterRef('id'),
+        ft_type=ft_type,
+        result__gte=0
+    ))
+    samples = Grain.objects.annotate(
+        result_exists=Exists(result_query)
+    ).filter(
+        sample=sample,
+        result_exists=True
+    )
+    next = samples.filter(
+        index__gt=grain
+    ).order_by('index').first()
+    prev = samples.filter(
+        index__lt=grain
+    ).order_by('-index').first()
+    ctx = get_grain_info(
+        user,
+        g.pk,
+        ft_type,
+        next_page=next,
+        prev_page=prev
+    )
+    return render(request, 'ftc/public.html', ctx)
+
+@csrf_protect
 @user_passes_test(user_is_staff)
 def grain_update_roi(request, pk):
     grain = Grain.objects.get(pk=pk)
@@ -786,15 +830,15 @@ def get_grain_images_list(grain, ft_type):
     ).order_by('index')
     return list(map(lambda x: reverse('get_image', args=[x.pk]), images))
 
-@login_required
 def get_image(request, pk):
     image = get_object_or_404(Image, pk=pk)
+    if not request.user.is_authenticated and not image.grain.sample.public:
+        raise PermissionDenied('not a public image')
     mime = image.format = 'P' and 'image/png' or 'image/jpeg'
     return HttpResponse(image.data, content_type=mime)
 
 def redirect_to_count(request):
     ft_type = 'S'  # At the moment we're only choosing minerals randomly
-    res = {}
     grain = None
     if request.user.is_active:
         partial_save = FissionTrackNumbering.objects.filter(
@@ -868,6 +912,7 @@ def get_grain_info(user, pk, ft_type, **kwargs):
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,
         'messages': [],
+        'track_count': len(info.get('marker_latlngs', [])),
         **kwargs
     }
 

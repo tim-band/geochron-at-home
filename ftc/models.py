@@ -48,6 +48,7 @@ class Sample(models.Model):
     priority = models.IntegerField(default='0')
     min_contributor_num = models.IntegerField(default='1')
     completed = models.BooleanField(default=False)
+    public = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('sample_name', 'in_project',)
