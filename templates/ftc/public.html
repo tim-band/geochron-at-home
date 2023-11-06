@@ -8,30 +8,10 @@
 <link rel="stylesheet" href="{% static 'noUiSlider-14.6.3/nouislider.min.css' %}" />
 <style type="text/css">
 #map {
-      position: absolute;
-      top: 40px;
-      bottom: 0;
-      width: 100%;
-    }
-#dropdown-tracknum  .form-control, .dropdown-menu {
-border-radius: 0px;
-}
-
-#dropdown-tracknum .input-group-lg > .input-group-addon{
-border-radius: 0px;
-padding: 0px 6px;
-}
-
-#dropdown-tracknum .form-control {
-background-color: #fff;
-}
-.input-group-lg > .form-control {
-padding: 0px 8px;
-font-size: 44px; /*canot set too big otherwise chromium will not vartical center*/
-font-family: "ds-digitalitalic";
-}
-.input-group-addon {
-    padding: 6px 6px;
+    position: absolute;
+    top: 40px;
+    bottom: 0;
+    width: 100%;
 }
 
 .noUi-base {
@@ -53,23 +33,6 @@ font-family: "ds-digitalitalic";
 .noUi-vertical .noUi-handle:before,
 .noUi-vertical .noUi-handle:after {
     width: 0px;
-}
-
-#tracknum {
-  width:90px;
-  height:46px;
-  line-height: 1.3px;
-  text-align: center;
-  font-family: 'ds-digitalitalic';
-  font-size: 44px;
-}
-
-#btn-tracknum {
-  width:30px;height:46px;border-radius:0;padding:6px 1px;
-}
-
-#btn-comment {
-    height: 50px;
 }
 
 .noUi-vertical .noUi-tooltip {
@@ -111,10 +74,8 @@ font-family: "ds-digitalitalic";
     border: 1px solid black;
     z-index: 500;
     overflow: auto;
-    left: 70%;
-    width: 25%;
-    top: 90%;
-    height: 5%;
+    left: 1%;
+    bottom: 3%;
 }
 
 .visible {
@@ -206,9 +167,11 @@ function setup() {
 
 <div id="map" style="cursor: crosshair; position: absolute; top: 50px; bottom: 0; width: 100%; "></div>
 
-{% if prev_page or next_page %}
 <div class="overlay-box">
     <div class="button-bar">
+        <p>
+            Track count: <span id="track-count">{{ track_count }}</span>
+        </p>
         <span>
             {% if prev_page %}
             <button type="button" id="previous" onclick="previous_page()" class="button">
@@ -223,7 +186,6 @@ function setup() {
         </span>
     </div>
 </div>
-{% endif %}
 
 {% endblock %}
 

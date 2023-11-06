@@ -6,7 +6,7 @@ import io
 import json
 from random import uniform
 
-from ftc.models import TutorialPage
+from ftc.models import TutorialPage, Sample
 
 def gen_latlng():
   return [
@@ -37,6 +37,9 @@ class GahCase(TestCase):
 
   def login_super(self):
     self.login('super', 'super_password')
+
+  def login_counter(self):
+    self.login('counter', 'counter_password')
 
   def logout(self):
     self.client.post(reverse('logout'))
@@ -326,3 +329,41 @@ class TutorialPageCase(GahCase):
     tps = TutorialPage.objects.all()
     self.assertEqual(len(tps), 1, 'should still be one tutorial page')
     self.assertEqual(tps[0].pk, tp_pk, 'tutorial page changed')
+
+class PublicPageCase(GahCase):
+  fixtures = [
+    'essential.json',
+    'users.json',
+    'projects.json',
+    'samples.json',
+    'grains.json',
+    'results.json',
+    'images.json'
+  ]
+  def test_sample_publicness_controls_access_to_public_page(self):
+    self.login_counter()
+    r = self.client.get(
+      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
+    )
+    self.assertEqual(r.status_code, 403)
+    s = Sample.objects.get(pk=1)
+    s.public = True
+    s.save()
+    r = self.client.get(
+      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
+    )
+    self.assertEqual(r.status_code, 200)
+
+  def test_sample_publicness_controls_access_to_grain_image(self):
+    self.login_counter()
+    r = self.client.get(
+      reverse('get_image', kwargs={ 'pk': 1 })
+    )
+    self.assertEqual(r.status_code, 403)
+    s = Sample.objects.get(pk=1)
+    s.public = True
+    s.save()
+    r = self.client.get(
+      reverse('get_image', kwargs={ 'pk': 1 })
+    )
+    self.assertEqual(r.status_code, 200)

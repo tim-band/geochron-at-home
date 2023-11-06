@@ -912,6 +912,7 @@ def get_grain_info(user, pk, ft_type, **kwargs):
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,
         'messages': [],
+        'track_count': len(info.get('marker_latlngs', [])),
         **kwargs
     }
 
