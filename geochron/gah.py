@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import csv
+from datetime import date
 from getpass import getpass
 import json
 import os.path
@@ -1092,6 +1093,9 @@ def find_cell(path, x):
             x = x[p]
         else:
             return ''
+    if type(x) is str and (',' in x or '\n' in x):
+        x.replace('"', '""')
+        x = '"{0}"'.format(x)
     return x
 
 
@@ -1110,7 +1114,9 @@ def output_as_csv(xs):
 
 @token_refresh
 def count_list(opts, config):
-    kwargs = opts.all
+    kwargs = {}
+    if opts.all:
+        kwargs['all'] = True
     if opts.sample:
         kwargs['sample'] = opts.sample
     if opts.grain:
@@ -1118,10 +1124,34 @@ def count_list(opts, config):
     with api_get(config, 'count', **kwargs) as response:
         body = response.read()
         result = json.loads(body)
-        if type(result) is list:
+        if type(result) is list and not opts.json:
             output_as_csv(result)
         else:
             print(result)
+
+def count_post(config, count):
+    with api_post(
+        config,
+        'count',
+        grain='{0}/{1}'.format(count['sample'], count['index']),
+        ft_type=count['ft_type'],
+        worker=count['user'],
+        create_date=count['date'],
+        grainpoints=json.dumps(count['points'])
+    ) as response:
+        body = response.read()
+        result = json.loads(body)
+        print(result)
+
+@token_refresh
+def count_upload(opts, config):
+    with open(opts.file) as h:
+        j = json.loads(h.read())
+        if type(j) is list:
+            for obj in j:
+                count_post(config, obj)
+        else:
+            count_post(config, j)
 
 
 def add_count_subparser(subparsers):
@@ -1129,11 +1159,38 @@ def add_count_subparser(subparsers):
     count_parser = subparsers.add_parser('count', help='operations on user count results')
     verbs = count_parser.add_subparsers(dest='count_verb')
     verbs.required = True
-    list_counts = verbs.add_parser('list', help='list count results')
+    list_counts = verbs.add_parser('list', help='list count results as csv or json')
     list_counts.set_defaults(func=count_list)
-    list_counts.add_argument('--all', action='store_const', const={all:None}, default={}, help='report unfinished counts as well')
-    list_counts.add_argument('--sample', help='only report the sample with this name')
+    list_counts.add_argument(
+        '--all',
+        action='store_true',
+        help='report unfinished counts as well'
+    )
+    list_counts.add_argument('--sample', help='only report the sample with this ID or name')
     list_counts.add_argument('--grain', help='only report the grain with this index')
+    list_counts.add_argument(
+        '--json',
+        action='store_true',
+        help='report results as json (instead of CSV)'
+    )
+    upload_count = verbs.add_parser(
+        'upload',
+        help='upload csv count'
+    )
+    upload_count.set_defaults(func=count_upload)
+    upload_count.add_argument(
+        'file',
+        help=(
+            "JSON file containing a list of objects with keys:"
+            " sample (name or ID),"
+            " index (grain index within the sample),"
+            " ft_type ('S' if the grain tracks are counted, 'I' for the mica),"
+            " user (name or ID, the person who did the count),"
+            " date (the date the count was performed on),"
+            " points (list of dicts with keys x_pixels, y_pixels, and"
+            " optionally category and comment)."
+        )
+    )
 
 
 def add_genrois_subparser(subparsers):

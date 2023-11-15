@@ -22,7 +22,7 @@ from ftc.apiviews import request_roiss
 from ftc.get_image_size import get_image_size_from_handle
 from ftc.load_rois import get_rois
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
-    TutorialResult, Region, Vertex, GrainPoint, GrainPointCategory,
+    TutorialResult, Region, Vertex, GrainPointCategory,
     TutorialPage)
 from ftc.parse_image_name import parse_upload_name
 from geochron.gah import parse_metadata_grain, parse_metadata_image
@@ -31,7 +31,6 @@ from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 import csv
 import io
 import json
-import logging
 
 #
 def home(request):
@@ -245,6 +244,7 @@ class GrainDetailUpdateView(CreatorOrSuperuserMixin, UpdateView):
 
 
 class StackImageInput(ClearableFileInput):
+    allow_multiple_selected = True
     def value_from_datadict(self, data, files, name):
         return files.getlist(name)
 
@@ -1040,43 +1040,11 @@ def counting(request, uname=None):
     })
 
 
-def addGrainPointsFromLatlngs(ftn, marker_latlngs):
-    width = ftn.grain.image_width
-    height = ftn.grain.image_height
-    track = GrainPointCategory(name='track')
-    GrainPoint.objects.bulk_create([
-        GrainPoint(
-            category=track,
-            result=ftn,
-            x_pixels=lng * width,
-            y_pixels=height - lat * width
-        )
-        for (lat, lng) in marker_latlngs
-    ])
-
-
-def addGrainPointsFromGrainPoints(ftn, points):
-    for p in points:
-        category = p['category']
-        gpc = GrainPointCategory.objects.get(pk=category)
-        if gpc is None:
-            logging.warn('No such category {0}'.format(category))
-            gpc = GrainPointCategory.objects.get(pk='track')
-        gp = GrainPoint(
-            result=ftn,
-            x_pixels=p['x_pixels'],
-            y_pixels=p['y_pixels'],
-            comment=p['comment'],
-            category=gpc
-        )
-        gp.save()
-
-
 def addGrainPoints(ftn, res_dic):
     if 'points' in res_dic:
-        addGrainPointsFromGrainPoints(ftn, res_dic['points'])
+        ftn.addGrainPointsFromGrainPoints(res_dic['points'])
     else:
-        addGrainPointsFromLatlngs(ftn, res_dic['marker_latlngs'])
+        ftn.addGrainPointsFromLatlngs(res_dic['marker_latlngs'])
 
 
 def grainPointCount(res_dic):

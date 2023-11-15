@@ -553,11 +553,7 @@ function:
 ```sh
 (geochron-at-home) $ ./gah.py sample new Sample123 2 T 20 50
 b'{"id":199,"sample_name":"Sample123","in_project":2,"sample_property":"T","priority":20,"min_contributor_num":50,"completed":false}'
-<<<<<<< HEAD
 (geochron-at-home) $ ./gah.py grain upload --sample 199 /path/to/directory/of/grains
-=======
-(geochron-at-home) $ ./gah.py grain upload 199 /path/to/directory/of/grains
->>>>>>> 80d7c0de5fc206f69ea2f9e0a5696c1c3a4e91f3
 Created new grain 28
 Uploaded image /path/to/directory/of/grains/Grain01/Stack-09.jpg as image 469
 Uploaded image /path/to/directory/of/grains/Grain01/Stack-07.jpg as image 470

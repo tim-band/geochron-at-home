@@ -9,12 +9,16 @@ import logging
 from rest_framework import exceptions
 from rest_framework import generics, serializers
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.fields import empty
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 from ftc.load_rois import get_rois, get_roiss
-from ftc.models import Project, Sample, Grain, Image, FissionTrackNumbering, Transform2D
+from ftc.models import (
+    Project, Sample, Grain, Image, FissionTrackNumbering,
+    Transform2D, GrainPoint, GrainPointCategory
+)
 from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
 
@@ -389,21 +393,87 @@ class ImageInfoView(RetrieveUpdateDeleteView):
 
 class FissionTrackNumberingSerializer(serializers.ModelSerializer):
     class UserRelatedField(serializers.RelatedField):
+        def get_queryset(self):
+            return super().get_queryset()
         def to_representation(self, obj):
             out = {}
             for a in ['id', 'username', 'email']:
                 out[a] = getattr(obj, a)
             return out
+        def to_internal_value(self, data):
+            return User.objects.get(username=data)
 
-    worker = UserRelatedField(read_only=True)
+    class GrainField(serializers.RelatedField):
+        default_error_messages = {
+            'grain_format': 'grain format is <sample-name-or-id>/<index> or <id>; {data} does not match'
+        }
+        def get_queryset(self):
+            return super().get_queryset()
+        def to_internal_value(self, data):
+            parts = data.split('/')
+            gs = Grain.objects
+            if len(parts) == 1 and data.isnumeric():
+                return gs.get(pk=data)
+            if len(parts) != 2 or not parts[1].isnumeric():
+                self.fail('grain_format', data=data)
+            [sample, index] = parts
+            index = int(index)
+            if sample.isnumeric():
+                gs = gs.filter(sample__pk=sample)
+            else:
+                gs = gs.filter(sample__sample_name=sample)
+            return gs.get(index=index)
+        def to_representation(self, value):
+            return value.pk
+
+    # class GrainPointSerializer(serializers.ModelSerializer):
+    #     class Meta:
+    #         model = GrainPoint
+    #         fields = ['x_pixels', 'y_pixels', 'category', 'comment']
+
+    class LatLngSizeDefault:
+        """
+        A default value that gets the number of latlngs specified
+        """
+        requires_context = True
+        def __call__(self, serializer_field):
+            latlngs = serializer_field.parent.initial_data.getlist('latlngs')
+            return len(latlngs)
+
+    worker = UserRelatedField()
+    result = serializers.IntegerField(default=LatLngSizeDefault())
+    grain = GrainField()
+    latlngs = serializers.CharField(read_only=True)
+    # For some reason this "normal" way doesn't work, so we override
+    # create and run_validation
+    #grainpoints = GrainPointSerializer(many=True)
 
     class Meta:
         model = FissionTrackNumbering
         fields = ['id', 'grain', 'ft_type', 'worker',
             'result', 'create_date', 'latlngs']
 
+    def run_validation(self, data=...):
+        ret = super().run_validation(data)
+        gps = data.get('grainpoints', [])
+        ret['grainpoints'] = json.loads(gps)
+        return ret
 
-class FissionTrackNumberingView(generics.ListAPIView):
+    def create(self, validated_data):
+        points = validated_data.pop('grainpoints')
+        ftn = FissionTrackNumbering.objects.filter(
+            grain=validated_data['grain'],
+            worker=validated_data['worker']
+        ).delete()
+        ftn = FissionTrackNumbering.objects.create(**validated_data)
+        for point in points:
+            point["category"] = GrainPointCategory.objects.get(
+                name=point.get("category", "track")
+            )
+            GrainPoint.objects.create(result=ftn, **point)
+        return ftn
+
+class FissionTrackNumberingView(generics.ListCreateAPIView):
     serializer_class = FissionTrackNumberingSerializer
     model = FissionTrackNumbering
 
@@ -413,7 +483,11 @@ class FissionTrackNumberingView(generics.ListAPIView):
         if 'all' not in params:
             qs = qs.filter(result__gte=0)
         if 'sample' in params:
-            qs = qs.filter(grain__sample=params['in_sample'])
+            sample = params['sample']
+            if sample.isnumeric():
+                qs = qs.filter(grain__sample=sample)
+            else:
+                qs = qs.filter(grain__sample__sample_name=sample)
         if 'grain' in params:
             qs = qs.filter(grain__index=params['grain'])
         return qs.order_by('grain__sample', 'grain__index').select_related('worker')
