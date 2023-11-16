@@ -437,8 +437,8 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
         """
         requires_context = True
         def __call__(self, serializer_field):
-            latlngs = serializer_field.parent.initial_data.getlist('latlngs')
-            return len(latlngs)
+            grainpoints = serializer_field.parent.initial_data.getlist('grainpoints')
+            return len(grainpoints)
 
     worker = UserRelatedField()
     result = serializers.IntegerField(default=LatLngSizeDefault())

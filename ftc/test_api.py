@@ -1,6 +1,6 @@
 from django.test import Client, TestCase, tag, override_settings
 import django
-from ftc.models import Grain
+from ftc.models import Grain, FissionTrackNumbering
 from geochron.settings import SIMPLE_JWT
 
 import json
@@ -679,8 +679,16 @@ class ApiCount(ApiTestMixin, JwtTestCase):
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content.decode(r.charset))
         self.assertEqual(len(j), 1)
+        # Check the correct number of points
         jl = json.loads(j[0]['latlngs'])
         self.assertEqual(len(jl), 3)
+        # Check the FTN object has the correct "result"
+        ftn = FissionTrackNumbering.objects.get(
+            worker__username="counter",
+            grain__sample__pk=2,
+            grain__index=1
+        )
+        self.assertEqual(ftn.result, 3)
         data = {
             'grain': '2/1',
             'ft_type': 'S',
@@ -698,6 +706,12 @@ class ApiCount(ApiTestMixin, JwtTestCase):
         # but this time it has just one point
         jl = json.loads(j[0]['latlngs'])
         self.assertEqual(len(jl), 1)
+        ftn = FissionTrackNumbering.objects.get(
+            worker__username="counter",
+            grain__sample__pk=2,
+            grain__index=1
+        )
+        self.assertEqual(ftn.result, 1)
 
     def assertSetAlmostEqual(self, xs, ys, cmp):
         """
