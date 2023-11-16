@@ -1,17 +1,9 @@
 from django.test import Client, TestCase, tag, override_settings
 import django
-from ftc.models import (
-    Project,
-    Sample,
-    Grain,
-    Image
-)
+from ftc.models import Grain
 from geochron.settings import SIMPLE_JWT
 
-import io
 import json
-import sys
-import unittest
 
 
 testGrain1 = 'test/crystals/john/p1/s1/Grain01/stack-01.jpg'
@@ -418,7 +410,7 @@ class ApiGrainUpdate(ApiTestMixin, JwtTestCase):
         'grains.json'
     ]
 
-    def test_grain_update_roi(self):
+    def test_grain_update_index(self):
         new_index = 23
         r = self.client.patch('/ftc/api/grain/2/', {
             'index' : new_index
@@ -577,9 +569,15 @@ class ApiImageUpdate(ApiTestMixin, JwtTestCase):
                 'grain': 1
             }, content_type='application/json', **self.super_headers)
     
+def latlngs_close(lla, llb):
+    [lata, lnga] = lla
+    [latb, lngb] = llb
+    dlat = lata - latb
+    dlng = lnga - lngb
+    return dlat * dlat + dlng * dlng < 1e-4
 
 @tag('api')
-class ApiCount(JwtTestCase):
+class ApiCount(ApiTestMixin, JwtTestCase):
     fixtures = [
         'essential.json',
         'users.json',
@@ -590,6 +588,7 @@ class ApiCount(JwtTestCase):
     ]
 
     def setUp(self):
+        super().setUp()
         self.latlngs = [
             [0.1, 0.2],
             [0.2, 0.4],
@@ -606,12 +605,116 @@ class ApiCount(JwtTestCase):
         self.assertEqual(r.status_code, 200)
         self.headers = log_in_headers(self.client, 'counter', 'counter_password')
 
+    def upload_sample_2_results(self):
+        self.latlngs2 = [
+            [0.31, 0.24],
+            [0.1, 0.42],
+            [0.17, 0.12]
+        ]
+        r = self.client.post('/ftc/updateFtnResult/', {
+            'marker_latlngs': self.latlngs2,
+            'sample_id': 2,
+            'grain_num': 1,
+            'ft_type': 'T'
+        }, content_type='application/json')
+
     def test_download_count(self):
         r = self.client.get('/ftc/api/count/', {'all': True}, **self.headers)
         j = json.loads(r.content.decode(r.charset))
         jl = json.loads(j[0]['latlngs'])
         self.assertListAlmostEqual(jl, self.latlngs)
         self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
+
+    def test_download_count_from_one_named_sample(self):
+        self.upload_sample_2_results()
+        r = self.client.get('/ftc/api/count/', {'sample': 'adm_samp'}, **self.headers)
+        j = json.loads(r.content.decode(r.charset))
+        jl = json.loads(j[0]['latlngs'])
+        self.assertListAlmostEqual(jl, self.latlngs)
+        self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
+
+    def test_download_count_from_one_identified_sample(self):
+        self.upload_sample_2_results()
+        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        j = json.loads(r.content.decode(r.charset))
+        jl = json.loads(j[0]['latlngs'])
+        self.assertListAlmostEqual(jl, self.latlngs2)
+        self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
+
+    def test_upload_count(self):
+        latlngs = [
+            [0.1, 0.5],
+            [0.3, 0.4],
+            [0.7, 0.1],
+            [0.8, 0.6]
+        ]
+        sample = 2
+        index = 1
+        grain = Grain.objects.get(sample__pk=sample, index=index)
+        points = [{
+            'x_pixels': latlng[1] * grain.image_width,
+            'y_pixels': grain.image_height - latlng[0] * grain.image_width,
+            'category': 'track',
+            'comment': ''
+        } for latlng in latlngs]
+        data = {
+            'grain': '{0}/{1}'.format(sample, index),
+            'ft_type': 'S',
+            'worker': 'admin',
+            'create_date': '2023-11-14',
+            'grainpoints': json.dumps(points),
+        }
+        r = self.client.post('/ftc/api/count/', data, **self.super_headers)
+        self.assertEqual(r.status_code, 201)
+        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content.decode(r.charset))
+        jl = json.loads(j[0]['latlngs'])
+        self.assertSetAlmostEqual(jl, latlngs, latlngs_close)
+        self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, j[0]['worker'])
+
+    def test_upload_deletes_existing(self):
+        self.upload_sample_2_results()
+        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content.decode(r.charset))
+        self.assertEqual(len(j), 1)
+        jl = json.loads(j[0]['latlngs'])
+        self.assertEqual(len(jl), 3)
+        data = {
+            'grain': '2/1',
+            'ft_type': 'S',
+            'worker': 'counter',
+            'create_date': '2023-11-14',
+            'grainpoints': '[{"x_pixels": 120, "y_pixels": 123}]'
+        }
+        r = self.client.post('/ftc/api/count/', data, **self.headers)
+        self.assertEqual(r.status_code, 201)
+        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        self.assertEqual(r.status_code, 200)
+        # Should still only have one result
+        j = json.loads(r.content.decode(r.charset))
+        self.assertEqual(len(j), 1)
+        # but this time it has just one point
+        jl = json.loads(j[0]['latlngs'])
+        self.assertEqual(len(jl), 1)
+
+    def assertSetAlmostEqual(self, xs, ys, cmp):
+        """
+        asserts that iterables xs and ys contain items similar
+        enough to each other according to cmp(x,y).
+        It is only guaranteed to work if there's only one item in
+        x that is close to each item in y.
+        """
+        ss = list(xs)
+        def remove_cmp(y, ss):
+            for i in range(len(ss)):
+                if cmp(ss[i], y):
+                    ss = ss[:i] + ss[i + 1:]
+                    return
+            self.fail("No matching element {0} in {1}".format(y, xs))
+        for y in ys:
+            remove_cmp(y, ss)
 
     def assertListAlmostEqual(self, xs, ys):
         if type(xs) is list and type(ys) is list:

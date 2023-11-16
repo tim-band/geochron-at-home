@@ -4,6 +4,7 @@ from django.core.validators import RegexValidator
 from django.urls import reverse
 from django_prometheus.models import ExportModelOperationsMixin
 import json
+import logging
 
 class Project(models.Model):
     alphanumeric = RegexValidator(r'^[0-9a-zA-Z_-]+$', 'Only alphanumeric, "-" and "_" are allowed.')
@@ -267,12 +268,56 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
             [ (height - gp.y_pixels) / width, gp.x_pixels / width ]
             for gp in self.grainpoint_set.filter(category__name='track')
         ]
-    
+
+    @property
     def latlngs(self):
         """
         Returns the old latlngs field for backward compatibility.
         """
         return json.dumps(self.get_latlngs())
+
+    @latlngs.setter
+    def latlngs(self, value : list[list[float]]):
+        self.grainpoint_set.all().delete()
+        self.addGrainPointsFromLatlngs(value)
+
+    def addGrainPointsFromLatlngs(self, marker_latlngs : list[list[float]]):
+        width = self.grain.image_width
+        height = self.grain.image_height
+        track = GrainPointCategory(name='track')
+        GrainPoint.objects.bulk_create([
+            GrainPoint(
+                category=track,
+                result=self,
+                x_pixels=lng * width,
+                y_pixels=height - lat * width
+            )
+            for (lat, lng) in marker_latlngs
+        ])
+
+    def addGrainPointsFromGrainPoints(self, points : list[dict[str, any]]):
+        """
+        Add grain points from a list of dicts. Each dict has elements
+        `x_pixels` and `y_pixels` for the co-ordinates of the track with
+        (0,0) being the top left, `category` being 'track' or one of the
+        other category names, and `comment` being a string describing the
+        point.
+        """
+        for p in points:
+            category = p.get('category', 'track')
+            gpc = GrainPointCategory.objects.get(pk=category)
+            if gpc is None:
+                logging.warn('No such category {0}'.format(category))
+                gpc = GrainPointCategory.objects.get(pk='track')
+            gp = GrainPoint(
+                result=self,
+                x_pixels=p['x_pixels'],
+                y_pixels=p['y_pixels'],
+                comment=p.get('comment', ''),
+                category=gpc
+            )
+            gp.save()
+
 
 #
 class TutorialResult(models.Model):
