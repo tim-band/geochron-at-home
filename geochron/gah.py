@@ -563,8 +563,6 @@ def sample_new(opts, config):
         if 'id' in result:
             id = result['id']
             print('Created new sample with ID: {0}'.format(id))
-            return id
-        return None
 
 
 @token_refresh
@@ -739,8 +737,7 @@ def grain_list(opts, config):
             print(result)
 
 
-@token_refresh
-def grain_new(opts, config):
+def grain_new_with_id(opts, config):
     with api_upload(
         config, 'sample', opts.sample, 'grain',
         rois=open(opts.rois, 'rb'),
@@ -751,6 +748,12 @@ def grain_new(opts, config):
         id = result['id']
         print("Created new grain", id)
         return id
+
+
+@token_refresh
+def grain_new(opts, config):
+    grain_new_with_id(opts, config)
+    return None
 
 
 def output_json(opts, object):
@@ -982,7 +985,7 @@ def grain_upload(opts, config, make_sample_fn=None, explicit_sample_name=None):
                         new_samples.append(sample)
             try:
                 n += 1
-                grain = grain_new(opts, config)
+                grain = grain_new_with_id(opts, config)
                 files = os.listdir(root)
                 images = [os.path.join(root, f) for f in files if os.path.splitext(f)[1] in ('.jpg', '.jpeg', '.png')]
                 image_opts = argparse.Namespace(grain=grain, image=images)
