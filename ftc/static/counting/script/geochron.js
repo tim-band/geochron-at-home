@@ -779,13 +779,14 @@ function grain_view(options) {
             }
             return inside;
         };
-        function point_in_any_polygon(x, y, vss) {
+        function point_in_odd_number_of_polygons(x, y, vss) {
+            var count = 0;
             for (var i =0; i !== vss.length; ++i) {
                 if (point_in_polygon(x, y, vss[i])) {
-                    return true;
+                    count += 1;
                 }
             }
-            return false;
+            return (count % 2) === 1;
         }
         function add_current_layer() {
             if (layerRendered < imageOverlayers.length) {
@@ -821,7 +822,7 @@ function grain_view(options) {
                 refresh();
             },
             pointInRois: function(x, y) {
-                return point_in_any_polygon(x, y, rois);
+                return point_in_odd_number_of_polygons(x, y, rois);
             },
             rois_layer: rois_layer
         };
