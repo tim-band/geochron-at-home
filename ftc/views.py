@@ -866,7 +866,7 @@ def add_grain_info_markers(info, grain, ft_type, worker):
         objects = objects.filter(worker=worker)
     save = objects.order_by('result').first()
     if save:
-        info['marker_latlngs'] = save.get_latlngs()
+        info['marker_latlngs'] = save.get_latlngs_within_roi()
         info['points'] = save.points()
 
 def get_grain_info(user, pk, ft_type, **kwargs):
