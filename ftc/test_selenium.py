@@ -1668,7 +1668,30 @@ class GrainsWithDifferentlySizedRegions(SeleniumTests):
         assert self.driver.current_url.endswith('/6/')
         self.assert_all_markers_are_close_to_edge(counting)
 
-class GrainsWithDifferentlySizedRegions(SeleniumTests):
+class RegionWithHole(SeleniumTests):
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'test_user.json',
+        'projects.json',
+        'samples.json',
+        'grain_with_negative_region.json',
+    ]
+
+    def test_cannot_count_tracks_in_hole(self):
+        counting = self.sign_in(self.test_user).go_start_counting().check()
+        # start counting tracks
+        counting.check_count("000")
+        counting.click_at(0.1, 0.1)
+        counting.check_count("001")
+        counting.click_at(0.5, 0.5)
+        # this one is inside both boundaries so is in the hole
+        counting.check_count("001")
+        counting.click_at(0.9, 0.9)
+        counting.check_count("002")
+
+
+class PublicPageResults(SeleniumTests):
     fixtures = [
         'essential.json',
         'grain_with_images.json',
