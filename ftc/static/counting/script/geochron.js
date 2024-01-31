@@ -1062,11 +1062,11 @@ function grain_view(options) {
         }
         forEachCreateMarker(grain_info.points, function(create, point) {
             if (point_filter(point)) {
-                create(
-                    [(height - point.y_pixels) / width, point.x_pixels / width],
-                    point.category,
-                    point.comment
-                );
+                var lat = (height - point.y_pixels) / width;
+                var lng = point.x_pixels / width;
+                if (zStack.pointInRois(lat, lng)) {
+                    create([lat, lng], point.category, point.comment);
+                }
             }
         });
         undo.reset();
