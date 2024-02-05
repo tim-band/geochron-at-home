@@ -40,7 +40,7 @@
         "fields": {
             "result": 1,
             "category": "track",
-            "x_pixels": 80,
+            "x_pixels": 8,
             "y_pixels": 120
         }
     },
@@ -51,7 +51,7 @@
             "result": 1,
             "category": "inclusion",
             "x_pixels": 40,
-            "y_pixels": 362
+            "y_pixels": 36
         }
     },
     {
@@ -61,7 +61,7 @@
             "result": 1,
             "category": "defect",
             "x_pixels": 201,
-            "y_pixels": 160
+            "y_pixels": 16
         }
     },
     {

@@ -5,6 +5,7 @@ import csv
 import io
 import json
 from random import uniform
+import re
 
 from ftc.models import TutorialPage, Sample
 
@@ -305,9 +306,11 @@ class TutorialPageCase(GahCase):
   fixtures = [
     'essential.json',
     'users.json',
+    'counter_verification.json',
     'projects.json',
     'samples.json',
     'grains.json',
+    'grain1_region.json',
     'tutorial_pages.json'
   ]
   def test_modifying_results_does_not_delete_tutorial_page(self):
@@ -329,6 +332,43 @@ class TutorialPageCase(GahCase):
     tps = TutorialPage.objects.all()
     self.assertEqual(len(tps), 1, 'should still be one tutorial page')
     self.assertEqual(tps[0].pk, tp_pk, 'tutorial page changed')
+
+  def get_tutorial_page_grain_info(self, pk):
+    r = self.client.get(reverse('tutorial_page', kwargs={'pk': pk}))
+    content = r.content.decode('utf-8')
+    grain_info_json = re.search(r"grain_info:\s*JSON.parse\('(.*)'\)", content).group(1)
+    grain_info_json = grain_info_json.replace("\\u0022", '"')
+    return json.loads(grain_info_json)
+
+  def test_adding_count_does_not_change_tutorial(self):
+    self.login_counter()
+    grain_info = self.get_tutorial_page_grain_info(1)
+    self.assertEqual(len(grain_info["points"]), 3)
+    r = self.client.post(
+      reverse('updateFtnResult'),
+      {
+        'sample_id': 1,
+        'grain_num': 1,
+        'ft_type': 'S',
+        'marker_latlngs': gen_latlngs(2)
+      },
+      content_type='application/json'
+    )
+    self.assertEqual(r.status_code, 200)
+    grain_info = self.get_tutorial_page_grain_info(1)
+    self.assertEqual(len(grain_info["points"]), 3)
+    r = self.client.post(
+      reverse('updateFtnResult'),
+      {
+        'sample_id': 1,
+        'grain_num': 1,
+        'ft_type': 'S',
+        'marker_latlngs': gen_latlngs(6)
+      },
+      content_type='application/json'
+    )
+    grain_info = self.get_tutorial_page_grain_info(1)
+    self.assertEqual(len(grain_info["points"]), 3)
 
 class PublicPageCase(GahCase):
   fixtures = [

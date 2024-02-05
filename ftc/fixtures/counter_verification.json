@@ -1,0 +1,12 @@
+[
+    {
+        "model": "account.emailaddress",
+        "pk": 103,
+        "fields": {
+            "email": "counter@uni.ac.uk",
+            "user_id": 103,
+            "primary": true,
+            "verified": true
+        }
+    }
+]
