@@ -373,13 +373,21 @@ class CountingPage(BasePage):
         )
         return self
 
-    def click_at(self, x, y):
+    def try_click_at(self, x, y):
         mp = self.driver.find_element(By.ID, "map")
         lil = mp.find_element(By.CSS_SELECTOR,  'img.leaflet-image-layer')
         actions = ActionChains(self.driver)
         actions.move_to_element_with_offset(lil,
             (x - 0.5) * lil.rect["width"], (y - 0.5) * lil.size["height"])
         actions.click().pause(1.0).perform()
+        return self
+
+    def click_at(self, x, y):
+        retrying(
+            3,
+            lambda: self.try_click_at(x, y),
+            0.3
+        )
         return self
 
     def leaflet_image_layer(self):
@@ -1472,7 +1480,7 @@ class WithTwoGrainsUploaded(SeleniumTests):
         self.sign_in(self.project_user)
         samples = ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_count(1)
+        counting = samples.go_sample('s1').go_count(1).check()
         self.assertFalse(counting.undo_available())
         self.assertFalse(counting.redo_available())
         counting.click_at(0.6, 0.35)
