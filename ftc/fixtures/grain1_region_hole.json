@@ -1,0 +1,45 @@
+[
+  {
+    "model": "ftc.region",
+    "pk": 11,
+    "fields": {
+      "grain": 1
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 15,
+    "fields": {
+      "region": 11,
+      "x": 70,
+      "y": 80
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 16,
+    "fields": {
+      "region": 11,
+      "x": 80,
+      "y": 70
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 17,
+    "fields": {
+      "region": 11,
+      "x": 80,
+      "y": 70
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 18,
+    "fields": {
+      "region": 11,
+      "x": 70,
+      "y": 70
+    }
+  }
+]
