@@ -378,7 +378,9 @@ class PublicPageCase(GahCase):
     'samples.json',
     'grains.json',
     'results.json',
-    'images.json'
+    'images.json',
+    'grain1_region.json',
+    'grain1_region_hole.json'
   ]
   def test_sample_publicness_controls_access_to_public_page(self):
     self.login_counter()
@@ -407,3 +409,20 @@ class PublicPageCase(GahCase):
       reverse('get_image', kwargs={ 'pk': 1 })
     )
     self.assertEqual(r.status_code, 200)
+
+  def test_public_markers(self):
+    self.login_counter()
+    s = Sample.objects.get(pk=1)
+    s.public = True
+    s.save()
+    r = self.client.get(
+      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
+    )
+    self.assertEqual(r.status_code, 200)
+    content = r.content.decode('utf-8')
+    grain_info_json = re.search(r"grain_info:\s*JSON.parse\('(.*)'\)", content).group(1)
+    grain_info_json = grain_info_json.replace("\\u0022", '"')
+    j = json.loads(grain_info_json)
+    latlngs = j['marker_latlngs']
+    # There are three points; one is outside the ROI, one is in the hole
+    self.assertEqual(len(latlngs), 1)

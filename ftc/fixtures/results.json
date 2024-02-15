@@ -5,7 +5,7 @@
         "fields": {
             "grain": 1,
             "ft_type": "S",
-            "worker": 101,
+            "worker": 102,
             "result": 3,
             "create_date": "2023-01-01T00:00:00Z"
         }
@@ -27,7 +27,7 @@
             "result": 1,
             "category": "track",
             "x_pixels": 40,
-            "y_pixels": 362
+            "y_pixels": 70
         }
     },
     {
@@ -36,8 +36,8 @@
         "fields": {
             "result": 1,
             "category": "track",
-            "x_pixels": 201,
-            "y_pixels": 160
+            "x_pixels": 71,
+            "y_pixels": 75
         }
     },
     {
