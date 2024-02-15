@@ -142,17 +142,41 @@ class Grain(models.Model):
         return self.owners_result_of('I')
 
     def roi_area_pixels(self):
+        """
+        Find the area of the ROI in pixels.
+
+        Currently this does not take account of negative ROI regions.
+        """
         total = 0
         for r in self.region_set.all():
             total += r.area()
         return total
 
     def roi_area_mm2(self):
+        """
+        Find the area of the ROI in pixels.
+
+        Currently this does not take account of negative ROI regions.
+        """
         scale_x = self.scale_x
         scale_y = self.scale_y
         if scale_x is None or scale_y is None:
             return None
         return scale_x * scale_y * self.roi_area_pixels() * 1e6
+
+    def roi_contains_point(self, x, y):
+        """
+        Find if the point at (x,y) pixels is within this grain's Region of Interest.
+
+        If a point is within two sub-regions it counts as not being within
+        the region-of-interest; a region within a region is counted as
+        a hole.
+        """
+        count = 0
+        for r in self.region_set.all():
+            if r.contains_point(x, y):
+                count += 1
+        return count % 2 == 1
 
 #
 class Region(models.Model):
@@ -171,6 +195,24 @@ class Region(models.Model):
             total += v.x * last_v.y - last_v.x * v.y
             last_v = v
         return abs(total / 2)
+
+    def contains_point(self, x, y):
+        """Find if the point at (x,y) pixels is contained within this region"""
+        vs = list(self.vertex_set.all())
+        vs.sort(key=lambda v: v.pk)
+        n = len(vs)
+        if n == 0:
+            return 0
+        last_v = vs[n - 1]
+        total = 0
+        for v in vs:
+            if (
+                ((v.x <= x and x < last_v.x) or (last_v.x <= x and x < v.x))
+                and (y < last_v.y + (v.y - last_v.y) * (x - last_v.x) / (v.x - last_v.x))
+            ):
+                total += 1
+            last_v = v
+        return total % 2 == 1
 
 #
 class Vertex(models.Model):
@@ -267,6 +309,15 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         return [
             [ (height - gp.y_pixels) / width, gp.x_pixels / width ]
             for gp in self.grainpoint_set.filter(category__name='track')
+        ]
+
+    def get_latlngs_within_roi(self):
+        width = self.grain.image_width
+        height = self.grain.image_height
+        return [
+            [ (height - gp.y_pixels) / width, gp.x_pixels / width ]
+            for gp in self.grainpoint_set.filter(category__name='track')
+            if self.grain.roi_contains_point(gp.x_pixels, gp.y_pixels)
         ]
 
     @property
