@@ -46,8 +46,44 @@ class GahCase(TestCase):
     self.client.post(reverse('logout'))
 
 
+class ResultsCase(GahCase):
+  def get_results(self):
+    r = self.client.post(
+      reverse('getTableData'),
+      { 'client_response': [
+        1, 2
+      ] },
+      content_type='application/json'
+    )
+    self.assertEqual(r.status_code, 200)
+    j = json.loads(r.content)
+    return j['aaData']
 
-class CountingCase(GahCase):
+  def get_total_track_count(self):
+    total = 0
+    for [
+      _project, _sample, _index, _ft_type, track_count, _user, _datetime, _area
+    ] in self.get_results():
+      total += track_count
+    return total
+
+  def assert_area(self, sample: str, index: int, ft_type: str, expected: float) -> None:
+    count = 0
+    for [
+      _project, r_sample, r_index, r_ft_type, _track_count, _user, _datetime, area
+    ] in self.get_results():
+      if r_sample == sample and r_index == index and r_ft_type == ft_type:
+        count += 1
+        self.assertAlmostEqual(area, expected)
+    self.assertGreater(
+      count,
+      0,
+      f"Did not find any results matching"
+      f" sample {sample}, index {index}, type {ft_type}"
+    )
+
+
+class CountingCase(ResultsCase):
   def count_grain(self, sample, grain, count):
     r = self.client.post(
       reverse('updateFtnResult'),
@@ -71,21 +107,6 @@ class CountingCase(GahCase):
     for ((sample, grain), count) in grain_counts.items():
       self.count_grain(sample, grain, count)
     self.logout()
-
-  def get_total_track_count(self):
-    r = self.client.post(
-      reverse('getTableData'),
-      { 'client_response': [
-        1, 2
-      ] },
-      content_type='application/json'
-    )
-    self.assertEqual(r.status_code, 200)
-    j = json.loads(r.content)
-    total = 0
-    for [project, sample, index, ft_type, track_count, user, datetime, area] in j['aaData']:
-      total += track_count
-    return total
 
 
 class TestGuestCounts(CountingCase):
@@ -220,6 +241,19 @@ class TestCountCsvDownload(CountingCase):
     assert(sorted(grains[("proj1", "adm_samp", '2')]) == [2])
     assert(sorted(grains[("proj1", "adm_samp", '3')]) == [2])
     assert(sorted(grains[("proj2", "counter_samp", '1')]) == [2, 2, 3, 3])
+
+
+class TestResultsArea(ResultsCase):
+  fixtures = [
+    'essential.json',
+    'users.json', 'projects.json', 'samples.json',
+    'grain_with_small_region.json',
+    'results6.json'
+  ]
+
+  def test_area_of_roi(self):
+    self.login_admin()
+    self.assert_area('adm_samp', 6, 'S', 49 * 49 / 2)
 
 
 class RegionCase(GahCase):

@@ -83,7 +83,9 @@ class Grain(models.Model):
     index = models.IntegerField()
     image_width = models.IntegerField()
     image_height = models.IntegerField()
+    # Horizontal scale in meters per pixel
     scale_x = models.FloatField(null=True, blank=True)
+    # Vertical scale in meters per pixel
     scale_y = models.FloatField(null=True, blank=True)
     stage_x = models.FloatField(null=True, blank=True)
     stage_y = models.FloatField(null=True, blank=True)
@@ -142,12 +144,14 @@ class Grain(models.Model):
         return self.owners_result_of('I')
 
     def roi_area_pixels(self):
+        """Get the area of the ROI in pixels."""
         total = 0
         for r in self.region_set.all():
             total += r.area()
         return total
 
     def roi_area_mm2(self):
+        """Get the area of the ROI in square millimeters."""
         scale_x = self.scale_x
         scale_y = self.scale_y
         if scale_x is None or scale_y is None:
@@ -245,6 +249,7 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         return cls.objects.filter(grain__sample__in_project__creator=user)
 
     def roi_area_micron2(self):
+        """Get the ROI area in square microns."""
         a = self.grain.roi_area_mm2()
         if a is None:
             return None

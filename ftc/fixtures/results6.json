@@ -1,0 +1,23 @@
+[
+    {
+        "model": "ftc.fissiontracknumbering",
+        "pk": 10,
+        "fields": {
+            "grain": 6,
+            "ft_type": "S",
+            "worker": 101,
+            "result": 1,
+            "create_date": "2023-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 100,
+        "fields": {
+            "result": 10,
+            "category": "track",
+            "x_pixels": 29,
+            "y_pixels": 30
+        }
+    }
+]
