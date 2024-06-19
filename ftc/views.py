@@ -611,6 +611,15 @@ def publicSample(request, sample, grain):
     return render(request, 'ftc/public.html', ctx)
 
 @csrf_protect
+def grainUserResult(request, grain, user):
+    ctx = get_grain_info(
+        user,
+        grain,
+        'S',
+    )
+    return render(request, 'ftc/public.html', ctx)
+
+@csrf_protect
 @user_passes_test(user_is_staff)
 def grain_update_roi(request, pk):
     grain = Grain.objects.get(pk=pk)
