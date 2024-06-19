@@ -802,6 +802,7 @@ def getCsvResults(request):
         'index',
         'ft_type',
         'user_id',
+        'name',
         'create_date',
         'count',
         'area_pixels',
@@ -809,12 +810,16 @@ def getCsvResults(request):
     ])
     for grain in grains.values():
         for result in grain.results.all():
+            name = result.worker.get_full_name()
+            if not name:
+                name = result.worker.email
             writer.writerow([
                 grain.sample.in_project.project_name,
                 grain.sample.sample_name,
                 grain.index,
                 result.ft_type,
                 result.worker.pk,
+                name,
                 result.create_date,
                 result.result,
                 grain.roi_area_pixels(),
