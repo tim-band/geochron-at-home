@@ -17,7 +17,9 @@
  * grain_info.rois Array of regions of interest, each of which is an array
  *   of vertex positions [lat,lng] (that is, [(height - y_pixels)/width,
  *   x_pixels/width])
- * iconUrl_normal.url Url of marker image
+ * grain_info.lengths (optional) Array of fully-contained tracks, each as a two-element
+ *  array of [lat,lng] positions of the ends of the track.
+ * iconUrl_normal Url of marker image
  * iconSize size of marker image in pixels
  * iconAnchor [x, y] position of anchor on marker image in pixels
  * iconPopup [x, y] position of anchor of popups on marker image in pixels
@@ -25,6 +27,8 @@
  *   and shape as iconUrl_normal.
  * iconUrl_comment (optional) marker image with comment tooltip, same size
  *   and shape as iconUrl_normal.
+ * horizontalEndUrl_normal (optional) marker image for the end of a contained
+ *  track.
  * only_category only consider points if their category matches this.
  * atoken CSRF token
  * @returns {*} An object giving functions to add functionality to the viewer
@@ -516,6 +520,34 @@ function grain_view(options) {
                 }
                 return true;
             }
+        };
+    }
+    function makeLengthMarkers(map) {
+        if (!('horizontalEndUrl_normal' in options)) {
+            return null;
+        }
+        var endIcon = new MarkerIcon({
+            iconUrl: options.horizontalEndUrl_normal
+        });
+        var track_id = 0;
+        return {
+            makeAndShow: function(latlng1, latlng2) {
+                var mks = {};
+                var mk1 = new L.marker(latlng1, {
+                    icon: endIcon,
+                    draggable: false,
+                    riseOnHover: false,
+                    className: `contained-track-${track_id}-1`
+                }).addTo(map);
+                var mk2 = new L.marker(latlng2, {
+                    icon: endIcon,
+                    draggable: false,
+                    riseOnHover: false,
+                    className: `contained-track-${track_id}-2`
+                }).addTo(map);
+                var line = L.polyline([latlng1, latlng2], {color: 'green'}).addTo(map);
+                ++track_id;
+            },
         };
     }
     /**
@@ -1015,6 +1047,12 @@ function grain_view(options) {
     );
     markers = makeMarkers(map);
     selector = markers.makeSelector();
+    lengthMarkers = makeLengthMarkers(map);
+    if (lengthMarkers && 'lengths' in grain_info) {
+        grain_info.lengths.forEach(lens =>
+            lengthMarkers.makeAndShow(lens[0], lens[1])
+        );
+    }
     var category_select = document.getElementById('category');
     if (category_select) {
         category_select.onchange = function() {
