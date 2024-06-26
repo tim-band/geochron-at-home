@@ -884,6 +884,7 @@ def add_grain_info_markers(info, grain, ft_type, worker):
     if save:
         info['marker_latlngs'] = save.get_latlngs_within_roi()
         info['points'] = save.points()
+        info['lengths'] = save.contained_tracks_latlngs
 
 def get_grain_info(user, pk, ft_type, **kwargs):
     if pk == 'done':

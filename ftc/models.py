@@ -369,6 +369,71 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
             )
             gp.save()
 
+    def get_contained_tracks(self):
+        return [
+            { k: getattr(ct, k) for k in [
+                'x1_pixels',
+                'y1_pixels',
+                'z1_level',
+                'x2_pixels',
+                'y2_pixels',
+                'z2_level'
+            ]}
+            for ct in self.containedtrack_set.all()
+        ]
+
+    @property
+    def contained_tracks(self) -> str:
+        return json.dumps(self.get_contained_tracks())
+
+    @contained_tracks.setter
+    def contained_tracks(self, tracks : list[dict[str, any]]):
+        """
+        Set grain points from a list of dicts. Each dict has elements
+        `x1_pixels`, `y1_pixels`, `z1_level`, `x2_pixels`, `y2_pixels`
+        and `z2_level`. (`x1_pixels`, `y1_pixels`) and (`x2_pixels`, `y2_pixels`)
+        are co-ordinates on the image, (0,0) being the top left. `z1_level`
+        and `z2_level` are the respective z-positions of the ends with 0
+        representing the top level (near the surface) and increasing by
+        1 for every image in the z-stack. Non-integers are acceptable to
+        describe points that are not in perfect focus in any z-stack image.
+        Instead of dicts with keys `x1_pixels` and so on, a list with six
+        elements is acceptable.
+        """
+        self.containedtrack_set.all().delete()
+        for t in tracks:
+            if t is dict:
+                ct = ContainedTrack(
+                    result=self,
+                    x1_pixels=t['x1_pixels'],
+                    y1_pixels=t['y1_pixels'],
+                    z1_level=t['z1_level'],
+                    x2_pixels=t['x2_pixels'],
+                    y2_pixels=t['y2_pixels'],
+                    z2_level=t['z2_level']
+                )
+            else:
+                ct = ContainedTrack(
+                    result=self,
+                    x1_pixels=t[0],
+                    y1_pixels=t[1],
+                    z1_level=t[2],
+                    x2_pixels=t[3],
+                    y2_pixels=t[4],
+                    z2_level=t[5]
+                )
+            ct.save()
+
+    @property
+    def contained_tracks_latlngs(self):
+        width = self.grain.image_width
+        height = self.grain.image_height
+        return [
+            [[ (height - ct.y1_pixels) / width, ct.x1_pixels / width ],
+             [ (height - ct.y2_pixels) / width, ct.x2_pixels / width ]]
+            for ct in self.containedtrack_set.all()
+        ]
+        
 
 #
 class TutorialResult(models.Model):
@@ -413,3 +478,15 @@ class TutorialPage(models.Model):
     message = models.TextField()
     active = models.BooleanField(default=True)
     sequence_number = models.IntegerField(default=50)
+
+class ContainedTrack(models.Model):
+    """
+    Both ends of a track found by a user.
+    """
+    result = models.ForeignKey(FissionTrackNumbering, on_delete=models.CASCADE)
+    x1_pixels = models.IntegerField()
+    y1_pixels = models.IntegerField()
+    z1_level = models.FloatField()
+    x2_pixels = models.IntegerField()
+    y2_pixels = models.IntegerField()
+    z2_level = models.FloatField()

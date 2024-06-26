@@ -17,7 +17,7 @@ from rest_framework.views import exception_handler
 from ftc.load_rois import get_rois, get_roiss
 from ftc.models import (
     Project, Sample, Grain, Image, FissionTrackNumbering,
-    Transform2D, GrainPoint, GrainPointCategory
+    Transform2D, GrainPoint, GrainPointCategory, ContainedTrack
 )
 from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
@@ -444,6 +444,7 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
     result = serializers.IntegerField(default=LatLngSizeDefault())
     grain = GrainField()
     latlngs = serializers.CharField(read_only=True)
+    contained_tracks = serializers.CharField(read_only=True)
     # For some reason this "normal" way doesn't work, so we override
     # create and run_validation
     #grainpoints = GrainPointSerializer(many=True)
@@ -451,16 +452,19 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
     class Meta:
         model = FissionTrackNumbering
         fields = ['id', 'grain', 'ft_type', 'worker',
-            'result', 'create_date', 'latlngs']
+            'result', 'create_date', 'latlngs', 'contained_tracks']
 
     def run_validation(self, data=...):
         ret = super().run_validation(data)
         gps = data.get('grainpoints', [])
         ret['grainpoints'] = json.loads(gps)
+        cts = data.get('contained_tracks', [])
+        ret['contained_tracks'] = json.loads(cts)
         return ret
 
     def create(self, validated_data):
         points = validated_data.pop('grainpoints')
+        contained_tracks = validated_data.pop('contained_tracks')
         ftn = FissionTrackNumbering.objects.filter(
             grain=validated_data['grain'],
             worker=validated_data['worker']
@@ -471,7 +475,10 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
                 name=point.get("category", "track")
             )
             GrainPoint.objects.create(result=ftn, **point)
+        for ct in contained_tracks:
+            ContainedTrack.objects.create(result=ftn, **ct)
         return ftn
+
 
 class FissionTrackNumberingView(generics.ListCreateAPIView):
     serializer_class = FissionTrackNumberingSerializer
