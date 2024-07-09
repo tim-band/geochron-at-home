@@ -3,13 +3,13 @@ from django.core.exceptions import (
     ObjectDoesNotExist, MultipleObjectsReturned
 )
 from django.db.models.aggregates import Max
+from django.forms import ValidationError
 from django.shortcuts import get_object_or_404
 import json
 import logging
 from rest_framework import exceptions
 from rest_framework import generics, serializers
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.fields import empty
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
@@ -456,11 +456,47 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
 
     def run_validation(self, data=...):
         ret = super().run_validation(data)
-        gps = data.get('grainpoints', [])
-        ret['grainpoints'] = json.loads(gps)
-        cts = data.get('contained_tracks', [])
-        ret['contained_tracks'] = json.loads(cts)
+        gps = data.get("grainpoints", "[]")
+        ret["grainpoints"] = json.loads(gps)
+        ret["contained_tracks"] = self.validate_contained_tracks(data)
         return ret
+
+    def validate_contained_tracks(self, data):
+        ct_keys = ["x1_pixels", "y1_pixels", "z1_level", "x2_pixels", "y2_pixels", "z2_level"]
+        ct_key_set = set(ct_keys)
+
+        cts = data.get("contained_tracks", "[]")
+        cts_obj = json.loads(cts)
+        if type(cts_obj) is not list:
+            raise ValidationError("contained_tracks needs to be an array")
+        result = []
+        for cti, ct_obj in enumerate(cts_obj):
+            if type(ct_obj) is list:
+                if len(ct_obj) != 6:
+                    raise ValidationError(
+                        "contained_tracks element {0} has {1} elements; should have 6".format(cti, len(ct_obj))
+                    )
+                result.append({
+                    k: ct_obj[i] for i, k in enumerate(ct_keys)
+                })
+            elif type(ct_obj) is dict:
+                actual_keys = set(ct_obj.keys())
+                missing = ct_key_set - actual_keys
+                if missing:
+                    raise ValidationError(
+                        "contained_tracks element {0} lacks keys: {1}".format(cti, missing)
+                    )
+                unexpected = actual_keys - ct_key_set
+                if unexpected:
+                    raise ValidationError(
+                        "contained_tracks element {0} has unexpected keys: {1}".format(cti, unexpected)
+                    )
+                result.append(ct_obj)
+            else:
+                raise ValidationError(
+                    "contained_tracks element {0} should be dict or list, but is {1}".format(cti, type(ct_obj))
+                )
+        return result
 
     def create(self, validated_data):
         points = validated_data.pop('grainpoints')

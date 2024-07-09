@@ -397,31 +397,10 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         representing the top level (near the surface) and increasing by
         1 for every image in the z-stack. Non-integers are acceptable to
         describe points that are not in perfect focus in any z-stack image.
-        Instead of dicts with keys `x1_pixels` and so on, a list with six
-        elements is acceptable.
         """
         self.containedtrack_set.all().delete()
         for t in tracks:
-            if t is dict:
-                ct = ContainedTrack(
-                    result=self,
-                    x1_pixels=t['x1_pixels'],
-                    y1_pixels=t['y1_pixels'],
-                    z1_level=t['z1_level'],
-                    x2_pixels=t['x2_pixels'],
-                    y2_pixels=t['y2_pixels'],
-                    z2_level=t['z2_level']
-                )
-            else:
-                ct = ContainedTrack(
-                    result=self,
-                    x1_pixels=t[0],
-                    y1_pixels=t[1],
-                    z1_level=t[2],
-                    x2_pixels=t[3],
-                    y2_pixels=t[4],
-                    z2_level=t[5]
-                )
+            ct = ContainedTrack(result=self, **t)
             ct.save()
 
     @property

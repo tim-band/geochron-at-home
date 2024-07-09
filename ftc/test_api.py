@@ -673,7 +673,7 @@ class ApiCount(ApiTestMixin, JwtTestCase):
         self.assertSetAlmostEqual(jl, latlngs, latlngs_close)
         self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, j[0]['worker'])
 
-    def test_upload_contained_tracks(self):
+    def upload_contained_tracks(self, use_dict: bool):
         cts = [
             [100, 500, 300, 130, 420, 450],
             [300, 400, 250, 340, 340, 250],
@@ -694,7 +694,7 @@ class ApiCount(ApiTestMixin, JwtTestCase):
             'worker': 'admin',
             'create_date': '2024-06-26',
             'grainpoints': '[]',
-            'contained_tracks': json.dumps(tracks),
+            'contained_tracks': json.dumps(tracks if use_dict else cts),
         }
         r = self.client.post('/ftc/api/count/', data, **self.super_headers)
         self.assertEqual(r.status_code, 201)
@@ -703,6 +703,12 @@ class ApiCount(ApiTestMixin, JwtTestCase):
         j = json.loads(r.content.decode(r.charset))
         jl = json.loads(j[0]['contained_tracks'])
         self.assertEqual(jl, tracks)
+
+    def test_upload_contained_tracks_dict(self):
+        self.upload_contained_tracks(True)
+
+    def test_upload_contained_tracks_list(self):
+        self.upload_contained_tracks(False)
 
     def test_upload_deletes_existing(self):
         self.upload_sample_2_results()

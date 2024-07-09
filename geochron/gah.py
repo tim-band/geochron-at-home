@@ -1132,7 +1132,7 @@ def count_list(opts, config):
         else:
             print(result)
 
-def count_post(config, count):
+def count_post(config, count: dict[any]):
     with api_post(
         config,
         'count',
@@ -1140,7 +1140,8 @@ def count_post(config, count):
         ft_type=count['ft_type'],
         worker=count['user'],
         create_date=count['date'],
-        grainpoints=json.dumps(count['points'])
+        grainpoints=json.dumps(count.get('points', [])),
+        contained_tracks=json.dumps(count.get('lines', []))
     ) as response:
         body = response.read()
         result = json.loads(body)

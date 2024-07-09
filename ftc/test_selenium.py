@@ -1711,4 +1711,5 @@ class PublicPageResults(SeleniumTests):
         samples = ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project('p1')
         public_page = samples.go_sample('s1').go_public(3).check()
-        assert public_page.track_count() == 3
+        # There are three tracks, but only two are within the ROI
+        assert public_page.track_count() == 2
