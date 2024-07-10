@@ -1,7 +1,7 @@
 from django.contrib import admin
 from ftc.models import (
     Project, Sample, Grain, FissionTrackNumbering, TutorialResult,
-    GrainPoint, GrainPointCategory, TutorialPage
+    GrainPoint, GrainPointCategory, TutorialPage, ContainedTrack
 )
 
 class GrainInline(admin.TabularInline):
@@ -34,14 +34,6 @@ class FissionTrackNumberingAdmin(admin.ModelAdmin):
     list_filter = ['grain', 'grain__sample', 'grain__sample__in_project']
     inlines = [GrainPointInline]
 
-class GrainPointAdmin(admin.ModelAdmin):
-    list_display = (
-        'x_pixels',
-        'y_pixels',
-        'category',
-        'comment'
-    )
-
 class TutorialResultAdmin(admin.ModelAdmin):
     list_display = ('user', 'session', 'date')
 
@@ -61,3 +53,7 @@ admin.site.register(Grain, admin.ModelAdmin)
 admin.site.register(GrainPointCategory, GrainPointCategoryAdmin)
 
 admin.site.register(TutorialPage, admin.ModelAdmin)
+
+admin.site.register(ContainedTrack, admin.ModelAdmin)
+
+admin.site.register(GrainPoint, admin.ModelAdmin)
