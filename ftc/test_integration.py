@@ -388,11 +388,28 @@ class PublicPageCase(GahCase):
       reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
     )
     self.assertEqual(r.status_code, 403)
+    # Check also access to images in this grain
+    r = self.client.get(
+      reverse('get_image', kwargs={'pk': 1})
+    )
+    self.assertEqual(r.status_code, 403)
+    r = self.client.get(
+      reverse('grain_user_result', kwargs={'grain': 1, 'user': 101})
+    )
+    self.assertEqual(r.status_code, 403)
     s = Sample.objects.get(pk=1)
     s.public = True
     s.save()
     r = self.client.get(
       reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
+    )
+    self.assertEqual(r.status_code, 200)
+    r = self.client.get(
+      reverse('get_image', kwargs={'pk': 1})
+    )
+    self.assertEqual(r.status_code, 200)
+    r = self.client.get(
+      reverse('grain_user_result', kwargs={'grain': 1, 'user': 101})
     )
     self.assertEqual(r.status_code, 200)
 

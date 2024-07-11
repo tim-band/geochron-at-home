@@ -655,6 +655,25 @@ The overall type is a list, so as many results as you like can be
 uploaded in one call. For each uploaded result, any existing
 result from this user for this grain is discarded.
 
+## Public samples
+
+You can set a sample to be "public" either by ticking the "public" box
+on the appropriate Sample page in the Admin view, or by choosing
+Manage Projects, then the appropriate project, then the sample,
+then click "Edit", tick the "public" box and click the "Save" button.
+
+Once a sample is public, its grains will be available to view on
+the URL `/ftc/grain/<grain-id>/user/<user-id>/` where `<grain-id>`
+is the ID number of the grain and `<user-id>` is the ID number of
+the user whose track markers are to be displayed.
+
+Also a public sample can be displayed at `/ftc/public/<sample>/<grain-index>`,
+where `<sample>` is the sample ID number and `<grain-index>` is
+the number of the grain within the sample to view. Track markings
+for the owner of the sample will be visible, if any. "Previous" and
+"Next" buttons will be rendered to take the browser from grain to
+grain within that sample.
+
 ## Localization
 
 Text is internationalized by including the text:

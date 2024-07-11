@@ -612,6 +612,9 @@ def publicSample(request, sample, grain):
 
 @csrf_protect
 def grainUserResult(request, grain, user):
+    g = Grain.objects.get(pk=grain)
+    if not request.user.is_authenticated and not g.sample.public:
+        raise PermissionDenied('not a public grain')
     ctx = get_grain_info(
         user,
         grain,
