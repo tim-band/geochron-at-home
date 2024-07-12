@@ -467,9 +467,13 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
 
         cts = data.get("contained_tracks", "[]")
         cts_obj = json.loads(cts)
-        if type(cts_obj) is not list:
-            raise ValidationError("contained_tracks needs to be an array")
         result = []
+        if type(cts_obj) is not list:
+            # empty dicts are OK to help Pieter's script work
+            if not cts_obj:
+                logging.getLogger(__name__).warn("Empty thing")
+                return result
+            raise ValidationError("contained_tracks needs to be an array")
         for cti, ct_obj in enumerate(cts_obj):
             if type(ct_obj) is list:
                 if len(ct_obj) != 6:

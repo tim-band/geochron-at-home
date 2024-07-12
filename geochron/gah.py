@@ -1149,13 +1149,15 @@ def count_post(config, count: dict[any]):
 
 @token_refresh
 def count_upload(opts, config):
-    with open(opts.file) as h:
-        j = json.loads(h.read())
-        if type(j) is list:
-            for obj in j:
-                count_post(config, obj)
-        else:
-            count_post(config, j)
+    for file in opts.files:
+        print("uploading counts from file {0}".format(file))
+        with open(file) as h:
+            j = json.loads(h.read())
+            if type(j) is list:
+                for obj in j:
+                    count_post(config, obj)
+            else:
+                count_post(config, j)
 
 
 def add_count_subparser(subparsers):
@@ -1183,9 +1185,10 @@ def add_count_subparser(subparsers):
     )
     upload_count.set_defaults(func=count_upload)
     upload_count.add_argument(
-        'file',
+        'files',
+        nargs='*',
         help=(
-            "JSON file containing a list of objects with keys:"
+            "JSON files containing a list of objects with keys:"
             " sample (name or ID),"
             " index (grain index within the sample),"
             " ft_type ('S' if the grain tracks are counted, 'I' for the mica),"
