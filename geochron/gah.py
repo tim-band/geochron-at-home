@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import csv
-from datetime import date
 from getpass import getpass
 import json
 import os.path
@@ -1154,8 +1153,19 @@ def count_upload(opts, config):
         with open(file) as h:
             j = json.loads(h.read())
             if type(j) is list:
+                count = 0
                 for obj in j:
+                    if (type(obj) is not dict):
+                        raise Exception("Item {} in the array is not an object".format(count))
+                    print("File {} iteration {}: sample {}, index {}, user {}".format(
+                        file,
+                        count,
+                        obj.get("sample", "not specified"),
+                        obj.get("index", "not specified"),
+                        obj.get("user", "not specified")
+                    ))
                     count_post(config, obj)
+                    count += 1
             else:
                 count_post(config, j)
 
