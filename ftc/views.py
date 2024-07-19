@@ -847,7 +847,10 @@ def get_grain_images_list(grain, ft_type):
     images = grain.image_set.filter(
         ft_type=ft_type
     ).order_by('index')
-    return list(map(lambda x: reverse('get_image', args=[x.pk]), images))
+    return [
+        list(map(lambda x: reverse('get_image', args=[x.pk]), images)),
+        list(map(lambda x: x.index, images))
+    ]
 
 def get_image(request, pk):
     image = get_object_or_404(Image, pk=pk)
@@ -900,7 +903,7 @@ def get_grain_info(user, pk, ft_type, **kwargs):
     the_sample = grain.sample
     the_grain = grain.index
     ft_type = ft_type
-    images_list = get_grain_images_list(grain, ft_type)
+    [images_list, indices_list] = get_grain_images_list(grain, ft_type)
     matrix = grain.mica_transform_matrix if ft_type == 'I' else None
     rois = load_rois(grain, ft_type, matrix)
     if rois is None:
@@ -923,6 +926,7 @@ def get_grain_info(user, pk, ft_type, **kwargs):
         'image_height': grain.image_height,
         'scale_x': grain.scale_x,
         'images': images_list,
+        'indices': indices_list,
         'rois': rois
     }
     add_grain_info_markers(info, grain, ft_type, user)

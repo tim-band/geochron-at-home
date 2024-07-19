@@ -408,8 +408,8 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         width = self.grain.image_width
         height = self.grain.image_height
         return [
-            [[ (height - ct.y1_pixels) / width, ct.x1_pixels / width ],
-             [ (height - ct.y2_pixels) / width, ct.x2_pixels / width ]]
+            [[ (height - ct.y1_pixels) / width, ct.x1_pixels / width, ct.z1_level ],
+             [ (height - ct.y2_pixels) / width, ct.x2_pixels / width, ct.z2_level ],]
             for ct in self.containedtrack_set.all()
         ]
         

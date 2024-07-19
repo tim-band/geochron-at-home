@@ -8,6 +8,8 @@
  * grain_info.shift_y The y-difference in pixels of the Mica layers from the crystal layers
  * grain_info.scale_x Meters per pixel, if known
  * grain_info.images Array of URLs to the z-stack images
+ * grain_info.indices Array of indices corresponding to the images. A contained track will
+ *  have its z co-ordinate matching an index in this array.
  * grain_info.marker_latlngs Array of marker positions, instead of `points`
  * grain_info.points Array of marker positions and categories, instead of `marker_latlngs`. Objects with keys:
  * - x_pixels: x position in pixels from the left of the image
@@ -17,8 +19,8 @@
  * grain_info.rois Array of regions of interest, each of which is an array
  *   of vertex positions [lat,lng] (that is, [(height - y_pixels)/width,
  *   x_pixels/width])
- * grain_info.lengths (optional) Array of fully-contained tracks, each as a two-element
- *  array of [lat,lng] positions of the ends of the track.
+ * grain_info.lengths (optional) Array of fully-contained tracks, each as a three-element
+ *  array of [lat,lng,alt] positions of the ends of the track. `alt` is the layer; 0 at the top
  * iconUrl_normal Url of marker image
  * iconSize size of marker image in pixels
  * iconAnchor [x, y] position of anchor on marker image in pixels
@@ -27,8 +29,6 @@
  *   and shape as iconUrl_normal.
  * iconUrl_comment (optional) marker image with comment tooltip, same size
  *   and shape as iconUrl_normal.
- * horizontalEndUrl_normal (optional) marker image for the end of a contained
- *  track.
  * only_category only consider points if their category matches this.
  * atoken CSRF token
  * @returns {*} An object giving functions to add functionality to the viewer
@@ -522,32 +522,80 @@ function grain_view(options) {
             }
         };
     }
-    function makeLengthMarkers(map) {
-        if (!('horizontalEndUrl_normal' in options)) {
-            return null;
+    // find x in array of increasing numbers, returning an interpolated index
+    // depending on how close x is to its neighbouring values:
+    // findInMonotonic(5, [3,4,5,6]) => 2
+    // findInMonotonic(5, [2,4,6,8]) => 1.5
+    function findInMonotonic(x, xs) {
+        if (xs.length < 2 || x < xs[0]) {
+            return 0;
         }
-        var endIcon = new MarkerIcon({
-            iconUrl: options.horizontalEndUrl_normal
-        });
+        for (var i = 1; i != xs.length; ++i) {
+            if (x < xs[i]) {
+                // line (X,Y) through (i - 1, xs[i - 1]) and (i, xs[i])
+                // is Y = xs[i - 1] + (X - (i-1)) * (xs[i] - xs[i-1])
+                // we want X in terms of Y
+                // Y - xs[i-1] = (X - (i-1)) * (xs[i] - xs[i-1])
+                // (Y - xs[i-1]) / (xs[i] - xs[i-1]) = X - (i-1)
+                // X = (Y - xs[i-1]) / (xs[i] - xs[i-1]) + i - 1
+                // X = (Y - xs[i-1]) / (xs[i] - xs[i-1]) + i - ((xs[i] - xs[i-1]) / (xs[i] - xs[i-1]))
+                // X = (Y - xs[i-1] - (xs[i] - xs[i-1])) / (xs[i] - xs[i-1]) + i
+                // X = (Y - xs[i-1] - xs[i] + xs[i-1]) / (xs[i] - xs[i-1]) + i
+                // X = (Y - xs[i]) / (xs[i] - xs[i-1]) + i
+                return (x - xs[i]) / (xs[i] - xs[i-1]) + i;
+            }
+        }
+        return xs.length - 1;
+    }
+    function makeLengthMarkers(map) {
         var track_id = 0;
+        var markers = [];
+        var max_layer = grain_info.indices.length;
+        var max_radius = 40;
+        var min_radius = 4;
+        function layerToRadius(layer) {
+            return max_radius - (max_radius - min_radius) * layer / max_layer;
+        }
         return {
             makeAndShow: function(latlng1, latlng2) {
-                var mks = {};
-                var mk1 = new L.marker(latlng1, {
-                    icon: endIcon,
-                    draggable: false,
-                    riseOnHover: false,
+                var layer1 = findInMonotonic(latlng1[2], grain_info.indices);
+                var layer2 = findInMonotonic(latlng1[2], grain_info.indices);
+                var mk1 = new L.circleMarker(latlng1, {
+                    radius: layerToRadius(layer1),
+                    interactive: false,
+                    color: '#60E020',
+                    weight: 2,
+                    opacity: 0.3,
+                    fillOpacity: 0.2,
                     className: `contained-track-${track_id}-1`
                 }).addTo(map);
-                var mk2 = new L.marker(latlng2, {
-                    icon: endIcon,
-                    draggable: false,
-                    riseOnHover: false,
+                var mk2 = new L.circleMarker(latlng2, {
+                    radius: layerToRadius(layer2),
+                    interactive: false,
+                    color: '#60E020',
+                    weight: 2,
+                    opacity: 0.3,
+                    fillOpacity: 0.2,
                     className: `contained-track-${track_id}-2`
                 }).addTo(map);
-                var line = L.polyline([latlng1, latlng2], {color: 'green'}).addTo(map);
+
+                var line = L.polyline([latlng1, latlng2], {
+                    color: 'green',
+                    weight: 2 * max_radius,
+                    opacity: 0.3
+                }).addTo(map);
+                markers.push({
+                    end1: mk1,
+                    end2: mk2,
+                    line: line
+                });
                 ++track_id;
             },
+            focus: function(layer) {
+                markers.forEach(function(marker) {
+                    marker.line.setStyle({ weight: 2*layerToRadius(layer) });
+                });
+            }
         };
     }
     /**
@@ -764,6 +812,8 @@ function grain_view(options) {
     function makeZStack(
         map, images, imageCount, yOverX, rois
     ) {
+        // Callbacks for when the focused layer changes
+        var focus_callbacks = [];
         // Bounds elements are LatLng values, i.e. [y, x]
         var bounds = [
             [0.0, 0.0],
@@ -834,6 +884,9 @@ function grain_view(options) {
             remove_current_layer();
             layerRendered = layerCurrent;
             add_current_layer();
+            focus_callbacks.forEach(function(fn) {
+                fn(layerRendered);
+            });
         }
         refresh();
         return {
@@ -855,6 +908,12 @@ function grain_view(options) {
             },
             pointInRois: function(x, y) {
                 return point_in_odd_number_of_polygons(x, y, rois);
+            },
+            // Add a function taking an integer, returning nothing.
+            // This function will be called with the current layer index
+            // whenever this changes.
+            addFocusCallback: function(callback) {
+                focus_callbacks.push(callback);
             },
             rois_layer: rois_layer
         };
@@ -1052,6 +1111,7 @@ function grain_view(options) {
         grain_info.lengths.forEach(lens =>
             lengthMarkers.makeAndShow(lens[0], lens[1])
         );
+        zStack.addFocusCallback(lengthMarkers.focus);
     }
     var category_select = document.getElementById('category');
     if (category_select) {
