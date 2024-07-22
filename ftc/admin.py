@@ -29,10 +29,14 @@ class GrainPointInline(admin.TabularInline):
     model = GrainPoint
     extra = 0
 
+class ContainedTrackInline(admin.TabularInline):
+    model = ContainedTrack
+    extra = 0
+
 class FissionTrackNumberingAdmin(admin.ModelAdmin):
     list_display = ('id', 'grain', 'ft_type', 'worker', 'result', 'create_date')
     list_filter = ['grain', 'grain__sample', 'grain__sample__in_project']
-    inlines = [GrainPointInline]
+    inlines = [GrainPointInline, ContainedTrackInline]
 
 class TutorialResultAdmin(admin.ModelAdmin):
     list_display = ('user', 'session', 'date')
