@@ -623,6 +623,19 @@ def grainUserResult(request, grain, user):
     return render(request, 'ftc/public.html', ctx)
 
 @csrf_protect
+def grainAnalystResult(request, grain, analyst):
+    g = Grain.objects.get(pk=grain)
+    if not request.user.is_authenticated and not g.sample.public:
+        raise PermissionDenied('not a public grain')
+    ctx = get_grain_info(
+        User.objects.get(username__exact='guest'),
+        grain,
+        'S',
+        analyst=analyst
+    )
+    return render(request, 'ftc/public.html', ctx)
+
+@csrf_protect
 @user_passes_test(user_is_staff)
 def grain_update_roi(request, pk):
     grain = Grain.objects.get(pk=pk)
@@ -879,20 +892,22 @@ def redirect_to_count(request):
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def add_grain_info_markers(info, grain, ft_type, worker):
+def add_grain_info_markers(info, grain, ft_type, worker, analyst = None):
     objects = FissionTrackNumbering.objects.filter(
         grain=grain,
         ft_type=ft_type
     )
     if worker is not None:
         objects = objects.filter(worker=worker)
+    if analyst is not None:
+        objects = objects.filter(analyst=analyst)
     save = objects.order_by('result').first()
     if save:
         info['marker_latlngs'] = save.get_latlngs_within_roi()
         info['points'] = save.points()
         info['lengths'] = save.contained_tracks_latlngs
 
-def get_grain_info(user, pk, ft_type, **kwargs):
+def get_grain_info(user, pk, ft_type, analyst = None, **kwargs):
     if pk == 'done':
         return {
             'grain_info': 'null',
@@ -929,7 +944,7 @@ def get_grain_info(user, pk, ft_type, **kwargs):
         'indices': indices_list,
         'rois': rois
     }
-    add_grain_info_markers(info, grain, ft_type, user)
+    add_grain_info_markers(info, grain, ft_type, user, analyst)
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,

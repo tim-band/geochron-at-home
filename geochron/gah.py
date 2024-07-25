@@ -1138,6 +1138,7 @@ def count_post(config, count: dict[any]):
         grain='{0}/{1}'.format(count['sample'], count['index']),
         ft_type=count['ft_type'],
         worker=count['user'],
+        analyst=count.get('analyst'),
         create_date=count['date'],
         grainpoints=json.dumps(count.get('points', [])),
         contained_tracks=json.dumps(count.get('lines', []))

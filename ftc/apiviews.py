@@ -451,7 +451,7 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FissionTrackNumbering
-        fields = ['id', 'grain', 'ft_type', 'worker',
+        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst',
             'result', 'create_date', 'latlngs', 'contained_tracks']
 
     def run_validation(self, data=...):
@@ -505,9 +505,15 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         points = validated_data.pop('grainpoints')
         contained_tracks = validated_data.pop('contained_tracks')
+        worker = validated_data['worker']
+        delete_params = {
+            "grain": validated_data['grain'],
+            "worker": worker
+        }
+        if worker.username == "guest":
+            delete_params["analyst"] = validated_data["analyst"]
         ftn = FissionTrackNumbering.objects.filter(
-            grain=validated_data['grain'],
-            worker=validated_data['worker']
+            **delete_params
         ).delete()
         ftn = FissionTrackNumbering.objects.create(**validated_data)
         for point in points:

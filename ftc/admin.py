@@ -34,7 +34,7 @@ class ContainedTrackInline(admin.TabularInline):
     extra = 0
 
 class FissionTrackNumberingAdmin(admin.ModelAdmin):
-    list_display = ('id', 'grain', 'ft_type', 'worker', 'result', 'create_date')
+    list_display = ('id', 'grain', 'ft_type', 'worker', 'result', 'create_date', 'analyst')
     list_filter = ['grain', 'grain__sample', 'grain__sample__in_project']
     inlines = [GrainPointInline, ContainedTrackInline]
 

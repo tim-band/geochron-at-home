@@ -266,6 +266,9 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     )
     ft_type = models.CharField(max_length=1, choices=FT_TYPE)
     worker = models.ForeignKey(User, on_delete=models.CASCADE)
+    # If the worker is guest uploaded results won't overwrite existing
+    # results unless the analyst also matches and isn't NULL.
+    analyst = models.TextField(null=True)
     result = models.IntegerField() #-1 means this is a partial save state
     create_date = models.DateTimeField(auto_now_add=True)
 
@@ -465,7 +468,7 @@ class ContainedTrack(models.Model):
     result = models.ForeignKey(FissionTrackNumbering, on_delete=models.CASCADE)
     x1_pixels = models.IntegerField()
     y1_pixels = models.IntegerField()
-    z1_level = models.FloatField()
+    z1_level = models.IntegerField()
     x2_pixels = models.IntegerField()
     y2_pixels = models.IntegerField()
-    z2_level = models.FloatField()
+    z2_level = models.IntegerField()
