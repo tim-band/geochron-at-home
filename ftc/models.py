@@ -178,6 +178,14 @@ class Grain(models.Model):
                 count += 1
         return count % 2 == 1
 
+    def get_analyses(self):
+        return FissionTrackNumbering.objects.filter(
+            grain__sample=self.sample,
+            grain__index=self.index,
+            worker__username='guest',
+            analyst__isnull=False
+        )
+
 #
 class Region(models.Model):
     grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
@@ -415,7 +423,6 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
              [ (height - ct.y2_pixels) / width, ct.x2_pixels / width, ct.z2_level ],]
             for ct in self.containedtrack_set.all()
         ]
-        
 
 #
 class TutorialResult(models.Model):

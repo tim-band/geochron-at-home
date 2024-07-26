@@ -57,6 +57,7 @@
             <th>ROI</th>
             <th>Public</th>
             <th>Tutorial</th>
+            <th>Analyses</th>
             <th>Delete</th>
         </tr>
     </thead>
@@ -103,6 +104,11 @@
             <td>
                 {% if result != None %}
                     <a id='tutorial-page-{{ g.index }}' href="{% url 'tutorial_pages_of' g.pk object.get_owner %}">Tutorial pages</a>
+                {% endif %}
+            </td>
+            <td>
+                {% if g.get_analyses %}
+                    <a id="analyses-link-{{ g.index }}" href="{% url 'analyses_page' g.pk %}">Analyses</a>
                 {% endif %}
             </td>
             <td><a href="{% url 'grain_delete' g.pk %}">Delete</a></td>

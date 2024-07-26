@@ -1,0 +1,32 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+{% load order_by %}
+
+{% block head %}
+{% endblock %}
+
+{% block right_nav_fn_edit %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Analyses of grain
+    <strong>{{ grain.index }}</strong> of sample
+        <a href="{% url 'sample' grain.sample.pk %}">
+            {{ grain.sample.sample_name }}
+        </a>
+    of project
+    <a href="{% url 'project' grain.sample.in_project.pk %}">
+        {{ grain.sample.in_project.project_name }}
+    </a>
+</h1>
+<ul>
+    {% for ftn in object_list %}
+        <li><a href="{% url 'grain_analyst_result' grain.pk ftn.analyst %}">
+            {{ ftn.analyst }}
+        </a></li>
+    {% endfor %}
+</ul>
+
+{% endblock %}
