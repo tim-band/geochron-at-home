@@ -622,9 +622,8 @@ def grainUserResult(request, grain, user):
     )
     return render(request, 'ftc/public.html', ctx)
 
-class GrainAnalysesView(ParentCreatorOrSuperuserMixin, ListView):
+class GrainAnalysesView(UserPassesTestMixin, ListView):
     model = FissionTrackNumbering
-    parent = Grain
     template_name = "ftc/grain_analysts_list.html"
     def get_queryset(self):
         return FissionTrackNumbering.objects.filter(
@@ -638,6 +637,13 @@ class GrainAnalysesView(ParentCreatorOrSuperuserMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         ctx.update(grain=Grain.objects.get(pk=self.kwargs['pk']))
         return ctx
+    def test_func(self):
+        grain = Grain.objects.get(pk=self.kwargs['pk'])
+        return (
+            grain.sample.public
+            or self.request.user == grain.get_owner()
+            or self.request.user.is_superuser
+        )
 
 @csrf_protect
 def grainAnalystResult(request, grain, analyst):
