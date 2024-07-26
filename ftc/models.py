@@ -427,6 +427,9 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     def get_contained_track_count(self):
         return self.containedtrack_set.count()
 
+    def get_track_count(self):
+        return self.grainpoint_set.count()
+
 #
 class TutorialResult(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)

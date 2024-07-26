@@ -24,14 +24,14 @@
 <table class="table" id="analyst-table">
     <thead>
         <tr>
-            <th>Analyst</th><th>Etch pit count</th><th>Contained track count</th>
+            <th>Analyst</th><th>Tracks</th><th>Lengths</th>
         </tr>
     </thead>
     <tbody>
     {% for ftn in object_list %}
         <tr><td><a href="{% url 'grain_analyst_result' grain.pk ftn.analyst %}">
             {{ ftn.analyst }}
-        </a></td><td>{{ ftn.result }}</td><td>{{ ftn.get_contained_track_count }}</td></tr>
+        </a></td><td>{{ ftn.get_track_count }}</td><td>{{ ftn.get_contained_track_count }}</td></tr>
     {% endfor %}
     </tbody>
 </table>
