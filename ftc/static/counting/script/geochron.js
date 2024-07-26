@@ -550,52 +550,53 @@ function grain_view(options) {
     function makeLengthMarkers(map) {
         var track_id = 0;
         var markers = [];
-        var max_layer = grain_info.indices.length;
-        var max_radius = 40;
-        var min_radius = 4;
-        function layerToRadius(layer) {
-            return max_radius - (max_radius - min_radius) * layer / max_layer;
+        var radius = 20;
+        function focusEnd(mk, layer_diff) {
+            var abs_diff = Math.abs(layer_diff);
+            var weight = abs_diff * 5 + 3;
+            mk.setStyle({
+                weight: weight,
+                color: 0 < layer_diff? '#308050' : '#60a090',
+                opacity: 9 / weight
+            });
+        }
+        function focus(layer) {
+            markers.forEach(function(marker) {
+                focusEnd(marker.end1, layer - marker.layer1);
+                focusEnd(marker.end2, layer - marker.layer2);
+            });
         }
         return {
             makeAndShow: function(latlng1, latlng2) {
                 var layer1 = findInMonotonic(latlng1[2], grain_info.indices);
-                var layer2 = findInMonotonic(latlng1[2], grain_info.indices);
+                var layer2 = findInMonotonic(latlng2[2], grain_info.indices);
                 var mk1 = new L.circleMarker(latlng1, {
-                    radius: layerToRadius(layer1),
+                    radius: radius,
                     interactive: false,
-                    color: '#60E020',
-                    weight: 2,
-                    opacity: 0.3,
-                    fillOpacity: 0.2,
                     className: `contained-track-${track_id}-1`
                 }).addTo(map);
                 var mk2 = new L.circleMarker(latlng2, {
-                    radius: layerToRadius(layer2),
+                    radius: radius,
                     interactive: false,
-                    color: '#60E020',
-                    weight: 2,
-                    opacity: 0.3,
-                    fillOpacity: 0.2,
                     className: `contained-track-${track_id}-2`
                 }).addTo(map);
 
                 var line = L.polyline([latlng1, latlng2], {
                     color: 'green',
-                    weight: 2 * max_radius,
+                    weight: 2 * radius,
                     opacity: 0.3
                 }).addTo(map);
                 markers.push({
                     end1: mk1,
                     end2: mk2,
-                    line: line
+                    line: line,
+                    layer1: layer1,
+                    layer2: layer2
                 });
                 ++track_id;
+                focus(0);
             },
-            focus: function(layer) {
-                markers.forEach(function(marker) {
-                    marker.line.setStyle({ weight: 2*layerToRadius(layer) });
-                });
-            }
+            focus: focus
         };
     }
     /**
