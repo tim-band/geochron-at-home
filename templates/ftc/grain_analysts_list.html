@@ -21,12 +21,19 @@
         {{ grain.sample.in_project.project_name }}
     </a>
 </h1>
-<ul>
+<table class="table" id="analyst-table">
+    <thead>
+        <tr>
+            <th>Analyst</th><th>Etch pit count</th><th>Contained track count</th>
+        </tr>
+    </thead>
+    <tbody>
     {% for ftn in object_list %}
-        <li><a href="{% url 'grain_analyst_result' grain.pk ftn.analyst %}">
+        <tr><td><a href="{% url 'grain_analyst_result' grain.pk ftn.analyst %}">
             {{ ftn.analyst }}
-        </a></li>
+        </a></td><td>{{ ftn.result }}</td><td>{{ ftn.get_contained_track_count }}</td></tr>
     {% endfor %}
-</ul>
+    </tbody>
+</table>
 
 {% endblock %}
