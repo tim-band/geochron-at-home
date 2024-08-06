@@ -29,7 +29,7 @@
     </thead>
     <tbody>
     {% for ftn in object_list %}
-        <tr><td><a href="{% url 'grain_analyst_result' grain.pk ftn.analyst %}">
+        <tr><td><a href="{% url 'grain_analyst_result' grain.pk ftn.analyst %}" id="analysis-link-{{ ftn.analyst }}">
             {{ ftn.analyst }}
         </a></td><td>{{ ftn.get_track_count }}</td><td>{{ ftn.get_contained_track_count }}</td></tr>
     {% endfor %}

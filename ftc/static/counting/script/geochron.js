@@ -908,6 +908,11 @@ function grain_view(options) {
                 refresh();
             },
             pointInRois: function(x, y) {
+                // If there are no ROI regoins, we will say every point
+                // is in the ROI, otherwise none will be visible.
+                if (rois.length === 0) {
+                    return true;
+                }
                 return point_in_odd_number_of_polygons(x, y, rois);
             },
             // Add a function taking an integer, returning nothing.

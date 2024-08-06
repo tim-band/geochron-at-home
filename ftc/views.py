@@ -579,8 +579,8 @@ def publicSample(request, sample, grain):
     g = Grain.objects.get(sample=sample, index=grain)
     user = g.sample.in_project.creator
     if not g.sample.public:
-        # it's not public, but the creator is allowed to see it
-        if not request.user.is_authenticated or user != request.user:
+        # it's not public, but the creator and superusers can see it
+        if user != request.user and not request.user.is_superuser:
             raise PermissionDenied('This sample is not public')
     ft_type = 'S'
     result_query = Subquery(FissionTrackNumbering.objects.filter(

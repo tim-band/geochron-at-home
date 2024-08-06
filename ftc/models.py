@@ -323,6 +323,10 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         ]
 
     def get_latlngs_within_roi(self):
+        # if there are no regions we will count every marker as being
+        # within the ROI, otherwise nothing will be.
+        if 0 == self.grain.region_set.count():
+            return self.get_latlngs()
         width = self.grain.image_width
         height = self.grain.image_height
         return [
