@@ -7,7 +7,7 @@ import json
 from random import uniform
 import re
 
-from ftc.models import TutorialPage, Sample, Region
+from ftc.models import TutorialPage, Sample, Region, Grain
 
 def gen_latlng():
   return [
@@ -478,3 +478,30 @@ class PublicPageCase(GahCase):
       grain_info_json = grain_info_json.replace("\\u0022", '"')
       j = json.loads(grain_info_json)
       return j
+
+class SolidRegionCase(GahCase):
+  fixtures = [
+    'essential.json',
+    'users.json',
+    'projects.json',
+    'samples.json',
+    'grains.json',
+    'grain1_region.json'
+  ]
+  def test_roi_area_solid(self):
+    g = Grain.objects.get(pk=1)
+    self.assertAlmostEqual(g.roi_area_pixels(), 98 * 98)
+
+class HoleyRegionCase(GahCase):
+  fixtures = [
+    'essential.json',
+    'users.json',
+    'projects.json',
+    'samples.json',
+    'grains.json',
+    'grain1_region.json',
+    'grain1_region_hole.json'
+  ]
+  def test_roi_area_holey(self):
+    g = Grain.objects.get(pk=1)
+    self.assertAlmostEqual(g.roi_area_pixels(), 98 * 98 - 10 * 10)

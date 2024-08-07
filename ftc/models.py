@@ -147,10 +147,76 @@ class Grain(models.Model):
 
         Currently this does not take account of negative ROI regions.
         """
-        total = 0
-        for r in self.region_set.all():
-            total += r.area()
-        return total
+        # To take account of negative regions we will firstly divide
+        # the area into "simple" horizontal regions. These regions
+        # will have no vertices in them (and no line intersections,
+        # if we want to support that).
+        # Each region is then divided into wonky vertical stripes
+        # by the line segments in these horizontal regions.
+        # Now each vertical-ish line is either the start or end of
+        # a piece of the ROI alternately, start-end-start-end...
+        # so we can now add up all the trapezia bounded by
+        # these start and end lines within these horizontal
+        # stripes.
+        # We can make figuring out the total area of each
+        # trapezium easier by instead of calculating the
+        # area of [(x1top, y_min), (x1bottom, y_max),
+        # (x2bottom, y_max), (x2top, y_min)] for each
+        # trapezium, we can work out the area of
+        # [(x_top, y_min), (x_bottom, y_max), (0, y_max), (0, y_min)]
+        # for each side and subtract the left side "area" from
+        # the right side "area". So we can make this even easier
+        # by just working out the "area" for each side, ordering
+        # them, negating the 0th, 2nd, 4th etc values and summing
+        # them.
+        # And actually, we don't need the height, so we don't need
+        # the area; we can work out the area by multiplying by the
+        # height later, so actually we just need the average x value,
+        # which is the x value at (y_min + y_max)/2.
+        #
+        # This implementation is not the fastest way to do it,
+        # it is intended to be clear and simple.
+        #
+        # Get all lines as sequence of [vertex_1, vertex_2]
+        if self.region_set.count() == 0:
+            return 0
+        lines_mixed = [
+            line
+            for region in self.region_set.all()
+            # Python doesn't have let x = y so we use for x in [y]
+            for vertices in [list(region.vertex_set.all())]
+            for line in zip(vertices, vertices[1:] + [vertices[0]])
+        ]
+        # Flip any line going up, so they all go down
+        lines_down = list(map(
+            lambda vs: vs if vs[0].y < vs[1].y else (vs[1], vs[0]),
+            lines_mixed
+        ))
+        # Get all y boundaries of the horizontal stripes.
+        vset = set(v.y for r in self.region_set.all() for v in r.vertex_set.all())
+        vs = list(vset)
+        vs.sort()
+        area = 0
+        # For each horizontal band
+        for (y_min, y_max) in zip(vs, vs[1:]):
+            y_mid = (y_min + y_max) / 2
+            # distances to midpoints of line segments within this horizontal band
+            x_mids = [
+                v_top.x + (y_mid - v_top.y) * (v_bottom.x - v_top.x) / (v_bottom.y - v_top.y)
+                # Check every line; not efficient!
+                for v_top, v_bottom in lines_down
+                # if the line overlaps this horizontal band
+                if v_top.y < y_mid and y_mid < v_bottom.y
+            ]
+            x_mids.sort()
+            assert len(x_mids) % 2 == 0
+            sign = -1
+            total = 0
+            for xm in x_mids:
+                total += sign * xm
+                sign *= -1
+            area += total * (y_max - y_min)
+        return area
 
     def roi_area_mm2(self):
         """
