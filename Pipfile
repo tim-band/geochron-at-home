@@ -15,16 +15,19 @@ django-prometheus = "*"
 rsa = "*"
 tzdata = ">=2022.1"  # required for Alpine linux (used in the Dockerfile)
 pip = "*"
+requests = ">=2.32.3"
+requests-oauthlib = ">=2.0.0"
+geochron-at-home-cli = { editable = true, path = "./gah" }
 
 [dev-packages]
 rsa = "4.9"
 selenium = ">=4.4.0"
 
 [requires]
-python_version = "3.10"
+python_version = "3.12"
 
 [scripts]
-gah = "./geochron/gah.py"
+gah = "./gah/gah.py"
 server = "./manage.py runserver"
 test = "./manage.py test"
 shell = "./manage.py shell"

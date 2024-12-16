@@ -66,19 +66,14 @@ You can exit this any time with `exit`:
 $
 ```
 
-And enter it by cding to the correct directory and typing:
-
-```sh
-$ pipenv shell
-(geochron-at-home) $
-```
-
 ### Setting up PostgreSQL
 
 Set yourself up a PostgreSQL database from the pipenv shell like this:
 
 ```sh
 (geochron-at-home) $ sudo -Eu postgres ./init_db.sh
+(geochron-at-home) $ ./manage.py migrate sites
+(geochron-at-home) $ ./manage.py migrate
 (geochron-at-home) $ ./site_init.sh
 ```
 
@@ -86,7 +81,8 @@ If you do this you will have a database user that does not correspond to
 a real user on your system. If you want to log in to the database with this
 user, you will have to specify the host even if it is on localhost, or it will
 complain that the authentication failed. So you can log on, if you want,
-like this:
+like this (this password is what you set as `POSTGRES_PASSWORD` in
+the `.env` file):
 
 ```
 $ psql -h localhost geochron geochron
@@ -484,108 +480,11 @@ $ docker-compose down
 $ docker-compose up -d --build
 ```
 
-### Using the API
+### Using the CLI
 
-You can use the `./geochron/gah.py` script from any machine that
-can see the API endpoints. But first, you have to tell it where
-the endpoints are (here we are running it from the `geochron`
-directory):
-
-```sh
-(geochron-at-home) $ ./gah.py set url https://my.domain.com/geochron@home
-```
-
-Alternatively, from the root of the project you can use `pipenv run gah`
-(anytime you see `./gah.py` you can use this formulation instead):
-
-```sh
-$ pipenv run gah set url https://my.domain.com/geochron@home
-```
-
-Do not include any `/ftc` or `/api`. This produces a file
-`gah.config` that stores this and other information. As long
-as you run `./gah.py` from a directory containing such a
-file, you will be able to use these settings.
-
-Next, you need to log in with `./gah.py login`. You can use
-any admin user on the site. This login session will last for
-one day, beyond which a further login will be required. You
-can use `./gah.py logout` to forget this login session.
-
-Now you can use the other commands of `gah`, for example:
-
-* `./gah.py` on its own lists help and commands
-* `./gah.py project -h` to get help on the project commands
-* `./gah.py project list` lists all the project IDs
-* `./gah.py project info <ID>` gives information on project with ID `<ID>`
-* `./gah.py project new <project-name> "<description>" <priority>`
-* `./gah.py sample -h` to get help on the sample commands
-* `./gah.py grain upload <path>` to upload all the grains in
-the directory under `<path>`. Every directory that contains a file called
-`rois.json` or contains `*_metadata.xml` files will become a grain, and
-all image files in the same directory with the right sort of file name
-will become images in the grain (see the Upload Image Files section above).
-The grains will be added to samples inferred from the names of the
-directories in which they sit, unless the `--sample <ID_OR_NAME>` option
-is given in which case they will all be added to the identified sample.
-* `./gah.py grain delete <path>` will delete the grain implied by the
-last two segments of `<path>`, which should match `<sample_name>/Grain<nn>`.
-* `./gah.py sample delete <name-or-id>` will delete the identified
-sample; there will be no interactive confirmation, so be careful!
-
-So, for example, to create a new sample with all its images in an
-existing project (say `ProjectDEF`), you might do this:
-
-```sh
-(geochron-at-home) $ ./gah.py project list
-1 ProjectABC
-2 ProjectDEF
-3 SomeOtherProject
-```
-
-So we need project ID `2`. We'll arbitrarily pick `20` as the priority (so
-this sample will be shown before any with a lower number for the
-priority and after any with a higher number) and `50` as the number of
-contributors required to finish this sample. We will look for the
-`"id":<N>` property of the JSON returned to feed to the `grain new`
-function:
-
-```sh
-(geochron-at-home) $ ./gah.py sample new Sample123 2 T 20 50
-b'{"id":199,"sample_name":"Sample123","in_project":2,"sample_property":"T","priority":20,"min_contributor_num":50,"completed":false}'
-(geochron-at-home) $ ./gah.py grain upload --sample 199 /path/to/directory/of/grains
-Created new grain 28
-Uploaded image /path/to/directory/of/grains/Grain01/Stack-09.jpg as image 469
-Uploaded image /path/to/directory/of/grains/Grain01/Stack-07.jpg as image 470
-Uploaded image /path/to/directory/of/grains/Grain01/Stack-02.jpg as image 471
-Uploaded image /path/to/directory/of/grains/Grain01/Stack-10.jpg as image 472
-Uploaded image /path/to/directory/of/grains/Grain01/ReflStackFlat.jpg as image 473
-Uploaded image /path/to/directory/of/grains/Grain01/Stack-12.jpg as image 474
-...
-```
-
-If your grains are in a directory named after the sample you can combine
-these:
-
-```sh
-(geochron-at-home) $ ./gah.py sample upload 2 T 20 999 /path/to/sample/Sample456
-Created new grain 33
-Uploaded image /path/to/sample/Sample456/Grain01/MicaReflStack-00.jpg as image 4981
-Uploaded image /path/to/sample/Sample456/Grain01/MicaReflStack-01.jpg as image 4982
-Uploaded grain count: 19
-```
-
-The structure of your grains directory should be `GrainNN/Stack-NN.jpg` to
-get predictable grain and image numbers. The capitalisation (or indeed spelling)
-of `Grain` does not matter as long as it is followed by two digits. The acceptable
-names for the images are:
-
-* `Stack-NN.jpg` for transmitted light apatite image, lower number is shallower
-* `ReflStackFlat.jpg` for reflected light apatite image
-* `MicaStack-NN.jpg` for transmitted light reflected image, lower number is shallower
-* `MicaReflStackFlat.jpg` for reflected light apatite image
-* as above, but `.jpeg` instead of `.jpg`
-* as above, but `.png` instead of `.jpg` (for PNG image)
+You can manage your Geochron@Home projects including making projects,
+uploading samples, uploading and downloading results, using the command
+line tool `gah`. See the [gah documentation](gah/README.md).
 
 ## Localization
 

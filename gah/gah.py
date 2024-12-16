@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import csv
-from datetime import date
 from getpass import getpass
 import json
 import os.path
@@ -166,7 +165,7 @@ def find_mica_transformation(root, files):
 
 def find_grains_in_directories(path):
     """
-    Finds all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files or rois.json files.
+    Finds all folders containing (Refl)?Stack-(-?\\d+)_metadata.xml files or rois.json files.
     Returns a dict of directory paths to 
     """
     meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
@@ -1284,6 +1283,9 @@ def perform_action(options):
             print(body)
         exit(1)
 
-if __name__ == '__main__':
+def main():
     options = parse_argv()
     perform_action(options)
+
+if __name__ == '__main__':
+    main()
