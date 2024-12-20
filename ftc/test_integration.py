@@ -54,6 +54,9 @@ class GahCase(TestCase):
       self.fail("response was redirect to {0}, not to login.".format(response.url))
     self.fail("response code was {0}, not 403 or redirect to login".format(response.status_code))
 
+  def assertDictContainsSubset(self, a, b):
+      self.assertEqual(b, {**b, **a})
+
 
 class CountingCase(GahCase):
   def count_grain(self, sample, grain, count):

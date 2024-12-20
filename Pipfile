@@ -18,7 +18,7 @@ pip = "*"
 
 [dev-packages]
 rsa = "4.9"
-selenium = ">=4.4.0"
+selenium = ">=4.25.0"
 
 [requires]
 python_version = "3.10"

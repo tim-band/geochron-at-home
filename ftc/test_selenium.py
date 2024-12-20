@@ -12,6 +12,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 import glob
 import os
 import re
+import subprocess
 import tempfile
 import time
 
@@ -1079,16 +1080,18 @@ class SeleniumTests(LiveServerTestCase):
         browser = os.environ.get('BROWSER')
         if browser == 'firefox':
             self.tmp = tempfile.mkdtemp(prefix='tmp', dir=Path.home())
-            self.service = webdriver.firefox.service.Service(service_args=[
-                "--profile-root",
-                self.tmp,
-            ])
+            self.service = webdriver.FirefoxService(
+                executable_path=subprocess.getoutput("which geckodriver"),
+                service_args=[
+                    "--profile-root",
+                    self.tmp,
+                ],
+            )
             self.driver = webdriver.Firefox(service=self.service)
         elif browser == 'chrome':
             self.driver = webdriver.Chrome()
         else:
             self.driver = webdriver.chromium.webdriver.ChromiumDriver(
-                'gah', 'gah',
                 service=webdriver.chromium.service.ChromiumService(
                     'chromium.chromedriver',
                     start_error_message='Failed to start chromedriver for Geochron@Home'
@@ -1102,6 +1105,9 @@ class SeleniumTests(LiveServerTestCase):
         self.driver.close()
         if self.tmp is not None:
             os.rmdir(self.tmp)
+
+    def assertDictContainsSubset(self, a, b):
+        self.assertEqual(b, {**b, **a})
 
 
 class WithTutorials(SeleniumTests):

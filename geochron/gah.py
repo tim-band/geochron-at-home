@@ -165,7 +165,7 @@ def find_mica_transformation(root, files):
 
 def find_grains_in_directories(path):
     """
-    Finds all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files or rois.json files.
+    Finds all folders containing (Refl)?Stack-(-?\\d+)_metadata.xml files or rois.json files.
     Returns a dict of directory paths to 
     """
     meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)

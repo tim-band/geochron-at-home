@@ -54,6 +54,9 @@ class ApiTestMixin:
         self.headers = log_in_headers(self.client, 'counter', 'counter_password')
         self.super_headers = log_in_headers(self.client, 'super', 'super_password')
 
+    def assertDictContainsSubset(self, a, b):
+        self.assertEqual(b, {**b, **a})
+
 
 @tag('api')
 class ApiJwt(JwtTestCase):
@@ -767,6 +770,18 @@ class ApiCount(ApiTestMixin, JwtTestCase):
             line_set += json.loads(ftn["contained_tracks"])
             results[analyst] = line_set
         self.assertDictsOfListsContainTheSameDicts(ctss, results)
+
+    def test_upload_guest_no_analyst(self):
+        data = {
+            'grain': '2/1',
+            'ft_type': 'S',
+            'worker': 'guest',
+            'create_date': '2024-07-25',
+            'grainpoints': '[]',
+            'contained_tracks': '[]'
+        }
+        r = self.client.post('/ftc/api/count/', data, **self.super_headers)
+        self.assertEqual(r.status_code, 201)
 
     def assertDictsOfListsContainTheSameDicts(
         self,

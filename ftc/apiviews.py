@@ -511,7 +511,7 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
             "worker": worker
         }
         if worker.username == "guest":
-            delete_params["analyst"] = validated_data["analyst"]
+            delete_params["analyst"] = validated_data.get("analyst", None)
         ftn = FissionTrackNumbering.objects.filter(
             **delete_params
         ).delete()
