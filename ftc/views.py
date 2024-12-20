@@ -579,8 +579,8 @@ def publicSample(request, sample, grain):
     g = Grain.objects.get(sample=sample, index=grain)
     user = g.sample.in_project.creator
     if not g.sample.public:
-        # it's not public, but the creator is allowed to see it
-        if not request.user.is_authenticated or user != request.user:
+        # it's not public, but the creator and superusers can see it
+        if user != request.user and not request.user.is_superuser:
             raise PermissionDenied('This sample is not public')
     ft_type = 'S'
     result_query = Subquery(FissionTrackNumbering.objects.filter(
@@ -607,6 +607,54 @@ def publicSample(request, sample, grain):
         ft_type,
         next_page=next,
         prev_page=prev
+    )
+    return render(request, 'ftc/public.html', ctx)
+
+@csrf_protect
+def grainUserResult(request, grain, user):
+    g = Grain.objects.get(pk=grain)
+    if not request.user.is_authenticated and not g.sample.public:
+        raise PermissionDenied('not a public grain')
+    ctx = get_grain_info(
+        user,
+        grain,
+        'S',
+    )
+    return render(request, 'ftc/public.html', ctx)
+
+class GrainAnalysesView(UserPassesTestMixin, ListView):
+    model = FissionTrackNumbering
+    template_name = "ftc/grain_analysts_list.html"
+    def get_queryset(self):
+        return FissionTrackNumbering.objects.filter(
+            grain = self.kwargs['pk'],
+            worker__username = "guest",
+            analyst__isnull = False
+        ).order_by(
+            'analyst'
+        )
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx.update(grain=Grain.objects.get(pk=self.kwargs['pk']))
+        return ctx
+    def test_func(self):
+        grain = Grain.objects.get(pk=self.kwargs['pk'])
+        return (
+            grain.sample.public
+            or self.request.user == grain.get_owner()
+            or self.request.user.is_superuser
+        )
+
+@csrf_protect
+def grainAnalystResult(request, grain, analyst):
+    g = Grain.objects.get(pk=grain)
+    if not request.user.is_authenticated and not g.sample.public:
+        raise PermissionDenied('not a public grain')
+    ctx = get_grain_info(
+        User.objects.get(username__exact='guest'),
+        grain,
+        'S',
+        analyst=analyst
     )
     return render(request, 'ftc/public.html', ctx)
 
@@ -835,7 +883,10 @@ def get_grain_images_list(grain, ft_type):
     images = grain.image_set.filter(
         ft_type=ft_type
     ).order_by('index')
-    return list(map(lambda x: reverse('get_image', args=[x.pk]), images))
+    return [
+        list(map(lambda x: reverse('get_image', args=[x.pk]), images)),
+        list(map(lambda x: x.index, images))
+    ]
 
 def get_image(request, pk):
     image = get_object_or_404(Image, pk=pk)
@@ -864,19 +915,22 @@ def redirect_to_count(request):
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def add_grain_info_markers(info, grain, ft_type, worker):
+def add_grain_info_markers(info, grain, ft_type, worker, analyst = None):
     objects = FissionTrackNumbering.objects.filter(
         grain=grain,
         ft_type=ft_type
     )
     if worker is not None:
         objects = objects.filter(worker=worker)
+    if analyst is not None:
+        objects = objects.filter(analyst=analyst)
     save = objects.order_by('result').first()
     if save:
         info['marker_latlngs'] = save.get_latlngs_within_roi()
         info['points'] = save.points()
+        info['lengths'] = save.contained_tracks_latlngs
 
-def get_grain_info(user, pk, ft_type, **kwargs):
+def get_grain_info(user, pk, ft_type, analyst = None, **kwargs):
     if pk == 'done':
         return {
             'grain_info': 'null',
@@ -887,7 +941,7 @@ def get_grain_info(user, pk, ft_type, **kwargs):
     the_sample = grain.sample
     the_grain = grain.index
     ft_type = ft_type
-    images_list = get_grain_images_list(grain, ft_type)
+    [images_list, indices_list] = get_grain_images_list(grain, ft_type)
     matrix = grain.mica_transform_matrix if ft_type == 'I' else None
     rois = load_rois(grain, ft_type, matrix)
     if rois is None:
@@ -910,9 +964,10 @@ def get_grain_info(user, pk, ft_type, **kwargs):
         'image_height': grain.image_height,
         'scale_x': grain.scale_x,
         'images': images_list,
+        'indices': indices_list,
         'rois': rois
     }
-    add_grain_info_markers(info, grain, ft_type, user)
+    add_grain_info_markers(info, grain, ft_type, user, analyst)
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,

@@ -532,6 +532,14 @@ is given in which case they will all be added to the identified sample.
 last two segments of `<path>`, which should match `<sample_name>/Grain<nn>`.
 * `./gah.py sample delete <name-or-id>` will delete the identified
 sample; there will be no interactive confirmation, so be careful!
+* `./gah.py count list` returns results of user counts
+* `./gah.py count upload <file>` uploads new user counts
+* `./gah.py genrois <path>` creates `rois.json` files for all the grains
+within `<path>`. Obviously the ROI paths are arbitrary, but other data is
+derived from the grain files present. This is necessary to upload grains
+if you have not created your own `rois.json` files.
+
+#### Example: Uploading a new sample
 
 So, for example, to create a new sample with all its images in an
 existing project (say `ProjectDEF`), you might do this:
@@ -586,6 +594,85 @@ names for the images are:
 * `MicaReflStackFlat.jpg` for reflected light apatite image
 * as above, but `.jpeg` instead of `.jpg`
 * as above, but `.png` instead of `.jpg` (for PNG image)
+
+#### Example: Uploading user counts
+
+If you have counted grains in some other program, you can still display these counts in
+Geochron@Home by uploading them. The command is simple:
+
+```sh
+$ ./gah.py count upload count.json
+```
+
+where `count.json` has the following format:
+```json
+[{
+    "sample": 14,
+    "index": 1,
+    "ft_type": "S",
+    "user": "admin",
+    "date": "2024-06-26",
+    "points": [{
+        "x_pixels": 444,
+        "y_pixels": 555,
+        "category": "track",
+        "comment": "Not sure about this one"
+    }],
+    "lines": [
+        [100, 200, 2, 500, 600, 4],
+        [560, 560, 3.5, 900, 100, 3],
+        {
+          "x1_pixels": 1000,
+          "y1_pixels": 1200,
+          "z1_level": 2,
+          "x2_pixels": 700,
+          "y2_pixels": 900,
+          "z2_level": 2.5
+        }
+    ]
+}]
+```
+
+Here `"points"` is the list of etch pits identified by the user.
+(`x_pixels`, `y_pixels`) is the position of the etch pit, `category`
+is optional, and can take the values `track` (default), `inclusion`,
+`surface` or `defect`. More can be added through the admin
+interface by altering the `GrainPointCategory` table. `comment`
+is also optional. `category` and `comment` are useful for
+making tutorial pages.
+
+`"lines"` is the list of contained tracks. Currently Geochron@Home
+has no way to allow users to add these, they can only be uploaded.
+We can see two different ways to specify a line; one is to describe
+the endpoints with keys `x1_pixels`, `y1_pixels`,  `z1_level`,
+`x2_pixels`, `y2_pixels` and  `z2_level`. As these names suggest,
+the x and y co-ordinates are defined in pixels, whereas the z
+co-ordinate is the focus level at which the end is in focus (with
+0 as the uppermost level). Alternatively, a simple list of six floating
+point numbers is acceptable.
+
+The overall type is a list, so as many results as you like can be
+uploaded in one call. For each uploaded result, any existing
+result from this user for this grain is discarded.
+
+## Public samples
+
+You can set a sample to be "public" either by ticking the "public" box
+on the appropriate Sample page in the Admin view, or by choosing
+Manage Projects, then the appropriate project, then the sample,
+then click "Edit", tick the "public" box and click the "Save" button.
+
+Once a sample is public, its grains will be available to view on
+the URL `/ftc/grain/<grain-id>/user/<user-id>/` where `<grain-id>`
+is the ID number of the grain and `<user-id>` is the ID number of
+the user whose track markers are to be displayed.
+
+Also a public sample can be displayed at `/ftc/public/<sample>/<grain-index>`,
+where `<sample>` is the sample ID number and `<grain-index>` is
+the number of the grain within the sample to view. Track markings
+for the owner of the sample will be visible, if any. "Previous" and
+"Next" buttons will be rendered to take the browser from grain to
+grain within that sample.
 
 ## Localization
 

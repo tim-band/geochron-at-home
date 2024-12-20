@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import csv
-from datetime import date
 from getpass import getpass
 import json
 import os.path
@@ -1132,15 +1131,17 @@ def count_list(opts, config):
         else:
             print(result)
 
-def count_post(config, count):
+def count_post(config, count: dict[any]):
     with api_post(
         config,
         'count',
         grain='{0}/{1}'.format(count['sample'], count['index']),
         ft_type=count['ft_type'],
         worker=count['user'],
+        analyst=count.get('analyst'),
         create_date=count['date'],
-        grainpoints=json.dumps(count['points'])
+        grainpoints=json.dumps(count.get('points', [])),
+        contained_tracks=json.dumps(count.get('lines', []))
     ) as response:
         body = response.read()
         result = json.loads(body)
@@ -1148,13 +1149,26 @@ def count_post(config, count):
 
 @token_refresh
 def count_upload(opts, config):
-    with open(opts.file) as h:
-        j = json.loads(h.read())
-        if type(j) is list:
-            for obj in j:
-                count_post(config, obj)
-        else:
-            count_post(config, j)
+    for file in opts.files:
+        print("uploading counts from file {0}".format(file))
+        with open(file) as h:
+            j = json.loads(h.read())
+            if type(j) is list:
+                count = 0
+                for obj in j:
+                    if (type(obj) is not dict):
+                        raise Exception("Item {} in the array is not an object".format(count))
+                    print("File {} iteration {}: sample {}, index {}, user {}".format(
+                        file,
+                        count,
+                        obj.get("sample", "not specified"),
+                        obj.get("index", "not specified"),
+                        obj.get("user", "not specified")
+                    ))
+                    count_post(config, obj)
+                    count += 1
+            else:
+                count_post(config, j)
 
 
 def add_count_subparser(subparsers):
@@ -1182,9 +1196,10 @@ def add_count_subparser(subparsers):
     )
     upload_count.set_defaults(func=count_upload)
     upload_count.add_argument(
-        'file',
+        'files',
+        nargs='*',
         help=(
-            "JSON file containing a list of objects with keys:"
+            "JSON files containing a list of objects with keys:"
             " sample (name or ID),"
             " index (grain index within the sample),"
             " ft_type ('S' if the grain tracks are counted, 'I' for the mica),"

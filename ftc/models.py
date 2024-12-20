@@ -178,6 +178,14 @@ class Grain(models.Model):
                 count += 1
         return count % 2 == 1
 
+    def get_analyses(self):
+        return FissionTrackNumbering.objects.filter(
+            grain__sample=self.sample,
+            grain__index=self.index,
+            worker__username='guest',
+            analyst__isnull=False
+        )
+
 #
 class Region(models.Model):
     grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
@@ -266,6 +274,9 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     )
     ft_type = models.CharField(max_length=1, choices=FT_TYPE)
     worker = models.ForeignKey(User, on_delete=models.CASCADE)
+    # If the worker is guest uploaded results won't overwrite existing
+    # results unless the analyst also matches and isn't NULL.
+    analyst = models.TextField(null=True)
     result = models.IntegerField() #-1 means this is a partial save state
     create_date = models.DateTimeField(auto_now_add=True)
 
@@ -312,6 +323,10 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         ]
 
     def get_latlngs_within_roi(self):
+        # if there are no regions we will count every marker as being
+        # within the ROI, otherwise nothing will be.
+        if 0 == self.grain.region_set.count():
+            return self.get_latlngs()
         width = self.grain.image_width
         height = self.grain.image_height
         return [
@@ -369,6 +384,55 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
             )
             gp.save()
 
+    def get_contained_tracks(self):
+        return [
+            { k: getattr(ct, k) for k in [
+                'x1_pixels',
+                'y1_pixels',
+                'z1_level',
+                'x2_pixels',
+                'y2_pixels',
+                'z2_level'
+            ]}
+            for ct in self.containedtrack_set.all()
+        ]
+
+    @property
+    def contained_tracks(self) -> str:
+        return json.dumps(self.get_contained_tracks())
+
+    @contained_tracks.setter
+    def contained_tracks(self, tracks : list[dict[str, any]]):
+        """
+        Set grain points from a list of dicts. Each dict has elements
+        `x1_pixels`, `y1_pixels`, `z1_level`, `x2_pixels`, `y2_pixels`
+        and `z2_level`. (`x1_pixels`, `y1_pixels`) and (`x2_pixels`, `y2_pixels`)
+        are co-ordinates on the image, (0,0) being the top left. `z1_level`
+        and `z2_level` are the respective z-positions of the ends with 0
+        representing the top level (near the surface) and increasing by
+        1 for every image in the z-stack. Non-integers are acceptable to
+        describe points that are not in perfect focus in any z-stack image.
+        """
+        self.containedtrack_set.all().delete()
+        for t in tracks:
+            ct = ContainedTrack(result=self, **t)
+            ct.save()
+
+    @property
+    def contained_tracks_latlngs(self):
+        width = self.grain.image_width
+        height = self.grain.image_height
+        return [
+            [[ (height - ct.y1_pixels) / width, ct.x1_pixels / width, ct.z1_level ],
+             [ (height - ct.y2_pixels) / width, ct.x2_pixels / width, ct.z2_level ],]
+            for ct in self.containedtrack_set.all()
+        ]
+
+    def get_contained_track_count(self):
+        return self.containedtrack_set.count()
+
+    def get_track_count(self):
+        return self.grainpoint_set.count()
 
 #
 class TutorialResult(models.Model):
@@ -413,3 +477,15 @@ class TutorialPage(models.Model):
     message = models.TextField()
     active = models.BooleanField(default=True)
     sequence_number = models.IntegerField(default=50)
+
+class ContainedTrack(models.Model):
+    """
+    Both ends of a track found by a user.
+    """
+    result = models.ForeignKey(FissionTrackNumbering, on_delete=models.CASCADE)
+    x1_pixels = models.IntegerField()
+    y1_pixels = models.IntegerField()
+    z1_level = models.IntegerField()
+    x2_pixels = models.IntegerField()
+    y2_pixels = models.IntegerField()
+    z2_level = models.IntegerField()

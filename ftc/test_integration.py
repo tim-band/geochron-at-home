@@ -7,7 +7,7 @@ import json
 from random import uniform
 import re
 
-from ftc.models import TutorialPage, Sample
+from ftc.models import TutorialPage, Sample, Region
 
 def gen_latlng():
   return [
@@ -45,6 +45,14 @@ class GahCase(TestCase):
   def logout(self):
     self.client.post(reverse('logout'))
 
+  def assertForbidden(self, response):
+    if response.status_code == 403:
+      return
+    if response.status_code == 302:
+      if "accounts/login" in response.url:
+        return
+      self.fail("response was redirect to {0}, not to login.".format(response.url))
+    self.fail("response code was {0}, not 403 or redirect to login".format(response.status_code))
 
 
 class CountingCase(GahCase):
@@ -378,37 +386,67 @@ class PublicPageCase(GahCase):
     'samples.json',
     'grains.json',
     'results.json',
+    'results_analyst.json',
     'images.json',
     'grain1_region.json',
     'grain1_region_hole.json'
   ]
-  def test_sample_publicness_controls_access_to_public_page(self):
+  # Checks for access to certain aspects of sample 1.
+  # Sample 1 is owned by admin, so these aspects
+  # should be visible to super (as superuser) and admin
+  # (as the owner but not superuser) but not to
+  # counter or an unauthenticated user unless the
+  # sample is made public.
+  def run_publicness(self, gets):
+    sample_pk = 1
+    self.logout()
+    for get in gets:
+      r = self.client.get(get)
+      self.assertForbidden(r)
+    self.login_super()
+    for get in gets:
+      r = self.client.get(get)
+      self.assertEqual(r.status_code, 200)
+    self.logout()
+    # The admin is the owner of the sample, but is not superuser
+    self.login_admin()
+    for get in gets:
+      r = self.client.get(get)
+      self.assertEqual(r.status_code, 200)
+    self.logout()
     self.login_counter()
-    r = self.client.get(
-      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
-    )
-    self.assertEqual(r.status_code, 403)
-    s = Sample.objects.get(pk=1)
+    for get in gets:
+      r = self.client.get(get)
+      self.assertForbidden(r)
+    s = Sample.objects.get(pk=sample_pk)
     s.public = True
     s.save()
-    r = self.client.get(
-      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
-    )
-    self.assertEqual(r.status_code, 200)
+    for get in gets:
+      r = self.client.get(get)
+      self.assertEqual(r.status_code, 200)
+    self.logout()
+    # unauthenticated users should be able to see, too
+    for get in gets:
+      r = self.client.get(get)
+      self.assertEqual(r.status_code, 200)
+
+  def test_sample_publicness_controls_access_to_public_page(self):
+    self.run_publicness(gets = [
+      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 }),
+      # Check access to images in this grain
+      reverse('get_image', kwargs={'pk': 1}),
+      reverse('grain_user_result', kwargs={'grain': 1, 'user': 101})
+    ])
 
   def test_sample_publicness_controls_access_to_grain_image(self):
-    self.login_counter()
-    r = self.client.get(
-      reverse('get_image', kwargs={ 'pk': 1 })
-    )
-    self.assertEqual(r.status_code, 403)
-    s = Sample.objects.get(pk=1)
-    s.public = True
-    s.save()
-    r = self.client.get(
-      reverse('get_image', kwargs={ 'pk': 1 })
-    )
-    self.assertEqual(r.status_code, 200)
+    self.run_publicness(gets = [
+      reverse('get_image', kwargs={ 'pk': 1 }),
+    ])
+
+  def test_analyst_page_publicness(self):
+    self.run_publicness(gets = [
+      reverse('analyses_page', kwargs={ 'pk': 1 })
+    ])
 
   def test_public_markers(self):
     self.login_counter()
@@ -419,10 +457,24 @@ class PublicPageCase(GahCase):
       reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
     )
     self.assertEqual(r.status_code, 200)
-    content = r.content.decode('utf-8')
-    grain_info_json = re.search(r"grain_info:\s*JSON.parse\('(.*)'\)", content).group(1)
-    grain_info_json = grain_info_json.replace("\\u0022", '"')
-    j = json.loads(grain_info_json)
+    j = self.get_grain_info(r)
     latlngs = j['marker_latlngs']
     # There are three points; one is outside the ROI, one is in the hole
     self.assertEqual(len(latlngs), 1)
+    # Delete the ROI regions, all the markers should become visible
+    Region.objects.filter(grain__index=1, grain__sample__pk=1).delete()
+    r = self.client.get(
+      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
+    )
+    self.assertEqual(r.status_code, 200)
+    j = self.get_grain_info(r)
+    latlngs = j['marker_latlngs']
+    # Now we should see them all
+    self.assertEqual(len(latlngs), 3)
+
+  def get_grain_info(self, response):
+      content = response.content.decode('utf-8')
+      grain_info_json = re.search(r"grain_info:\s*JSON.parse\('(.*)'\)", content).group(1)
+      grain_info_json = grain_info_json.replace("\\u0022", '"')
+      j = json.loads(grain_info_json)
+      return j
