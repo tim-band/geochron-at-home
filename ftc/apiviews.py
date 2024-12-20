@@ -6,10 +6,8 @@ from django.db.models.aggregates import Max
 from django.shortcuts import get_object_or_404
 import json
 import logging
-from rest_framework import exceptions
-from rest_framework import generics, serializers
+from rest_framework import exceptions, generics, serializers
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.fields import empty
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
@@ -30,7 +28,25 @@ def explicit_exception_handler(exc, context):
             { 'failed_validations': exc.detail },
             status=400
         )
-    return exception_handler(exc, context)
+    if isinstance(exc, exceptions.APIException):
+        return Response(
+            {
+                'detail': exc.detail,
+                'status': exc.get_codes(),
+            },
+            status=exc.status_code
+        )
+    req = context['request']
+    return Response(
+        {
+            'exception': exc.__class__.__name__,
+            'message': str(exc),
+            'user': req.user.username,
+            'method': req.method,
+            'path': req.path,
+            'query_params': dict(req.query_params),
+        }
+    )
 
 
 def models_owned(model_class, request):
