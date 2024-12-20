@@ -8,3 +8,5 @@ production.env
 /db/
 __pycache__
 /*.log
+/gah/build/
+*.egg-info

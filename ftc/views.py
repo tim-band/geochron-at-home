@@ -25,7 +25,7 @@ from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex, GrainPointCategory,
     TutorialPage)
 from ftc.parse_image_name import parse_upload_name
-from geochron.gah import parse_metadata_grain, parse_metadata_image
+from gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 
 import csv
