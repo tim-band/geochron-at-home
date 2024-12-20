@@ -1,0 +1,76 @@
+[
+    {
+        "model": "ftc.fissiontracknumbering",
+        "pk": 11,
+        "fields": {
+            "grain": 1,
+            "ft_type": "S",
+            "worker": 99,
+            "analyst": "terry",
+            "result": 3,
+            "create_date": "2024-01-01T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 110,
+        "fields": {
+            "result": 11,
+            "category": "track",
+            "x_pixels": 81,
+            "y_pixels": 121
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 111,
+        "fields": {
+            "result": 11,
+            "category": "track",
+            "x_pixels": 41,
+            "y_pixels": 72
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 112,
+        "fields": {
+            "result": 11,
+            "category": "track",
+            "x_pixels": 73,
+            "y_pixels": 74
+        }
+    },
+    {
+        "model": "ftc.fissiontracknumbering",
+        "pk": 21,
+        "fields": {
+            "grain": 1,
+            "ft_type": "S",
+            "worker": 99,
+            "analyst": "julie",
+            "result": 2,
+            "create_date": "2024-01-02T00:00:00Z"
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 121,
+        "fields": {
+            "result": 21,
+            "category": "track",
+            "x_pixels": 21,
+            "y_pixels": 52
+        }
+    },
+    {
+        "model": "ftc.grainpoint",
+        "pk": 122,
+        "fields": {
+            "result": 21,
+            "category": "track",
+            "x_pixels": 53,
+            "y_pixels": 44
+        }
+    }
+]

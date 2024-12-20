@@ -330,7 +330,7 @@ class ProfilePage(BasePage):
         assert any(['must finish the tutorial' in e.text for e in danger])
         return self
 
-    def go_tutorial(self):
+    def go_tutorial(self) -> TutorialPage:
         self.click_by_id('tutorial-link')
         return TutorialPage(self.driver, self.url)
 
@@ -347,7 +347,63 @@ class PublicPage(BasePage):
         return None
 
 
-class CountingPage(BasePage):
+class GrainViewPage(BasePage):
+    def leaflet_image_layer(self):
+        mp = self.find_by_id("map")
+        return mp.find_element(By.CSS_SELECTOR,  'img.leaflet-image-layer')
+
+    def find_marker(self, x, y):
+        lil = self.leaflet_image_layer()
+        ms = self.all_markers()
+        return find_best(ms, lambda m: sum_squares(
+            x * lil.rect['width'] + lil.rect['x'] - pin_x(m),
+            y * lil.rect['height'] + lil.rect['y'] - centre_y(m)
+        ))
+
+    def all_markers(self):
+        return self.driver.find_elements(
+            By.CSS_SELECTOR,
+            'img.leaflet-marker-icon'
+        )
+
+    def image_displayed_url(self):
+        class ElementsLoaded:
+            def __init__(self, locator_type, locator_string, count):
+                self.locator_type = locator_type
+                self.locator_string = locator_string
+                self.count = count
+            def __call__(self, driver):
+                es = driver.find_elements(self.locator_type, self.locator_string)
+                if len(es) < self.count:
+                    return False
+                return es
+
+        # we used to wait for all four to be loaded, but now it seems only one
+        # gets loaded at a time.
+        images = WebDriverWait(self.driver, 3).until(
+            ElementsLoaded(By.CLASS_NAME, "leaflet-image-layer", 1))
+
+        return images[-1].get_attribute("src")
+
+
+class AnalysesPage(BasePage):
+    def do_check(self):
+        h1s = self.driver.find_elements(By.TAG_NAME, "h1")
+        for h1 in h1s:
+            if "Analyses of grain" in h1.text:
+                return
+        raise Exception("Not on Analyses page")
+
+    def check(self):
+        retrying(3, self.do_check, 0.3)
+        return self
+
+    def go_analysis(self, name) -> GrainViewPage:
+        self.find_by_id('analysis-link-{0}'.format(name)).click()
+        return GrainViewPage(self.driver, self.url)
+
+
+class CountingPage(GrainViewPage):
     def check(self):
         self.find_by_id('btn-tracknum')
         return self
@@ -390,10 +446,6 @@ class CountingPage(BasePage):
         )
         return self
 
-    def leaflet_image_layer(self):
-        mp = self.find_by_id("map")
-        return mp.find_element(By.CSS_SELECTOR,  'img.leaflet-image-layer')
-
     def delete_from(self, minx, maxx, miny, maxy):
         self.click_by_id('ftc-btn-select')
         lil = self.leaflet_image_layer()
@@ -406,14 +458,6 @@ class CountingPage(BasePage):
         actions.click().pause(0.1).perform()
         self.driver.find_element(By.ID, "ftc-btn-delete").click()
         return self
-
-    def find_marker(self, x, y):
-        lil = self.leaflet_image_layer()
-        ms = self.driver.find_elements(By.CSS_SELECTOR, 'img.leaflet-marker-icon')
-        return find_best(ms, lambda m: sum_squares(
-            x * lil.rect['width'] + lil.rect['x'] - pin_x(m),
-            y * lil.rect['height'] + lil.rect['y'] - centre_y(m)
-        ))
 
     def drag(self, marker, dx, dy):
         actions = ActionChains(self.driver)
@@ -474,26 +518,6 @@ class CountingPage(BasePage):
         actions = ActionChains(self.driver)
         actions.drag_and_drop_by_offset(handle, 0, dy).pause(1.0).perform()
         return self
-
-    def image_displayed_url(self):
-
-        class ElementsLoaded:
-            def __init__(self, locator_type, locator_string, count):
-                self.locator_type = locator_type
-                self.locator_string = locator_string
-                self.count = count
-            def __call__(self, driver):
-                es = driver.find_elements(self.locator_type, self.locator_string)
-                if len(es) < self.count:
-                    return False
-                return es
-
-        # we used to wait for all four to be loaded, but now it seems only one
-        # gets loaded at a time.
-        images = WebDriverWait(self.driver, 3).until(
-            ElementsLoaded(By.CLASS_NAME, "leaflet-image-layer", 1))
-
-        return images[-1].get_attribute("src")
 
 
 class NavBar(BasePage):
@@ -571,27 +595,6 @@ class ReportPage(BasePage):
         return retrying(4, lambda: self.result_or_fail(grain_number), 0.1)
 
 
-class ProjectsPage(BasePage):
-    def go(self):
-        self.get(self.url + '/ftc/projects/')
-        return self
-
-    def check(self):
-        self.find_by_xpath('//h1[text()="Projects"]')
-        return self
-
-    def create_project(self):
-        self.click_by_id('create-project')
-        return ProjectCreatePage(self.driver, self.url)
-
-    def go_project(self, name):
-        self.click_element(
-            By.XPATH,
-            '//tbody[@id="project-list"]/tr/td/a[text()="{0}"]'.format(name)
-        )
-        return ProjectPage(self.driver, self.url)
-
-
 class ProjectCreatePage(BasePage):
     def create(self, name, description, priority, closed):
         self.fill_form({
@@ -615,6 +618,27 @@ class ProjectPage(BasePage):
             '//tbody[@id="sample-list"]/tr/td/a[text()="{0}"]'.format(name)
         )
         return SamplePage(self.driver, self.url)
+
+
+class ProjectsPage(BasePage):
+    def go(self):
+        self.get(self.url + '/ftc/projects/')
+        return self
+
+    def check(self):
+        self.find_by_xpath('//h1[text()="Projects"]')
+        return self
+
+    def create_project(self):
+        self.click_by_id('create-project')
+        return ProjectCreatePage(self.driver, self.url)
+
+    def go_project(self, name):
+        self.click_element(
+            By.XPATH,
+            '//tbody[@id="project-list"]/tr/td/a[text()="{0}"]'.format(name)
+        )
+        return ProjectPage(self.driver, self.url)
 
 
 class SampleCreatePage(BasePage):
@@ -673,6 +697,13 @@ class SamplePage(BasePage):
             '//table[@id="grain-set"]/tbody/tr/td/a[@id="public-{0}"]'.format(index)
         )
         return PublicPage(self.driver, self.url)
+
+    def go_analyses(self, index):
+        self.click_element(
+            By.XPATH,
+            '//table[@id="grain-set"]/tbody/tr/td/a[@id="analyses-link-{0}"]'.format(index)
+        )
+        return AnalysesPage(self.driver, self.url)
 
     def grain_present(self, pk):
         es = self.driver.find_elements(
@@ -1711,4 +1742,20 @@ class PublicPageResults(SeleniumTests):
         samples = ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project('p1')
         public_page = samples.go_sample('s1').go_public(3).check()
-        assert public_page.track_count() == 3
+        # There are three tracks, but only two are within the ROI
+        assert public_page.track_count() == 2
+
+
+class AnalysesWithoutRegions(SeleniumTests):
+    fixtures = [
+        'essential.json',
+        'users.json', 'projects.json', 'samples.json',
+        'grains.json', 'images.json', 'results_analyst.json'
+    ]
+    def test_analyses_without_regions_shows_all_markers(self):
+        self.sign_in(self.project_user)
+        samples = ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project('proj1')
+        anayses_page = samples.go_sample('adm_samp').go_analyses(1).check()
+        grain_view = anayses_page.go_analysis('terry')
+        self.assertEqual(len(grain_view.all_markers()), 3)

@@ -673,6 +673,119 @@ class ApiCount(ApiTestMixin, JwtTestCase):
         self.assertSetAlmostEqual(jl, latlngs, latlngs_close)
         self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, j[0]['worker'])
 
+    def upload_contained_tracks(self, use_dict: bool):
+        cts = [
+            [100, 500, 300, 130, 420, 450],
+            [300, 400, 250, 340, 340, 250],
+        ]
+        sample = 2
+        index = 1
+        tracks = [{
+            'x1_pixels': ct[0],
+            'y1_pixels': ct[1],
+            'z1_level': ct[2],
+            'x2_pixels': ct[3],
+            'y2_pixels': ct[4],
+            'z2_level': ct[5],
+        } for ct in cts]
+        data = {
+            'grain': '{0}/{1}'.format(sample, index),
+            'ft_type': 'S',
+            'worker': 'admin',
+            'create_date': '2024-06-26',
+            'grainpoints': '[]',
+            'contained_tracks': json.dumps(tracks if use_dict else cts),
+        }
+        r = self.client.post('/ftc/api/count/', data, **self.super_headers)
+        self.assertEqual(r.status_code, 201)
+        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content.decode(r.charset))
+        jl = json.loads(j[0]['contained_tracks'])
+        self.assertEqual(jl, tracks)
+
+    def test_upload_contained_tracks_dict(self):
+        self.upload_contained_tracks(True)
+
+    def test_upload_contained_tracks_list(self):
+        self.upload_contained_tracks(False)
+
+    def test_upload_different_analysts(self):
+        ctss: dict[str, list[dict]] = {
+            "amy": [{
+               'x1_pixels': 100,
+                'y1_pixels': 200,
+                'z1_level': 3,
+                'x2_pixels': 400,
+                'y2_pixels': 500,
+                'z2_level': 6,
+            }, {
+               'x1_pixels': 300,
+                'y1_pixels': 200,
+                'z1_level': 2,
+                'x2_pixels': 500,
+                'y2_pixels': 400,
+                'z2_level': 5,
+            }],
+            "bill": [{
+               'x1_pixels': 123,
+                'y1_pixels': 223,
+                'z1_level': 4,
+                'x2_pixels': 423,
+                'y2_pixels': 523,
+                'z2_level': 5,
+            }, {
+               'x1_pixels': 323,
+                'y1_pixels': 223,
+                'z1_level': 1,
+                'x2_pixels': 523,
+                'y2_pixels': 423,
+                'z2_level': 2,
+            }]
+        }
+        sample = 2
+        index = 1
+        data = [{
+            'grain': '{0}/{1}'.format(sample, index),
+            'ft_type': 'S',
+            'worker': 'guest',
+            'analyst': analyst,
+            'create_date': '2024-07-25',
+            'grainpoints': '[]',
+            'contained_tracks': json.dumps(cts)
+        } for analyst, cts in ctss.items()]
+        for data_item in data:
+            r = self.client.post('/ftc/api/count/', data_item, **self.super_headers)
+            self.assertEqual(r.status_code, 201)
+        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content.decode(r.charset))
+        results: dict[str, list[dict[str, str]]] = {}
+        for ftn in j:
+            analyst = ftn["analyst"]
+            line_set = results.get(analyst, list())
+            line_set += json.loads(ftn["contained_tracks"])
+            results[analyst] = line_set
+        self.assertDictsOfListsContainTheSameDicts(ctss, results)
+
+    def assertDictsOfListsContainTheSameDicts(
+        self,
+        dict2ListOfDicts1: dict[str, list[dict]],
+        dict2ListOfDicts2: dict[str, list[dict]]
+    ):
+        self.assertEqual(sorted(dict2ListOfDicts2.keys()), sorted(dict2ListOfDicts1.keys()))
+        for k in dict2ListOfDicts2.keys():
+            self.listsContainTheSameDicts(dict2ListOfDicts1[k], dict2ListOfDicts2[k])
+
+    def listsContainTheSameDicts(self, listOfDicts1: list[dict], listOfDicts2: list[dict]):
+        self.assertEqual(
+            self.comparableListOfDicts(listOfDicts1),
+            self.comparableListOfDicts(listOfDicts2)
+        )
+
+    def comparableListOfDicts(self, ds: list[dict]):
+        return sorted(map(lambda x: sorted(x.items()), ds))
+
     def test_upload_deletes_existing(self):
         self.upload_sample_2_results()
         r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
