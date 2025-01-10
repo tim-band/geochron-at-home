@@ -541,9 +541,7 @@ class NavBar(BasePage):
                 if home.is_here():
                     return True
                 self.nav.click_dropdown()
-                logout = driver.find_element(By.CSS_SELECTOR,
-                    'a[href="/accounts/logout/"]'
-                )
+                logout = driver.find_element(By.ID, 'nav-logout-link')
                 if logout.is_displayed() and logout:
                     logout.click()
                     home.check()
