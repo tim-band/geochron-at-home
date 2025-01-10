@@ -1158,6 +1158,7 @@ def updateFtnResult(request):
             )
         else:
             fts.result = result
+            fts.grainpoint_set.all().delete()
         fts.save()
         addGrainPoints(fts, res_dic)
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)

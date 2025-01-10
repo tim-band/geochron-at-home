@@ -7,7 +7,10 @@ import json
 from random import uniform
 import re
 
-from ftc.models import TutorialPage, Sample, Region
+from ftc.models import (
+  GrainPoint,
+  TutorialPage, Sample, Region
+)
 
 def gen_latlng():
   return [
@@ -343,6 +346,28 @@ class TutorialPageCase(GahCase):
     tps = TutorialPage.objects.all()
     self.assertEqual(len(tps), 1, 'should still be one tutorial page')
     self.assertEqual(tps[0].pk, tp_pk, 'tutorial page changed')
+
+  def test_modifying_tutorial_results_works(self):
+    self.login_admin()
+    tps = TutorialPage.objects.all()
+    self.assertEqual(len(tps), 1, 'precondition failed, should be one tutorial page')
+    LATLNG_COUNT = 4
+    r = self.client.post(
+      reverse('updateFtnResult'),
+      {
+        'sample_id': 1,
+        'grain_num': 1,
+        'ft_type': 'S',
+        'marker_latlngs': gen_latlngs(LATLNG_COUNT)
+      },
+      content_type='application/json'
+    )
+    self.assertEqual(r.status_code, 200)
+    tps = TutorialPage.objects.all()
+    self.assertEqual(len(tps), 1, 'should still be one tutorial page')
+    tp = tps[0]
+    gp_count = GrainPoint.objects.filter(result=tp.marks.pk).count()
+    self.assertEqual(gp_count, LATLNG_COUNT)
 
   def get_tutorial_page_grain_info(self, pk):
     r = self.client.get(reverse('tutorial_page', kwargs={'pk': pk}))
