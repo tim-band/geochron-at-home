@@ -1129,7 +1129,7 @@ def count_list(opts, config):
         if type(result) is list and not opts.json:
             output_as_csv(result)
         else:
-            print(result)
+            print(body.decode("utf-8"))
 
 def count_post(config, count: dict[any]):
     with api_post(

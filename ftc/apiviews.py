@@ -456,8 +456,10 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
 
     def run_validation(self, data=...):
         ret = super().run_validation(data)
-        gps = data.get("grainpoints", "[]")
-        ret["grainpoints"] = json.loads(gps)
+        gps_json = data.get("grainpoints", "[]")
+        gps = json.loads(gps_json)
+        ret["grainpoints"] = gps
+        ret["result"] = data.get("result", len(gps))
         ret["contained_tracks"] = self.validate_contained_tracks(data)
         return ret
 

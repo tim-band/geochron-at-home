@@ -671,6 +671,12 @@ class ApiCount(ApiTestMixin, JwtTestCase):
         self.assertEqual(r.status_code, 201)
         r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
         self.assertEqual(r.status_code, 200)
+        ftn = FissionTrackNumbering.objects.get(
+            worker__username="admin",
+            grain__sample__pk=sample,
+            grain__index=index
+        )
+        self.assertEqual(ftn.result, 4)
         j = json.loads(r.content.decode(r.charset))
         jl = json.loads(j[0]['latlngs'])
         self.assertSetAlmostEqual(jl, latlngs, latlngs_close)
