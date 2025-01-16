@@ -21,6 +21,7 @@ from ftc.models import (
 )
 from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
+from ftc import views
 
 
 def explicit_exception_handler(exc, context):
@@ -286,9 +287,16 @@ class GrainInfoView(RetrieveUpdateDeleteView):
 
 @api_view()
 @permission_classes([IsAuthenticated])
+def get_image(request, pk):
+    return views.get_image(request, pk)
+
+
+@api_view()
+@permission_classes([IsAuthenticated])
 def get_grain_rois(request, pk):
     grain = Grain.objects.get(id=pk)
     return Response(get_rois(grain))
+
 
 def request_roiss(request):
     gq = Grain.objects.all()
@@ -545,4 +553,6 @@ class FissionTrackNumberingView(generics.ListCreateAPIView):
                 qs = qs.filter(grain__sample__sample_name=sample)
         if 'grain' in params:
             qs = qs.filter(grain__index=params['grain'])
+        if 'user' in params:
+            qs = qs.filter(worker__username=params['user'])
         return qs.order_by('grain__sample', 'grain__index').select_related('worker')
