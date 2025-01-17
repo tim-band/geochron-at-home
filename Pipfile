@@ -15,6 +15,8 @@ django-prometheus = "*"
 rsa = "*"
 tzdata = ">=2022.1"  # required for Alpine linux (used in the Dockerfile)
 pip = "*"
+requests = ">= 2.32.3"
+requests-oauthlib = ">= 2.0.0"
 
 [dev-packages]
 rsa = "4.9"

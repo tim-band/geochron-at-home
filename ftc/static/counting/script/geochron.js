@@ -511,6 +511,11 @@ function grain_view(options) {
                 }
                 return ps;
             },
+            makeDraggable: function() {
+                for (var i in markers) {
+                    markers[i].marker.dragging.enable();
+                }
+            },
             trackCount: function() {
                 return track_num;
             },
@@ -1261,6 +1266,7 @@ function grain_view(options) {
         },
         enableEditing: function() {
             isEditable = true;
+            markers.makeDraggable();
             buttonControl = L.easyButton(buttons, map, 'topright');
             buttonControl.getContainer().addEventListener('dblclick', function(e) {
                 e.stopPropagation();
