@@ -347,6 +347,15 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
         self.grainpoint_set.all().delete()
         self.addGrainPointsFromLatlngs(value)
 
+    @property
+    def grainpoints(self):
+        return self.points()
+
+    @grainpoints.setter
+    def grainpoints(self, value : list[dict[str, any]]):
+        self.grainpoint_set.all().delete()
+        self.addGrainPointsFromGrainPoints(value)
+
     def addGrainPointsFromLatlngs(self, marker_latlngs : list[list[float]]):
         width = self.grain.image_width
         height = self.grain.image_height

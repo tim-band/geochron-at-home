@@ -8,6 +8,6 @@ production.env
 /db/
 __pycache__
 /*.log
-/geochron/build/
+/geochron/gah/build/
 /geochron/geochron_at_home_cli.egg-info/
 /geochron/gah/geochron_at_home_cli.egg-info/

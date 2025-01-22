@@ -21,6 +21,7 @@ from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
     ImageListView, GrainListView, FissionTrackNumberingView,
+    FissionTrackNumberingViewLatLngs,
     get_grain_rois, get_many_roiss, SampleGrainInfoView)
 
 urlpatterns = [
@@ -94,4 +95,5 @@ urlpatterns = [
     path('api/image/<pk>/', ImageInfoView.as_view(), name='api_image_info'),
     path('api/image/<pk>/data/', apiviews.get_image, name='api_image_data'),
     path('api/count/', FissionTrackNumberingView.as_view(), name='api_ftn_list'),
+    path('api/countll/', FissionTrackNumberingViewLatLngs.as_view(), name='api_ftn_list'),
 ]

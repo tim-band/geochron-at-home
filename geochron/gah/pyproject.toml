@@ -11,3 +11,6 @@ build-backent = "setuptools.build_meta"
 
 [project.scripts]
 gah = "gah:main"
+
+[tools.setuptools]
+packages = ["gah"]

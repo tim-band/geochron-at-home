@@ -1201,16 +1201,26 @@ def count_list(opts, config):
             print(body.decode("utf-8"))
 
 def count_post(config, count: dict[any]):
+    if 'sample' in count and 'index' in count and 'grain' not in count:
+        grain = f"{count['sample']}/{count['index']}"
+    elif 'sample' not in count and 'index' not in count and 'grain' in count:
+        grain = str(count['grain'])
+    else:
+        raise Exception(f'A count should either have "grain": <grain_id> or "sample": <sample_id> and "index": <grain_index_within_sample>')
+    worker = count.get('user', count['worker']['username'])
+    create_date = count.get('date', count['create_date'])
     with api_post(
         config,
         'count',
-        grain='{0}/{1}'.format(count['sample'], count['index']),
+        grain=grain,
         ft_type=count['ft_type'],
-        worker=count['user'],
+        worker=worker,
         analyst=count.get('analyst'),
-        create_date=count['date'],
-        grainpoints=json.dumps(count.get('points', [])),
-        contained_tracks=json.dumps(count.get('lines', []))
+        create_date=create_date,
+        # points can be "points" or "grainpoints"
+        grainpoints=json.dumps(count.get('grainpoints', count.get('points', []))),
+        # contained tracks can be "lines" or "contained_tracks"
+        contained_tracks=json.dumps(count.get('contained_tracks', count.get('lines', [])))
     ) as response:
         body = response.read()
         result = json.loads(body)
@@ -1227,12 +1237,11 @@ def count_upload(opts, config):
                 for obj in j:
                     if (type(obj) is not dict):
                         raise Exception("Item {} in the array is not an object".format(count))
-                    print("File {} iteration {}: sample {}, index {}, user {}".format(
+                    print("File {} iteration {}: grain {}, user {}".format(
                         file,
                         count,
-                        obj.get("sample", "not specified"),
-                        obj.get("index", "not specified"),
-                        obj.get("user", "not specified")
+                        obj['grain'] if 'grain' in obj else f"{obj['sample']}/{obj['index']}",
+                        obj.get('user', obj['worker'].get('username', 'not specified'))
                     ))
                     count_post(config, obj)
                     count += 1

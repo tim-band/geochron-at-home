@@ -399,7 +399,7 @@ class ImageInfoView(RetrieveUpdateDeleteView):
         serializer.save(**kwargs)
 
 
-class FissionTrackNumberingSerializer(serializers.ModelSerializer):
+class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
     class UserRelatedField(serializers.RelatedField):
         def get_queryset(self):
             return super().get_queryset()
@@ -434,14 +434,9 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
         def to_representation(self, value):
             return value.pk
 
-    # class GrainPointSerializer(serializers.ModelSerializer):
-    #     class Meta:
-    #         model = GrainPoint
-    #         fields = ['x_pixels', 'y_pixels', 'category', 'comment']
-
-    class LatLngSizeDefault:
+    class ResultSizeDefault:
         """
-        A default value that gets the number of latlngs specified
+        A default value that gets the number of points specified
         """
         requires_context = True
         def __call__(self, serializer_field):
@@ -449,18 +444,17 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
             return len(grainpoints)
 
     worker = UserRelatedField()
-    result = serializers.IntegerField(default=LatLngSizeDefault())
+    result = serializers.IntegerField(default=ResultSizeDefault())
     grain = GrainField()
-    latlngs = serializers.CharField(read_only=True)
-    contained_tracks = serializers.CharField(read_only=True)
-    # For some reason this "normal" way doesn't work, so we override
-    # create and run_validation
-    #grainpoints = GrainPointSerializer(many=True)
+    contained_tracks = serializers.SerializerMethodField()
 
-    class Meta:
-        model = FissionTrackNumbering
-        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst',
-            'result', 'create_date', 'latlngs', 'contained_tracks']
+
+    def get_contained_tracks(self, obj):
+        return [
+            { k: v for (k, v) in gp.items() if k not in ['id', 'result_id'] }
+            for gp in obj.containedtrack_set.values()
+        ]
+
 
     def run_validation(self, data=...):
         ret = super().run_validation(data)
@@ -481,7 +475,7 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
         if type(cts_obj) is not list:
             # empty dicts are OK to help Pieter's script work
             if not cts_obj:
-                logging.getLogger(__name__).warn("Empty thing")
+                logging.getLogger(__name__).warning("Empty thing")
                 return result
             raise ValidationError("contained_tracks needs to be an array")
         for cti, ct_obj in enumerate(cts_obj):
@@ -536,8 +530,37 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
         return ftn
 
 
+class FissionTrackNumberingSerializerLatLngs(FissionTrackNumberingSerializerBase):
+    """
+    FissionTrackNumberingSerializer that reports result points as LatLngs
+    """
+    class Meta:
+        model = FissionTrackNumbering
+        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst',
+            'result', 'create_date', 'latlngs', 'contained_tracks']
+
+    latlngs = serializers.CharField(read_only=True)
+
+
+class FissionTrackNumberingSerializerGps(FissionTrackNumberingSerializerBase):
+    """
+    FissionTrackNumberingSerializer that reports result points as GrainPoints
+    """
+    class Meta:
+        model = FissionTrackNumbering
+        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst',
+            'result', 'create_date', 'contained_tracks', 'grainpoints']
+
+    grainpoints = serializers.SerializerMethodField()
+
+    def get_grainpoints(self, obj):
+        return [
+            { k: v for (k, v) in gp.items() if k not in ['id', 'result_id'] }
+            for gp in obj.grainpoint_set.values()
+        ]
+
 class FissionTrackNumberingView(generics.ListCreateAPIView):
-    serializer_class = FissionTrackNumberingSerializer
+    serializer_class = FissionTrackNumberingSerializerGps
     model = FissionTrackNumbering
 
     def get_queryset(self):
@@ -556,3 +579,7 @@ class FissionTrackNumberingView(generics.ListCreateAPIView):
         if 'user' in params:
             qs = qs.filter(worker__username=params['user'])
         return qs.order_by('grain__sample', 'grain__index').select_related('worker')
+
+
+class FissionTrackNumberingViewLatLngs(FissionTrackNumberingView):
+    serializer_class = FissionTrackNumberingSerializerLatLngs

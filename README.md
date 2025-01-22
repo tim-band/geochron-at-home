@@ -492,10 +492,10 @@ from github:
 
 ```sh
 python3 -m pip install --user pipx
-pipx install git+https://github.com/tim-band/geochron-at-home.git#subdirectory=geochron
+pipx install git+https://github.com/tim-band/geochron-at-home.git#subdirectory=geochron/gah
 ```
 
-Or you can install it from a local path (like `pipx install ./geochron`).
+Or you can install it from a local path, like `pipx install ./geochron`.
 
 Before using it you have to tell it where the endpoints are:
 
@@ -534,7 +534,8 @@ last two segments of `<path>`, which should match `<sample_name>/Grain<nn>`.
 * `gah sample delete <name-or-id>` will delete the identified
 sample; there will be no interactive confirmation, so be careful!
 * `gah count list` returns results of user counts
-* `gah count upload <file>` uploads new user counts
+* `gah count upload <file>` uploads new user counts. You can edit the file
+returned from `gah count list` if you like.
 * `gah genrois <path>` creates `rois.json` files for all the grains
 within `<path>`. Obviously the ROI paths are arbitrary, but other data is
 derived from the grain files present. This is necessary to upload grains
