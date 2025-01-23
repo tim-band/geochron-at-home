@@ -1,4 +1,4 @@
-/* geochron v0.1 (c) 2014 Jiangping He */
+/* geochron v0.1 (c) 2014-2018 Jiangping He and 2019-2025 Tim Band */
 /**
  * Creates a pannable, focusable viewer of a grain z-stack.
  * @param {*} options Options:
@@ -510,6 +510,11 @@ function grain_view(options) {
                     });
                 }
                 return ps;
+            },
+            makeDraggable: function() {
+                for (var i in markers) {
+                    markers[i].marker.dragging.enable();
+                }
             },
             trackCount: function() {
                 return track_num;
@@ -1261,6 +1266,7 @@ function grain_view(options) {
         },
         enableEditing: function() {
             isEditable = true;
+            markers.makeDraggable();
             buttonControl = L.easyButton(buttons, map, 'topright');
             buttonControl.getContainer().addEventListener('dblclick', function(e) {
                 e.stopPropagation();

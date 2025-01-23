@@ -141,7 +141,7 @@ footer {
 
         <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
           <div class="list-group">
-            <a href="{% url 'account_logout'%}" class="list-group-item active">Logout</a>
+            <a href="#" onclick="document.getElementById('logout-form').submit()" class="list-group-item active">Logout</a>
             {% if user.username != "guest" %}
             <a href="{% url 'account_change_password'%}" class="list-group-item">Change password</a>
             {% endif %}
@@ -151,7 +151,7 @@ footer {
 
       <hr>
       <footer>
-        <p>&copy; Jiangping He 2014 - 2021</p>
+        <p>&copy; Jiangping He 2014 - 2018 and Tim Band 2019 - 2025</p>
       </footer>
 
     </div>

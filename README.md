@@ -1,7 +1,7 @@
 # Geochron@Home
 
-Copyright 2014-2023 Jiangping He (geochron.home@gmail.com)
-and Tim Band.
+Copyright 2014-2018 Jiangping He (geochron.home@gmail.com)
+and 2019-2025 Tim Band.
 
 This work was in part funded by the Natural Environment Research Council
 (grant number 09 NE/T001518/1 ("Beyond Isoplot")).
@@ -318,6 +318,22 @@ you did not change them from the defaults, they will be
 `admin` with password `yOuRsEcReT_01` and `john` with password
 `yOuRsEcReT_02`.
 
+### Crowdsourcing
+
+Users can count random grains from the database by clicking the "Count"
+button on the dashboard (after they have completed the tutorial). The
+grains are chosen in the following manner:
+
+- If the user has already saved a partial count, this grain will be chosen.
+- Otherwise, it will choose, at random, one of the grains:
+  - that has images of the correct type (Spontaneous or Induced)
+  - and that does not already have a count from this user (if not guest)
+  - and that has fewer than min_contributor_num non-guest counts
+  - from the highest priority project
+    - that is not "closed"
+    - from the highest priority sample
+      - that is not "completed"
+
 ### Backup and restore
 
 Back up the entire database like this:
@@ -486,41 +502,42 @@ $ docker-compose up -d --build
 
 ### Using the API
 
-You can use the `./geochron/gah.py` script from any machine that
-can see the API endpoints. But first, you have to tell it where
-the endpoints are (here we are running it from the `geochron`
-directory):
+You can use the `gah.py` script from any machine that can see the API endpoints.
+To install it you need to install `pipx` on your machine then use it to install `gah`
+from github:
 
 ```sh
-(geochron-at-home) $ ./gah.py set url https://my.domain.com/geochron@home
+python3 -m pip install --user pipx
+pipx install git+https://github.com/tim-band/geochron-at-home.git#subdirectory=geochron/gah
 ```
 
-Alternatively, from the root of the project you can use `pipenv run gah`
-(anytime you see `./gah.py` you can use this formulation instead):
+Or you can install it from a local path, like `pipx install ./geochron`.
+
+Before using it you have to tell it where the endpoints are:
 
 ```sh
-$ pipenv run gah set url https://my.domain.com/geochron@home
+(geochron-at-home) $ gah set url https://my.domain.com/geochron@home
 ```
 
 Do not include any `/ftc` or `/api`. This produces a file
 `gah.config` that stores this and other information. As long
-as you run `./gah.py` from a directory containing such a
+as you run `gah` from a directory containing such a
 file, you will be able to use these settings.
 
-Next, you need to log in with `./gah.py login`. You can use
+Next, you need to log in with `gah login`. You can use
 any admin user on the site. This login session will last for
 one day, beyond which a further login will be required. You
-can use `./gah.py logout` to forget this login session.
+can use `gah logout` to forget this login session.
 
 Now you can use the other commands of `gah`, for example:
 
-* `./gah.py` on its own lists help and commands
-* `./gah.py project -h` to get help on the project commands
-* `./gah.py project list` lists all the project IDs
-* `./gah.py project info <ID>` gives information on project with ID `<ID>`
-* `./gah.py project new <project-name> "<description>" <priority>`
-* `./gah.py sample -h` to get help on the sample commands
-* `./gah.py grain upload <path>` to upload all the grains in
+* `gah` on its own lists help and commands
+* `gah project -h` to get help on the project commands
+* `gah project list` lists all the project IDs
+* `gah project info <ID>` gives information on project with ID `<ID>`
+* `gah project new <project-name> "<description>" <priority>`
+* `gah sample -h` to get help on the sample commands
+* `gah grain upload <path>` to upload all the grains in
 the directory under `<path>`. Every directory that contains a file called
 `rois.json` or contains `*_metadata.xml` files will become a grain, and
 all image files in the same directory with the right sort of file name
@@ -528,13 +545,14 @@ will become images in the grain (see the Upload Image Files section above).
 The grains will be added to samples inferred from the names of the
 directories in which they sit, unless the `--sample <ID_OR_NAME>` option
 is given in which case they will all be added to the identified sample.
-* `./gah.py grain delete <path>` will delete the grain implied by the
+* `gah grain delete <path>` will delete the grain implied by the
 last two segments of `<path>`, which should match `<sample_name>/Grain<nn>`.
-* `./gah.py sample delete <name-or-id>` will delete the identified
+* `gah sample delete <name-or-id>` will delete the identified
 sample; there will be no interactive confirmation, so be careful!
-* `./gah.py count list` returns results of user counts
-* `./gah.py count upload <file>` uploads new user counts
-* `./gah.py genrois <path>` creates `rois.json` files for all the grains
+* `gah count list` returns results of user counts
+* `gah count upload <file>` uploads new user counts. You can edit the file
+returned from `gah count list` if you like.
+* `gah genrois <path>` creates `rois.json` files for all the grains
 within `<path>`. Obviously the ROI paths are arbitrary, but other data is
 derived from the grain files present. This is necessary to upload grains
 if you have not created your own `rois.json` files.
@@ -545,7 +563,7 @@ So, for example, to create a new sample with all its images in an
 existing project (say `ProjectDEF`), you might do this:
 
 ```sh
-(geochron-at-home) $ ./gah.py project list
+(geochron-at-home) $ gah project list
 1 ProjectABC
 2 ProjectDEF
 3 SomeOtherProject
@@ -559,9 +577,9 @@ contributors required to finish this sample. We will look for the
 function:
 
 ```sh
-(geochron-at-home) $ ./gah.py sample new Sample123 2 T 20 50
+(geochron-at-home) $ gah sample new Sample123 2 T 20 50
 b'{"id":199,"sample_name":"Sample123","in_project":2,"sample_property":"T","priority":20,"min_contributor_num":50,"completed":false}'
-(geochron-at-home) $ ./gah.py grain upload --sample 199 /path/to/directory/of/grains
+(geochron-at-home) $ gah grain upload --sample 199 /path/to/directory/of/grains
 Created new grain 28
 Uploaded image /path/to/directory/of/grains/Grain01/Stack-09.jpg as image 469
 Uploaded image /path/to/directory/of/grains/Grain01/Stack-07.jpg as image 470
@@ -576,7 +594,7 @@ If your grains are in a directory named after the sample you can combine
 these:
 
 ```sh
-(geochron-at-home) $ ./gah.py sample upload 2 T 20 999 /path/to/sample/Sample456
+(geochron-at-home) $ gah sample upload 2 T 20 999 /path/to/sample/Sample456
 Created new grain 33
 Uploaded image /path/to/sample/Sample456/Grain01/MicaReflStack-00.jpg as image 4981
 Uploaded image /path/to/sample/Sample456/Grain01/MicaReflStack-01.jpg as image 4982
@@ -601,7 +619,7 @@ If you have counted grains in some other program, you can still display these co
 Geochron@Home by uploading them. The command is simple:
 
 ```sh
-$ ./gah.py count upload count.json
+$ gah count upload count.json
 ```
 
 where `count.json` has the following format:
@@ -738,6 +756,14 @@ issued when downloading JSON results:
 
 Remember that you exit a `Pdb` shell by typing `c` and pressing
 return.
+
+If `gah` gives you `Failed (with HTTP code 500: Internal Server Error)`
+including detail `InvalidKeyError at /ftc/api/get-token` then you have
+a problem with your JWT token (see the information about `gen_jwt.py`
+above). However, VSCode's terminal fails to read these JWT tokens
+correctly out of the `.env` file and so running the server from within
+VSCode's terminal will fail to respond correctly to `gah` unless
+you also set the environment variable `DISABLE_JWT=1`.
 
 #### TODO:
 

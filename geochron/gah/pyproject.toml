@@ -1,0 +1,16 @@
+[project]
+name = "geochron-at-home-cli"
+description = "Command line interface for Geochron@Home"
+requires-python = ">= 3.8"
+version = "1.0"
+readme = "gah.md"
+
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backent = "setuptools.build_meta"
+
+[project.scripts]
+gah = "gah:main"
+
+[tools.setuptools]
+packages = ["gah"]

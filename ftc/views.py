@@ -25,7 +25,7 @@ from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex, GrainPointCategory,
     TutorialPage)
 from ftc.parse_image_name import parse_upload_name
-from geochron.gah import parse_metadata_grain, parse_metadata_image
+from geochron.gah.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 
 import csv
@@ -1103,6 +1103,8 @@ def counting(request, uname=None):
 def addGrainPoints(ftn, res_dic):
     if 'points' in res_dic:
         ftn.addGrainPointsFromGrainPoints(res_dic['points'])
+    elif 'grainpoints' in res_dic:
+        ftn.addGrainPointsFromGrainPoints(res_dic['grainpoints'])
     else:
         ftn.addGrainPointsFromLatlngs(res_dic['marker_latlngs'])
 
@@ -1110,6 +1112,8 @@ def addGrainPoints(ftn, res_dic):
 def grainPointCount(res_dic):
     if 'points' in res_dic:
         return len(res_dic['points'])
+    elif 'grainpoints' in res_dic:
+        return len(res_dic['grainpoints'])
     return len(res_dic['marker_latlngs'])
 
 
@@ -1158,6 +1162,7 @@ def updateFtnResult(request):
             )
         else:
             fts.result = result
+            fts.grainpoint_set.all().delete()
         fts.save()
         addGrainPoints(fts, res_dic)
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)

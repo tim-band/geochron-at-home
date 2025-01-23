@@ -5,5 +5,12 @@
         "fields": {
             "description": "Genuine fission track"
         }
+    },
+    {
+        "model": "ftc.grainpointcategory",
+        "pk": "defect",
+        "fields": {
+            "description": "Crystal defect"
+        }
     }
 ]

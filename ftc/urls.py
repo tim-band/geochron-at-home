@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt import views as jwt_views
 
+from ftc import apiviews
 from ftc.views import (home, signmeup, report, getTableData,
     count_grain, updateFtnResult, counting, saveWorkingGrain,
     get_image, projects, ProjectCreateView,
@@ -20,6 +21,7 @@ from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
     ImageListView, GrainListView, FissionTrackNumberingView,
+    FissionTrackNumberingViewLatLngs,
     get_grain_rois, get_many_roiss, SampleGrainInfoView)
 
 urlpatterns = [
@@ -91,5 +93,7 @@ urlpatterns = [
     path('api/grain/<grain>/image/', GrainImageListView.as_view(), name='api_grain_image_list'),
     path('api/image/', ImageListView.as_view(), name='api_image_list'),
     path('api/image/<pk>/', ImageInfoView.as_view(), name='api_image_info'),
+    path('api/image/<pk>/data/', apiviews.get_image, name='api_image_data'),
     path('api/count/', FissionTrackNumberingView.as_view(), name='api_ftn_list'),
+    path('api/countll/', FissionTrackNumberingViewLatLngs.as_view(), name='api_ftn_list'),
 ]

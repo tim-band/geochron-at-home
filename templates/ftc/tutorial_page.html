@@ -152,6 +152,9 @@ font-family: "ds-digitalitalic";
     padding: 7px 10px;
 }
 
+#map.no-boxes .leaflet-marker-icon {
+	display: none
+}
 </style>
 <script src="{% static 'Leaflet-1.9.3/leaflet.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
@@ -248,6 +251,15 @@ function setup() {
     setTimeout(map.firstMarker, 800);
     {% endif %}
 }
+function hide_boxes() {
+    var hidden = document.getElementById('hide-boxes').checked;
+    var mapelt = document.getElementById('map');
+    if (hidden) {
+        mapelt.classList.add('no-boxes');
+    } else {
+        mapelt.classList.remove('no-boxes');
+    }
+}
 </script>
 {% endblock %}
 
@@ -311,6 +323,7 @@ function setup() {
             <button type="button" id="next" onclick="next_page()" class="button">
                 Next Page
             </button>
+            <input type="checkbox" id="hide-boxes" onclick="hide_boxes()"><label for="hide-boxes">Hide boxes</label>
         </span>
         {% endif %}
     </div>

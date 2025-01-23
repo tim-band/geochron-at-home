@@ -3,7 +3,7 @@ import argparse
 import csv
 from getpass import getpass
 import json
-import os.path
+import os
 import re
 import sys
 from urllib.error import HTTPError
@@ -165,7 +165,7 @@ def find_mica_transformation(root, files):
 
 def find_grains_in_directories(path):
     """
-    Finds all folders containing (Refl)?Stack-(-?\d+)_metadata.xml files or rois.json files.
+    Finds all folders containing (Refl)?Stack-(-?\\d+)_metadata.xml files or rois.json files.
     Returns a dict of directory paths to 
     """
     meta_re = re.compile(r'(Refl)?Stack-(-?\d+)\.[a-z]+_metadata.xml', flags=re.IGNORECASE)
@@ -948,6 +948,69 @@ def images_upload(opts, config):
     print("Last error was", last_error)
 
 
+@token_refresh
+def download_image(opts, config, id, file_name):
+    with api_get(config, 'image', id, 'data') as response:
+        with open(file_name, 'wb') as output:
+            print(f'Downloading {file_name}')
+            output.write(response.read())
+
+
+skeleton_metadata_template ="""<ImageMetadata>
+<HardwareSetting>
+<ParameterCollection Id="MTBRLTLSwitch">
+<PositionName Status="Valid">RLTLSwitch.{light_path}L</PositionName>
+</ParameterCollection>
+<ParameterCollection Id="MTBFocus">
+<Position Status="Valid" Unit="µm">{focus}</Position>
+</ParameterCollection>
+</HardwareSetting>
+</ImageMetadata>
+"""
+
+
+@token_refresh
+def images_download(opts, config):
+    with api_get(config, 'grain', opts.id or '-', 'image') as response:
+        body = response.read()
+        result = json.loads(body)
+        if type(result) is list:
+            if opts.dir:
+                os.makedirs(opts.dir, exist_ok=True)
+            for v in result:
+                extension = '.jpg'
+                if v['format'] == 'P':
+                    extension = '.png'
+                index = int(v.get('index'))
+                index_text = f'-{index:02d}'
+                if index < -9:
+                    index += 100
+                    index_text = f'-{index:02d}'
+                prefix = 'Mica' if v.get('ft_type') == 'I' else ''
+                if v['light_path'] == 'R':
+                    prefix += 'Refl'
+                file_name = f'{prefix}Stack{index_text}{extension}'
+                if opts.dir:
+                    file_name = os.path.join(opts.dir, file_name)
+                download_image(opts, config, v.get('id'), file_name)
+                # make a metadata file if applicable
+                if v.get('focus') and v.get('light_path'):
+                    with open(file_name + '_metadata.xml', 'w') as fh:
+                        print(
+                            skeleton_metadata_template.format(**v),
+                            file=fh,
+                        )
+            file_name = 'rois.json'
+            if opts.dir:
+                file_name = os.path.join(opts.dir, file_name)
+            with open(file_name, 'w') as fh:
+                opts.file = fh
+                opts.indent = 2
+                opts.compact = False
+                print(f'Downloading {file_name}')
+                grain_rois_download(opts, config)
+
+
 def get_sample_and_index_from_path(path):
     path = os.path.abspath(path)
     (p1, p0) = os.path.split(path)
@@ -1063,6 +1126,10 @@ def add_image_subparser(subparsers):
         help='Paths to image files (PNG or JPG)',
         nargs='+',
     )
+    download = verbs.add_parser('download', help='download images of a grain')
+    download.set_defaults(func=images_download)
+    download.add_argument('id', help='Grain ID')
+    download.add_argument('--dir', help='directory to download to')
     info = verbs.add_parser('info', help='information about image')
     info.set_defaults(func=image_info)
     info.add_argument('id', help='Image ID')
@@ -1095,9 +1162,13 @@ def find_cell(path, x):
             x = x[p]
         else:
             return ''
-    if type(x) is str and (',' in x or '\n' in x):
-        x.replace('"', '""')
-        x = '"{0}"'.format(x)
+    if x is None:
+        return ''
+    if type(x) is dict or type(x) is list:
+        x = json.dumps(x)
+    if type(x) is str:
+        if ',' in x or '\n' in x:
+            x = '"{0}"'.format(x.replace('"', '""'))
     return x
 
 
@@ -1123,25 +1194,37 @@ def count_list(opts, config):
         kwargs['sample'] = opts.sample
     if opts.grain:
         kwargs['grain'] = opts.grain
+    if opts.user:
+        kwargs['user'] = opts.user
     with api_get(config, 'count', **kwargs) as response:
         body = response.read()
         result = json.loads(body)
         if type(result) is list and not opts.json:
             output_as_csv(result)
         else:
-            print(result)
+            print(body.decode("utf-8"))
 
 def count_post(config, count: dict[any]):
+    if 'sample' in count and 'index' in count and 'grain' not in count:
+        grain = f"{count['sample']}/{count['index']}"
+    elif 'sample' not in count and 'index' not in count and 'grain' in count:
+        grain = str(count['grain'])
+    else:
+        raise Exception(f'A count should either have "grain": <grain_id> or "sample": <sample_id> and "index": <grain_index_within_sample>')
+    worker = count.get('user', count['worker']['username'])
+    create_date = count.get('date', count['create_date'])
     with api_post(
         config,
         'count',
-        grain='{0}/{1}'.format(count['sample'], count['index']),
+        grain=grain,
         ft_type=count['ft_type'],
-        worker=count['user'],
+        worker=worker,
         analyst=count.get('analyst'),
-        create_date=count['date'],
-        grainpoints=json.dumps(count.get('points', [])),
-        contained_tracks=json.dumps(count.get('lines', []))
+        create_date=create_date,
+        # points can be "points" or "grainpoints"
+        grainpoints=json.dumps(count.get('grainpoints', count.get('points', []))),
+        # contained tracks can be "lines" or "contained_tracks"
+        contained_tracks=json.dumps(count.get('contained_tracks', count.get('lines', [])))
     ) as response:
         body = response.read()
         result = json.loads(body)
@@ -1158,12 +1241,11 @@ def count_upload(opts, config):
                 for obj in j:
                     if (type(obj) is not dict):
                         raise Exception("Item {} in the array is not an object".format(count))
-                    print("File {} iteration {}: sample {}, index {}, user {}".format(
+                    print("File {} iteration {}: grain {}, user {}".format(
                         file,
                         count,
-                        obj.get("sample", "not specified"),
-                        obj.get("index", "not specified"),
-                        obj.get("user", "not specified")
+                        obj['grain'] if 'grain' in obj else f"{obj['sample']}/{obj['index']}",
+                        obj.get('user', obj['worker'].get('username', 'not specified'))
                     ))
                     count_post(config, obj)
                     count += 1
@@ -1185,6 +1267,7 @@ def add_count_subparser(subparsers):
     )
     list_counts.add_argument('--sample', help='only report the sample with this ID or name')
     list_counts.add_argument('--grain', help='only report the grain with this index')
+    list_counts.add_argument('--user', help='only report counts made by the user with this username')
     list_counts.add_argument(
         '--json',
         action='store_true',
@@ -1296,9 +1379,11 @@ def perform_action(options):
             j = json.loads(body)
             render_json(j)
         except:
-            print(body)
-        exit(1)
+            print(str(body)[:1000])
 
-if __name__ == '__main__':
+def main():
     options = parse_argv()
     perform_action(options)
+
+if __name__ == '__main__':
+    main()

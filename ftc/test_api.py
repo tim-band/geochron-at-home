@@ -3,6 +3,7 @@ import django
 from ftc.models import Grain, FissionTrackNumbering
 from geochron.settings import SIMPLE_JWT
 
+import abc
 import json
 
 
@@ -53,6 +54,9 @@ class ApiTestMixin:
     def setUp(self):
         self.headers = log_in_headers(self.client, 'counter', 'counter_password')
         self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+
+    def assertDictContainsSubset(self, a, b):
+        self.assertEqual(b, {**b, **a})
 
 
 @tag('api')
@@ -569,15 +573,8 @@ class ApiImageUpdate(ApiTestMixin, JwtTestCase):
                 'grain': 1
             }, content_type='application/json', **self.super_headers)
     
-def latlngs_close(lla, llb):
-    [lata, lnga] = lla
-    [latb, lngb] = llb
-    dlat = lata - latb
-    dlng = lnga - lngb
-    return dlat * dlat + dlng * dlng < 1e-4
 
-@tag('api')
-class ApiCount(ApiTestMixin, JwtTestCase):
+class ApiCount(ApiTestMixin):
     fixtures = [
         'essential.json',
         'users.json',
@@ -587,61 +584,69 @@ class ApiCount(ApiTestMixin, JwtTestCase):
         'images.json'
     ]
 
+    @staticmethod
+    @abc.abstractmethod
+    def points_close(lla, llb):
+        ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def points_from_result(result):
+        ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def with_points(points, other):
+        ...
+
     def setUp(self):
         super().setUp()
-        self.latlngs = [
-            [0.1, 0.2],
-            [0.2, 0.4],
-            [0.5, 0.3]
-        ]
         logged_in = self.client.login(username='counter', password='counter_password')
         self.assertTrue(logged_in, 'failed to log in')
-        r = self.client.post('/ftc/updateFtnResult/', {
-            'marker_latlngs': self.latlngs,
+        r = self.client.post('/ftc/updateFtnResult/', self.with_points(self.points, {
             'sample_id': 1,
             'grain_num': 1,
             'ft_type': 'T'
-        }, content_type='application/json')
+        }), content_type='application/json')
         self.assertEqual(r.status_code, 200)
         self.headers = log_in_headers(self.client, 'counter', 'counter_password')
 
     def upload_sample_2_results(self):
-        self.latlngs2 = [
-            [0.31, 0.24],
-            [0.1, 0.42],
-            [0.17, 0.12]
-        ]
-        r = self.client.post('/ftc/updateFtnResult/', {
-            'marker_latlngs': self.latlngs2,
+        r = self.client.post('/ftc/updateFtnResult/', self.with_points(self.points2, {
             'sample_id': 2,
             'grain_num': 1,
             'ft_type': 'T'
-        }, content_type='application/json')
+        }), content_type='application/json')
+        self.assertEqual(r.status_code, 200)
 
     def test_download_count(self):
-        r = self.client.get('/ftc/api/count/', {'all': True}, **self.headers)
+        r = self.client.get(self.count_url, {'all': True}, **self.headers)
         j = json.loads(r.content.decode(r.charset))
-        jl = json.loads(j[0]['latlngs'])
-        self.assertListAlmostEqual(jl, self.latlngs)
+        jl = self.points_from_result(j[0])
+        self.assertSetAlmostEqual(jl, self.points, self.points_close)
         self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
 
     def test_download_count_from_one_named_sample(self):
         self.upload_sample_2_results()
-        r = self.client.get('/ftc/api/count/', {'sample': 'adm_samp'}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 'adm_samp'}, **self.headers)
         j = json.loads(r.content.decode(r.charset))
-        jl = json.loads(j[0]['latlngs'])
-        self.assertListAlmostEqual(jl, self.latlngs)
+        jl = self.points_from_result(j[0])
+        self.assertSetAlmostEqual(jl, self.points, self.points_close)
         self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
 
     def test_download_count_from_one_identified_sample(self):
         self.upload_sample_2_results()
-        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
         j = json.loads(r.content.decode(r.charset))
-        jl = json.loads(j[0]['latlngs'])
-        self.assertListAlmostEqual(jl, self.latlngs2)
+        jl = self.points_from_result(j[0])
+        self.assertSetAlmostEqual(jl, self.points2, self.points_close)
         self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
 
     def test_upload_count(self):
+        """
+        Uploads a count, downloads it as both latlngs and grainpoints
+        (regardless of how it was uploaded) and tests that the result is the same.
+        """
         latlngs = [
             [0.1, 0.5],
             [0.3, 0.4],
@@ -664,14 +669,29 @@ class ApiCount(ApiTestMixin, JwtTestCase):
             'create_date': '2023-11-14',
             'grainpoints': json.dumps(points),
         }
-        r = self.client.post('/ftc/api/count/', data, **self.super_headers)
+        r = self.client.post(self.count_url, data, **self.super_headers)
         self.assertEqual(r.status_code, 201)
+        # Check that we now have four points
+        ftn = FissionTrackNumbering.objects.get(
+            worker__username="admin",
+            grain__sample__pk=sample,
+            grain__index=index
+        )
+        self.assertEqual(ftn.result, 4)
+        # Download as latlngs
+        r = self.client.get('/ftc/api/countll/', {'sample': 2}, **self.headers)
+        self.assertEqual(r.status_code, 200)
+        jo = json.loads(r.content.decode(r.charset))
+        jl = json.loads(jo[0]['latlngs'])
+        self.assertListAlmostEqual(jl, latlngs)
+        self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, jo[0]['worker'])
+        # Download as grainpoints
         r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
         self.assertEqual(r.status_code, 200)
-        j = json.loads(r.content.decode(r.charset))
-        jl = json.loads(j[0]['latlngs'])
-        self.assertSetAlmostEqual(jl, latlngs, latlngs_close)
-        self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, j[0]['worker'])
+        jo2 = json.loads(r.content.decode(r.charset))
+        jgp = jo2[0]['grainpoints']
+        self.assertSetAlmostEqual(jgp, points, ApiCountGrainPoint.points_close)
+        self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, jo2[0]['worker'])
 
     def upload_contained_tracks(self, use_dict: bool):
         cts = [
@@ -696,12 +716,12 @@ class ApiCount(ApiTestMixin, JwtTestCase):
             'grainpoints': '[]',
             'contained_tracks': json.dumps(tracks if use_dict else cts),
         }
-        r = self.client.post('/ftc/api/count/', data, **self.super_headers)
+        r = self.client.post(self.count_url, data, **self.super_headers)
         self.assertEqual(r.status_code, 201)
-        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content.decode(r.charset))
-        jl = json.loads(j[0]['contained_tracks'])
+        jl = j[0]['contained_tracks']
         self.assertEqual(jl, tracks)
 
     def test_upload_contained_tracks_dict(self):
@@ -755,18 +775,30 @@ class ApiCount(ApiTestMixin, JwtTestCase):
             'contained_tracks': json.dumps(cts)
         } for analyst, cts in ctss.items()]
         for data_item in data:
-            r = self.client.post('/ftc/api/count/', data_item, **self.super_headers)
+            r = self.client.post(self.count_url, data_item, **self.super_headers)
             self.assertEqual(r.status_code, 201)
-        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content.decode(r.charset))
         results: dict[str, list[dict[str, str]]] = {}
         for ftn in j:
             analyst = ftn["analyst"]
             line_set = results.get(analyst, list())
-            line_set += json.loads(ftn["contained_tracks"])
+            line_set += ftn["contained_tracks"]
             results[analyst] = line_set
         self.assertDictsOfListsContainTheSameDicts(ctss, results)
+
+    def test_upload_guest_no_analyst(self):
+        data = {
+            'grain': '2/1',
+            'ft_type': 'S',
+            'worker': 'guest',
+            'create_date': '2024-07-25',
+            'grainpoints': '[]',
+            'contained_tracks': '[]'
+        }
+        r = self.client.post(self.count_url, data, **self.super_headers)
+        self.assertEqual(r.status_code, 201)
 
     def assertDictsOfListsContainTheSameDicts(
         self,
@@ -788,12 +820,12 @@ class ApiCount(ApiTestMixin, JwtTestCase):
 
     def test_upload_deletes_existing(self):
         self.upload_sample_2_results()
-        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content.decode(r.charset))
         self.assertEqual(len(j), 1)
         # Check the correct number of points
-        jl = json.loads(j[0]['latlngs'])
+        jl = self.points_from_result(j[0])
         self.assertEqual(len(jl), 3)
         # Check the FTN object has the correct "result"
         ftn = FissionTrackNumbering.objects.get(
@@ -809,15 +841,15 @@ class ApiCount(ApiTestMixin, JwtTestCase):
             'create_date': '2023-11-14',
             'grainpoints': '[{"x_pixels": 120, "y_pixels": 123}]'
         }
-        r = self.client.post('/ftc/api/count/', data, **self.headers)
+        r = self.client.post(self.count_url, data, **self.headers)
         self.assertEqual(r.status_code, 201)
-        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
         self.assertEqual(r.status_code, 200)
         # Should still only have one result
         j = json.loads(r.content.decode(r.charset))
         self.assertEqual(len(j), 1)
         # but this time it has just one point
-        jl = json.loads(j[0]['latlngs'])
+        jl = self.points_from_result(j[0])
         self.assertEqual(len(jl), 1)
         ftn = FissionTrackNumbering.objects.get(
             worker__username="counter",
@@ -850,6 +882,60 @@ class ApiCount(ApiTestMixin, JwtTestCase):
                 self.assertListAlmostEqual(xs[i], ys[i])
         else:
             self.assertAlmostEqual(xs, ys, delta=0.05)
+
+
+@tag('api')
+class ApiCountLatLng(ApiCount, JwtTestCase):
+    count_url = '/ftc/api/countll/'
+    points = [
+        [0.1, 0.2],
+        [0.2, 0.4],
+        [0.5, 0.3]
+    ]
+    points2 = [
+        [0.31, 0.24],
+        [0.1, 0.42],
+        [0.17, 0.12]
+    ]
+    @staticmethod
+    def points_close(lla, llb):
+        [lata, lnga] = lla
+        [latb, lngb] = llb
+        dlat = lata - latb
+        dlng = lnga - lngb
+        return dlat * dlat + dlng * dlng < 1e-4
+    @staticmethod
+    def points_from_result(result):
+        return json.loads(result['latlngs'])
+    @staticmethod
+    def with_points(points, other):
+        return {**other, 'marker_latlngs': points}
+
+
+@tag('api')
+class ApiCountGrainPoint(ApiCount, JwtTestCase):
+    count_url = '/ftc/api/count/'
+    points = [
+        {"x_pixels": 100, "y_pixels": 200},
+        {"x_pixels": 200, "y_pixels": 400},
+        {"x_pixels": 500, "y_pixels": 300},
+    ]
+    points2 = [
+        {"x_pixels": 310, "y_pixels": 240, "category": "track", "comment": "one"},
+        {"x_pixels": 100, "y_pixels": 424, "category": "defect", "comment": "two"},
+        {"x_pixels": 170, "y_pixels": 123},
+    ]
+    @staticmethod
+    def points_close(gpa, gpb):
+        dx = gpa['x_pixels'] - gpb['x_pixels']
+        dy = gpa['y_pixels'] - gpb['y_pixels']
+        return dx * dx + dy * dy < 1
+    @staticmethod
+    def points_from_result(result):
+        return result['grainpoints']
+    @staticmethod
+    def with_points(points, other):
+        return {**other, 'grainpoints': points}
 
 
 class ApiGrainCreate(ApiTestMixin, JwtTestCase):
