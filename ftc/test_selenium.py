@@ -292,8 +292,24 @@ class TutorialPage(BasePage):
         return self
 
     def check_markers_shown(self):
-        assert self.find_by_css('img.leaflet-marker-icon')
+        elt = self.find_by_css('img.leaflet-marker-icon')
+        assert elt
+        assert elt.is_displayed()
         return self
+
+    def are_markers_not_shown(self):
+        elts = self.driver.find_elements(By.CSS_SELECTOR, 'img.leaflet-marker-icon')
+        assert 0 < len(elts)
+        assert all([not elt.is_displayed() for elt in elts])
+        return self
+
+    def check_markers_not_shown(self):
+        return WebDriverWait(self.driver, 2).until(
+            lambda _: self.are_markers_not_shown()
+        )
+
+    def click_hide_boxes(self):
+        self.click_by_id('hide-boxes')
 
 
 class ProfilePage(BasePage):
@@ -1154,6 +1170,17 @@ class WithTutorials(SeleniumTests):
             self.test_user
         ).go_start_counting().check()
 
+    def test_user_can_hide_boxes_in_tutorial(self):
+        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
+
+        # attempt to count, get a refusal, so do the tutorial
+        profile.check_cannot_count()
+        tutorial = profile.go_tutorial()
+        tutorial.check_markers_shown()
+        tutorial.click_hide_boxes()
+        tutorial.check_markers_not_shown()
+        tutorial.click_hide_boxes()
+        tutorial.check_markers_shown()
 
 
 class FromCleanWithTutorialsDone(SeleniumTests):
