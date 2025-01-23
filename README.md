@@ -318,6 +318,22 @@ you did not change them from the defaults, they will be
 `admin` with password `yOuRsEcReT_01` and `john` with password
 `yOuRsEcReT_02`.
 
+### Crowdsourcing
+
+Users can count random grains from the database by clicking the "Count"
+button on the dashboard (after they have completed the tutorial). The
+grains are chosen in the following manner:
+
+- If the user has already saved a partial count, this grain will be chosen.
+- Otherwise, it will choose, at random, one of the grains:
+  - that has images of the correct type (Spontaneous or Induced)
+  - and that does not already have a count from this user (if not guest)
+  - and that has fewer than min_contributor_num non-guest counts
+  - from the highest priority project
+    - that is not "closed"
+    - from the highest priority sample
+      - that is not "completed"
+
 ### Backup and restore
 
 Back up the entire database like this:
