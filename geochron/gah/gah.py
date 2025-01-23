@@ -1162,9 +1162,13 @@ def find_cell(path, x):
             x = x[p]
         else:
             return ''
-    if type(x) is str and (',' in x or '\n' in x):
-        x.replace('"', '""')
-        x = '"{0}"'.format(x)
+    if x is None:
+        return ''
+    if type(x) is dict or type(x) is list:
+        x = json.dumps(x)
+    if type(x) is str:
+        if ',' in x or '\n' in x:
+            x = '"{0}"'.format(x.replace('"', '""'))
     return x
 
 
