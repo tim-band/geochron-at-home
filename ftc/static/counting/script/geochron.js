@@ -1,4 +1,4 @@
-/* geochron v0.1 (c) 2014 Jiangping He */
+/* geochron v0.1 (c) 2014-2018 Jiangping He and 2019-2025 Tim Band */
 /**
  * Creates a pannable, focusable viewer of a grain z-stack.
  * @param {*} options Options:

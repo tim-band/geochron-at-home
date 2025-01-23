@@ -1,7 +1,7 @@
 # Geochron@Home
 
-Copyright 2014-2023 Jiangping He (geochron.home@gmail.com)
-and Tim Band.
+Copyright 2014-2018 Jiangping He (geochron.home@gmail.com)
+and 2019-2025 Tim Band.
 
 This work was in part funded by the Natural Environment Research Council
 (grant number 09 NE/T001518/1 ("Beyond Isoplot")).
