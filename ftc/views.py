@@ -14,6 +14,7 @@ from django.http import (HttpResponse, HttpResponseRedirect,
     HttpResponseForbidden)
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import redirect
@@ -36,11 +37,26 @@ import json
 def home(request):
     return render(request, 'ftc/home.html', {})
 
+def projects_user_can_access(user: User):
+    if user.is_superuser:
+        return Project.objects.all()
+    groups = Group.objects.filter(user=user)
+    if user_is_staff(user):
+        return Project.objects.filter(
+            Q(groups_who_have_access__in=groups)
+            | Q(creator=user)
+        )
+    return Project.objects.filter(groups_who_have_access__in=groups)
+
+def user_has_access_to_any_projects(user: User):
+    return projects_user_can_access(user).exists()
+
 # the view for /accounts/profile/
 def profile(request):
     if request.user.is_authenticated:
         return render(request, 'ftc/profile.html', {
-            'tutorial_completed': tutorialCompleted(request)
+            'tutorial_completed': tutorialCompleted(request),
+            'user_can_access_projects': user_has_access_to_any_projects(request.user),
         })
     else:
         return redirect('account_login') # 'home'
@@ -81,10 +97,10 @@ def report(request):
             status=403)
 
 
-@user_passes_test(user_is_staff)
+@user_passes_test(user_has_access_to_any_projects)
 def projects(request):
     return render(request, "ftc/projects.html", {
-        'projects': Project.objects.all()
+        'projects': projects_user_can_access(request.user)
     })
 
 
@@ -99,6 +115,17 @@ class CreatorOrSuperuserMixin(UserPassesTestMixin):
         return (
             self.request.user == self.object.get_owner()
             or self.request.user.is_superuser
+        )
+
+
+class UserHasProjectAccess(UserPassesTestMixin):
+    def test_func(self):
+        object = self.model.objects.get(pk=self.kwargs['pk'])
+        user = self.request.user
+        return (
+            user == object.get_owner()
+            or user.is_superuser
+            or object.user_has_access(user)
         )
 
 
@@ -125,7 +152,7 @@ class ParentCreatorOrSuperuserMixin(UserPassesTestMixin):
         )
 
 
-class ProjectDetailView(StaffRequiredMixin, DetailView):
+class ProjectDetailView(UserHasProjectAccess, DetailView):
     model = Project
     template_name = "ftc/project.html"
 
@@ -153,7 +180,7 @@ class ProjectUpdateView(CreatorOrSuperuserMixin, UpdateView):
     template_name = "ftc/project_update.html"
 
 
-class SampleDetailView(CreatorOrSuperuserMixin, DetailView):
+class SampleDetailView(UserHasProjectAccess, DetailView):
     model = Sample
     template_name = "ftc/sample.html"
 
@@ -186,7 +213,7 @@ def json_array(arr):
     return '[' + ','.join(arr) + ']'
 
 
-class GrainDetailView(StaffRequiredMixin, DetailView):
+class GrainDetailView(UserHasProjectAccess, DetailView):
     model = Grain
     template_name = "ftc/grain.html"
     ft_type = 'S'
@@ -527,7 +554,7 @@ class GrainDeleteView(CreatorOrSuperuserMixin, DeleteView):
     def get_success_url(self):
         return reverse('sample', args=[self.object.sample.id])
 
-class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
+class GrainImagesView(UserHasProjectAccess, UpdateView):
     model = Grain
     template_name = "ftc/grain_images.html"
     form_class = GrainForm
@@ -1051,7 +1078,7 @@ def addGrainPointCategories(ctx):
         for gpc in GrainPointCategory.objects.all()
     ]})
 
-class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
+class CountMyGrainView(UserHasProjectAccess, DetailView):
     ft_type = 'S'
     model = Grain
     template_name = "ftc/counting.html"

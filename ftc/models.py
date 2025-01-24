@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.validators import RegexValidator
 from django.urls import reverse
 from django_prometheus.models import ExportModelOperationsMixin
@@ -18,6 +18,7 @@ class Project(models.Model):
     project_description = models.CharField(max_length=200)
     priority = models.IntegerField(default='0')
     closed = models.BooleanField(default=False)
+    groups_who_have_access = models.ManyToManyField(Group)
 
     class Meta:
         get_latest_by = "create_date"
@@ -30,6 +31,11 @@ class Project(models.Model):
 
     def get_owner(self):
         return self.creator
+
+    def user_has_access(self, user: User):
+        if user.is_superuser or user == self.creator:
+            return True
+        return self.groups_who_have_access.filter(user=user).exists()
 
     @classmethod
     def filter_owned_by(cls, qs, user):
@@ -63,6 +69,9 @@ class Sample(models.Model):
 
     def get_owner(self):
         return self.in_project.get_owner()
+
+    def user_has_access(self, user: User):
+        return self.in_project.user_has_access(user)
 
     @classmethod
     def filter_owned_by(cls, qs, user):
@@ -101,6 +110,9 @@ class Grain(models.Model):
 
     def get_owner(self):
         return self.sample.get_owner()
+
+    def user_has_access(self, user: User):
+        return self.sample.user_has_access(user)
 
     @classmethod
     def filter_owned_by(cls, qs, user):
@@ -255,6 +267,9 @@ class Image(ExportModelOperationsMixin('image'), models.Model):
 
     def get_owner(self):
         return self.grain.get_owner()
+
+    def user_has_access(self, user: User):
+        return self.grain.user_has_access(user)
 
     @classmethod
     def filter_owned_by(cls, qs, user):

@@ -1,3 +1,4 @@
+from django.contrib import auth
 from django.core import mail
 from django.test import tag, LiveServerTestCase
 from django.urls import reverse
@@ -6,7 +7,6 @@ from selenium import webdriver
 from selenium.common import exceptions
 from selenium.webdriver.common.alert import Alert
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 import glob
@@ -15,6 +15,8 @@ import re
 import subprocess
 import tempfile
 import time
+import ftc
+import ftc.models
 
 def retrying(retries, f, delay=1):
     if retries == 1:
@@ -318,6 +320,15 @@ class ProfilePage(BasePage):
 
     def check(self):
         self.find_by_xpath("//*[contains(@class,jumbotron)]/h2[contains(.,'Welcome')]")
+        return self
+
+    def check_manage_button_visible(self):
+        assert self.find_by_id('manage-link').is_displayed()
+        return self
+
+    def check_manage_button_not_visible(self):
+        self.check()
+        assert len(self.driver.find_elements(By.ID, 'manage-link')) == 0
         return self
 
     def go(self):
@@ -648,12 +659,27 @@ class ProjectsPage(BasePage):
         self.click_by_id('create-project')
         return ProjectCreatePage(self.driver, self.url)
 
+    @staticmethod
+    def _project_xpath(name):
+        return '//tbody[@id="project-list"]/tr/td/a[text()="{0}"]'.format(name)
+
     def go_project(self, name):
         self.click_element(
             By.XPATH,
-            '//tbody[@id="project-list"]/tr/td/a[text()="{0}"]'.format(name)
+            self._project_xpath(name),
         )
         return ProjectPage(self.driver, self.url)
+
+    def check_project_is_link(self, name):
+        self.find_by_xpath(self._project_xpath(name))
+        return self
+
+    def check_project_does_not_have_link(self, name):
+        assert len(self.driver.find_elements(
+            By.XPATH,
+            '//tbody[@id="project-list"]/tr/td/a[text()="{0}"]'.format(name)
+        )) == 0
+        return self
 
 
 class SampleCreatePage(BasePage):
@@ -1090,6 +1116,7 @@ class SeleniumTests(LiveServerTestCase):
     def setUp(self):
         self.project_user = User("admin", "admin@uni.ac.uk", "admin_password")
         self.test_user = User("tester", "tester@test.com", "MyPaSsW0rd")
+        self.counter_user = User("counter", "counter@uni.ac.uk", "counter_password")
         self.tmp = None
         browser = os.environ.get('BROWSER')
         if browser == 'firefox':
@@ -1409,6 +1436,35 @@ class FromCleanWithTutorialsDone(SeleniumTests):
         ).delete().confirm_delete()
         assert sample.grain_present(other_explicit_index)
         assert not sample.grain_present(explicit_index)
+
+
+class WithProjectsAndTwoNonStaffUsers(SeleniumTests):
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'test_user.json',
+        'counter_verification.json',
+        'projects.json',
+        'samples.json',
+        'grains.json',
+    ]
+    def test_non_staff_on_projects_can_access_grain_count(self):
+        HomePage(self.driver, self.live_server_url).go()
+        profile_page = SignInPage(self.driver, self.live_server_url).go().sign_in(
+            self.counter_user
+        ).check_manage_button_not_visible()
+        counter = auth.models.User.objects.get(pk=103)
+        workg = auth.models.Group.objects.create(name="work")
+        workg.user_set.add(counter)
+        profile_page.go().check_manage_button_not_visible()
+        project1 = ftc.models.Project.objects.get(pk=1)
+        project1.groups_who_have_access.add(workg)
+        manage_page = profile_page.go().check_manage_button_visible().go_manage()
+        manage_page.check_project_is_link(project1.project_name)
+        project2 = ftc.models.Project.objects.get(pk=2)
+        manage_page.check_project_does_not_have_link(project2.project_name)
+        project_page = manage_page.go_project(project1.project_name).check()
+        project_page.go_sample('adm_samp').go_count(1).check()
 
 
 class WithOneGrainUploaded(SeleniumTests):

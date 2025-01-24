@@ -27,6 +27,9 @@ class ProjectAdmin(admin.ModelAdmin):
         'project_name', 'creator', 'create_date',
         'project_description', 'closed', 'priority'
     )
+    filter_horizontal = (
+        'groups_who_have_access',
+    )
 
 class GrainPointInline(admin.TabularInline):
     model = GrainPoint
