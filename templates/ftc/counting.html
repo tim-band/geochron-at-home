@@ -159,7 +159,7 @@ function setup() {
     if (cancel) {
         cancel.onclick = function() {
             map.cancelWithConfirm(
-                "{% url 'sample' sample_id %}"
+                "{{cancel_url}}"
             );
         };
     }

@@ -13,6 +13,7 @@ from django.urls import reverse
 from django.http import (HttpResponse, HttpResponseRedirect,
     HttpResponseForbidden)
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
@@ -21,7 +22,8 @@ from django.shortcuts import redirect
 
 from ftc.apiviews import request_roiss
 from ftc.get_image_size import get_image_size_from_handle
-from ftc.load_rois import get_rois
+from ftc.grain_uinfo import choose_working_grain
+from ftc.load_rois import get_rois, load_rois
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex, GrainPointCategory,
     TutorialPage)
@@ -73,13 +75,9 @@ def tutorial(request):
     tp = TutorialPage.objects.filter(active=True).order_by('sequence_number', 'pk').first()
     return redirect('tutorial_page', tp.pk)
 
-# Fission tracks measuring report
-from django.contrib.auth.decorators import login_required, user_passes_test
-
 def user_is_staff(user):
     return user.is_active and user.is_staff
 
-#@user_passes_test(user_is_staff)
 @login_required
 def report(request):
     if request.user.is_active and request.user.is_staff:
@@ -93,12 +91,12 @@ def report(request):
         else:
             return render(request, 'ftc/report.html', {'projects': projects})
     else:
-        return HttpResponse("Sorry, You don't have permission to access the requested page.",
-            status=403)
+        raise PermissionDenied
 
 
-@user_passes_test(user_has_access_to_any_projects)
 def projects(request):
+    if not (user_is_staff(request.user) or user_has_access_to_any_projects(request.user)):
+        raise PermissionDenied
     return render(request, "ftc/projects.html", {
         'projects': projects_user_can_access(request.user)
     })
@@ -239,6 +237,15 @@ class GrainDetailView(UserHasProjectAccess, DetailView):
         shift = self.get_shift()
         ctx['shift_x'] = shift[0]
         ctx['shift_y'] = shift[1]
+        (prev_grain, next_grain) = prev_and_next_grains(
+            self.request.user,
+            self.kwargs['pk'],
+            self.ft_type
+        )
+        if prev_grain is not None:
+            ctx['previous_pk'] = prev_grain.pk
+        if next_grain is not None:
+            ctx['next_pk'] = next_grain.pk
         return ctx
 
 class MicaDetailView(GrainDetailView):
@@ -459,14 +466,6 @@ class GrainForm(ModelForm):
             max_index = 0
         self.grain_index = max_index + 1
 
-    def explicit_grain(self, grain):
-        """
-        Set the grain explicitly
-        """
-        self.sample = None
-        self.grain = grain
-        self.grain_index = grain.index
-
     def delete_regions(self):
         Region.objects.filter(grain=self.instance).delete()
 
@@ -490,9 +489,11 @@ class GrainForm(ModelForm):
                 )
 
     def save(self, commit=True):
-        self.instance.index = self.grain_index
-        if self.sample is not None:
-            self.instance.sample = self.sample
+        if hasattr(self, 'grain_index'):
+            self.instance.index = self.grain_index
+        sample = getattr(self, 'sample', None)
+        if sample is not None:
+            self.instance.sample = sample
         for attr in ['image_width', 'image_height', 'scale_x', 'scale_y',
             'stage_x', 'stage_y', 'shift_x', 'shift_y']:
             if attr in self.cleaned_data:
@@ -558,14 +559,6 @@ class GrainImagesView(UserHasProjectAccess, UpdateView):
     model = Grain
     template_name = "ftc/grain_images.html"
     form_class = GrainForm
-    def post(self, request, *args, **kwargs):
-        form_class = self.get_form_class()
-        form = self.get_form(form_class)
-        form.explicit_grain(self.object)
-        if not form.is_valid():
-            return self.form_invalid(form)
-        return self.form_valid(form)
-
     def get_success_url(self):
         return reverse('grain_images', kwargs={'pk': self.object.pk})
 
@@ -686,8 +679,9 @@ def grainAnalystResult(request, grain, analyst):
     return render(request, 'ftc/public.html', ctx)
 
 @csrf_protect
-@user_passes_test(user_is_staff)
 def grain_update_roi(request, pk):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     grain = Grain.objects.get(pk=pk)
     if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
         return HttpResponse("Grain update forbidden", status=403)
@@ -727,8 +721,9 @@ def grain_update_roi(request, pk):
     return redirect('grain', pk=pk)
 
 @csrf_protect
-@user_passes_test(user_is_staff)
 def grain_update_shift(request, pk):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     grain = Grain.objects.get(pk=pk)
     if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
         return HttpResponse("Grain update forbidden", status=403)
@@ -738,8 +733,9 @@ def grain_update_shift(request, pk):
     return redirect('mica', pk=pk)
 
 @login_required
-@user_passes_test(user_is_staff)
 def getTableData(request):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     # http://owtrsnc.blogspot.co.uk/2013/12/sending-ajax-data-json-to-django.html
     # http://jonblack.org/2012/06/22/django-ajax-class-based-views/
     # assuming request.body contains json data which is UTF-8 encoded
@@ -834,8 +830,9 @@ def getGrainsWithResults(request):
     return grains
 
 @login_required
-@user_passes_test(user_is_staff)
 def download_rois(request, pk):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     grain = Grain.objects.get(id=pk)
     return HttpResponse(
         json.dumps(get_rois(grain)),
@@ -843,16 +840,18 @@ def download_rois(request, pk):
     )
 
 @login_required
-@user_passes_test(user_is_staff)
 def download_roiss(request):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     return HttpResponse(
         json.dumps(request_roiss(request)),
         content_type='application/json'
     )
 
 @login_required
-@user_passes_test(user_is_staff)
 def getJsonResults(request):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     grains = getGrainsWithResults(request)
     result = [json_grain_result(g) for g in grains.values()]
     return HttpResponse(
@@ -861,8 +860,9 @@ def getJsonResults(request):
     )
 
 @login_required
-@user_passes_test(user_is_staff)
 def getCsvResults(request):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     grains = getGrainsWithResults(request)
     response = HttpResponse(
         content_type='text/csv',
@@ -902,9 +902,6 @@ def getCsvResults(request):
             ])
     return response
 
-
-from .grain_uinfo import choose_working_grain
-from .load_rois import load_rois
 
 def get_grain_images_list(grain, ft_type):
     images = grain.image_set.filter(
@@ -1013,13 +1010,12 @@ def count_grain(request, pk):
     )
 
 
-def count_my_grain_extra_links(user, current_id, ft_type):
+def prev_and_next_grains(worker: User, current_id: int, ft_type: str):
     current_grain = Grain.objects.get(id=current_id)
     sample = current_grain.sample
-    project = sample.in_project
     index = current_grain.index
     done_query = Subquery(FissionTrackNumbering.objects.filter(
-        worker=user,
+        worker=worker,
         grain=OuterRef('id'),
         ft_type=ft_type,
         result__gte=0
@@ -1032,8 +1028,6 @@ def count_my_grain_extra_links(user, current_id, ft_type):
         done=Exists(done_query)
     ).filter(
         Q(Exists(has_backref_image)),
-        sample__in_project__creator=user,
-        sample__in_project=project,
         sample=sample,
         index__gt=index,
         done=False
@@ -1044,14 +1038,17 @@ def count_my_grain_extra_links(user, current_id, ft_type):
         done=Exists(done_query)
     ).filter(
         Q(Exists(has_backref_image)),
-        sample__in_project__creator=user,
-        sample__in_project=project,
         sample=sample,
         index__lt=index,
         done=False
     ).order_by(
         '-index'
     ).first()
+    return (prev_grain, next_grain)
+
+
+def count_my_grain_extra_links(user: User, current_id: int, ft_type: str):
+    (prev_grain, next_grain) = prev_and_next_grains(user, current_id, ft_type)
     back = reverse('grain', args=[current_id])
     r = {
         'submit_url': back,
@@ -1097,7 +1094,7 @@ class CountMyGrainView(UserHasProjectAccess, DetailView):
 class CountMyGrainMicaView(CountMyGrainView):
     ft_type = 'I'
 
-from django.contrib.auth.models import User
+
 def tutorialCompleted(request):
     if not TutorialPage.objects.filter(active=True).exists():
         return True

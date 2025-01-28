@@ -12,6 +12,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 import glob
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -719,31 +720,23 @@ class SamplePage(BasePage):
         return GrainDetailPage(self.driver, self.url)
 
     def go_count(self, index):
-        self.click_element(
-            By.XPATH,
-            '//table[@id="grain-set"]/tbody/tr/td/a[@id="count-link-{0}"]'.format(index)
-        )
+        self.click_by_id('count-link-{0}'.format(index))
         return CountingPage(self.driver, self.url)
 
     def go_mica_count(self, index):
-        self.click_element(
-            By.XPATH,
-            '//table[@id="grain-set"]/tbody/tr/td/a[@id="count-mica-link-{0}"]'.format(index)
-        )
+        self.click_by_id('count-mica-link-{0}'.format(index))
         return CountingPage(self.driver, self.url)
 
     def go_public(self, index):
-        self.click_element(
-            By.XPATH,
-            '//table[@id="grain-set"]/tbody/tr/td/a[@id="public-{0}"]'.format(index)
-        )
+        self.click_by_id('public-{0}'.format(index))
         return PublicPage(self.driver, self.url)
 
+    def go_roi(self, index):
+        self.click_by_id('roi-page-{0}'.format(index))
+        return GrainPage(self.driver, self.url)
+
     def go_analyses(self, index):
-        self.click_element(
-            By.XPATH,
-            '//table[@id="grain-set"]/tbody/tr/td/a[@id="analyses-link-{0}"]'.format(index)
-        )
+        self.click_by_id('analyses-link-{0}'.format(index))
         return AnalysesPage(self.driver, self.url)
 
     def grain_present(self, pk):
@@ -937,10 +930,6 @@ class GrainPage(BasePage):
         self.click_by_id('go_mica')
         return self
 
-    def go_grain(self):
-        self.click_by_id('go_grain')
-        return self
-
     #def go_update_metadata(self):
     #    self.click_by_id('meta')
     #    return GrainUpdateMetadataPage(self.driver, self.url)
@@ -975,6 +964,36 @@ class GrainPage(BasePage):
 
     def save(self):
         self.click_by_id('save')
+        return self
+
+    def check_has_next_grain(self):
+        self.find_by_id('go_next')
+        return self
+
+    def check_has_no_next_grain(self):
+        elts = self.driver.find_elements(By.ID, 'go_next')
+        assert len(elts) == 0
+        return self
+
+    def check_has_previous_grain(self):
+        self.find_by_id('go_prev')
+        return self
+
+    def check_has_no_previous_grain(self):
+        elts = self.driver.find_elements(By.ID, 'go_prev')
+        assert len(elts) == 0
+        return self
+
+    def go_next_grain(self):
+        self.click_by_id('go_next')
+        return self
+
+    def go_previous_grain(self):
+        self.click_by_id('go_prev')
+        return self
+
+    def check_grain_id_is(self, id):
+        assert self.driver.current_url.endswith(f'/{id}/')
         return self
 
     def check_saved(self):
@@ -1129,15 +1148,15 @@ class SeleniumTests(LiveServerTestCase):
                 ],
             )
             self.driver = webdriver.Firefox(service=self.service)
-        elif browser == 'chrome':
-            self.driver = webdriver.Chrome()
-        else:
-            self.driver = webdriver.chromium.webdriver.ChromiumDriver(
-                service=webdriver.chromium.service.ChromiumService(
-                    'chromium.chromedriver',
-                    start_error_message='Failed to start chromedriver for Geochron@Home'
-                )
+        elif browser == 'chromium':
+            options = webdriver.ChromeOptions()
+            options.binary_location = shutil.which("chromium")
+            service = webdriver.ChromeService(
+                executable_path=shutil.which("chromium.chromedriver")
             )
+            self.driver = webdriver.Chrome(options=options, service=service)
+        else:
+            self.driver = webdriver.Chrome()
 
     def sign_in(self, user):
         return SignInPage(self.driver, self.live_server_url).go().sign_in(user)
@@ -1746,6 +1765,37 @@ class OneGrainWithoutMineral(SeleniumTests):
         assert self.driver.current_url.endswith('/1/')
         counting.next().check()
         assert self.driver.current_url.endswith('/5/')
+
+class OneGrainWithoutMica(SeleniumTests):
+    fixtures = [
+        'essential.json',
+        'groups.json',
+        'grain_with_images.json',
+        'grain_with_images_mineral_only.json',
+        'grain_with_images5.json',
+        'tutorial_result_admin.json',
+        'tutorial_result_tester.json',
+        'counter_verification.json',
+    ]
+
+    def setUp(self):
+        counter = auth.models.User.objects.get(pk=103)
+        workg = auth.models.Group.objects.get(pk=1)
+        workg.user_set.add(counter)
+        self.project1 = ftc.models.Project.objects.get(pk=1)
+        self.project1.groups_who_have_access.add(workg)
+        return super().setUp()
+
+    def test_user_with_project_access_can_navigate_grains(self):
+        project_page = self.sign_in(self.counter_user).go_manage().check(
+        ).go_project(self.project1.project_name)
+        sample_page = project_page.go_sample('s1').check()
+        grain_page = sample_page.go_roi(1).check()
+        grain_page.check_has_no_previous_grain().check_grain_id_is(1).go_next_grain()
+        grain_page.check_has_next_grain().check_has_previous_grain().check_grain_id_is(3)
+        grain_page.check_has_previous_grain().go_next_grain().check_grain_id_is(5)
+        grain_page.check_has_no_next_grain().go_previous_grain().check_grain_id_is(3)
+        grain_page.go_previous_grain().check_grain_id_is(1).check_has_no_previous_grain()
 
 class GrainsWithDifferentlySizedRegions(SeleniumTests):
     fixtures = [

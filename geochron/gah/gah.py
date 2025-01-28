@@ -758,7 +758,7 @@ def grain_new(opts, config):
 def output_json(opts, object):
     v = json.loads(object)
     indent = None if opts.compact else opts.indent
-    print(json.dumps(v, indent=indent), file=options.file)
+    print(json.dumps(v, indent=indent), file=opts.file)
 
 
 @token_refresh
