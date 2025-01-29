@@ -154,6 +154,13 @@ class BasePage:
     def send_keys_to_css(self, css, keys):
         self.send_keys_by(By.CSS_SELECTOR, css, keys)
 
+    def assert_id_is(self, id):
+        """
+        Asserts that the last part of the URL is /{id}/
+        """
+        assert self.driver.current_url.endswith(f'/{id}/'), f'current URL {self.driver.current_url} does not end with /{id}/'
+        return self
+
 
 class HomePage(BasePage):
     check_xpath = '//*[contains(@class,jumbotron)]/p/a[contains(.,"Join us now")]'
@@ -236,6 +243,10 @@ class ConfirmPage(BasePage):
 class SignInPage(BasePage):
     def go(self):
         self.get(self.url + "/accounts/login")
+        return self
+
+    def check(self):
+        self.find_by_css('form.form-sign input[name="password"]')
         return self
 
     def sign_in(self, user):
@@ -458,6 +469,9 @@ class CountingPage(GrainViewPage):
         )
         return self
 
+    def check_grain_id_is(self, id):
+        return self.assert_id_is(id)
+
     def try_click_at(self, x, y):
         mp = self.driver.find_element(By.ID, "map")
         lil = mp.find_element(By.CSS_SELECTOR,  'img.leaflet-image-layer')
@@ -538,7 +552,7 @@ class CountingPage(GrainViewPage):
         self.click_by_id("tracknum-cancel")
         if confirm:
             Alert(self.driver).accept()
-        return SamplePage(self.driver, self.url)
+        return GrainPage(self.driver, self.url)
 
     def drag_layer_handle(self, offset):
         track = self.driver.find_element(By.ID, "focus-slider")
@@ -914,6 +928,7 @@ def centre_y(elt):
 
 
 class GrainPage(BasePage):
+    # Page from which we can edit the ROI or count minerals or mica
     def get_image_width(self):
         return WebDriverWait(
             self.driver,
@@ -928,6 +943,14 @@ class GrainPage(BasePage):
 
     def go_mica(self):
         self.click_by_id('go_mica')
+        return self
+
+    def count_mineral(self):
+        self.click_by_id('count')
+        return self
+
+    def count_mica(self):
+        self.click_by_id('count-mica')
         return self
 
     #def go_update_metadata(self):
@@ -993,8 +1016,7 @@ class GrainPage(BasePage):
         return self
 
     def check_grain_id_is(self, id):
-        assert self.driver.current_url.endswith(f'/{id}/')
-        return self
+        return self.assert_id_is(id)
 
     def check_saved(self):
         self.find_by_css('#edit:not([disabled])')
@@ -1236,8 +1258,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
     ]
     def test_onboard(self):
         # Upload Z-Stack images
-        HomePage(self.driver, self.live_server_url).go()
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
+        profile = SignInPage(self.driver, self.live_server_url).go().check().sign_in(self.project_user)
         uploader = WebUploader(self.driver, self.live_server_url)
         uploader.upload_projects('test/crystals')
         navbar = NavBar(self.driver, self.live_server_url)
@@ -1246,9 +1267,9 @@ class FromCleanWithTutorialsDone(SeleniumTests):
         # create user
         join_page = HomePage(self.driver, self.live_server_url).go().join()
         join_page.check().fill_in(self.test_user).check(self.test_user)
-        ConfirmPage(self.driver, self.live_server_url).go().check(self.test_user).confirm()
+        sign_in_page = ConfirmPage(self.driver, self.live_server_url).go().check(self.test_user).confirm()
 
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
+        sign_in_page.check().sign_in(self.test_user).check()
         counting = profile.go_start_counting().check()
         self.assertEqual(uploader.get_index(counting.image_displayed_url()), 1)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.33).image_displayed_url()), 2)
@@ -1624,16 +1645,16 @@ class WithTwoGrainsUploaded(SeleniumTests):
         counting.click_at(0.5, 0.25)
         counting.check_count("002")
         counting.next(confirm=True)
-        counting.check_count("000")
+        counting.check_count("000").check_grain_id_is(5)
         counting.click_at(0.51, 0.44)
         counting.check_count("001")
         counting.previous(confirm=True)
-        counting.check_count("002")
-        counting.next()
-        counting.check_count("001")
-        counting.cancel(confirm=False).check(grain_present=1).go_count(1).check()
+        counting.check_count("002").check_grain_id_is(1)
+        counting.next().check_count("001").check_grain_id_is(5)
+        grain_page = counting.cancel(confirm=False).check()
+        grain_page.check_grain_id_is(5).count_mineral()
         counting.click_at(0.51, 0.24)
-        counting.cancel(confirm=True).check(grain_present=1)
+        counting.cancel(confirm=True).check().check_grain_id_is(5)
 
     def test_can_count_mica(self):
         self.sign_in(self.project_user)
@@ -1726,18 +1747,13 @@ class OneGrainWithoutMica(SeleniumTests):
         self.sign_in(self.project_user)
         samples = ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/3/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/5/')
+        counting = samples.go_sample('s1').go_count(1).check().check_grain_id_is(1)
+        counting.next().check().check_grain_id_is(3)
+        counting.next().check().check_grain_id_is(5)
         samples = ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_mica_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/5/')
+        counting = samples.go_sample('s1').go_mica_count(1).check().check_grain_id_is(1)
+        counting.next().check().check_grain_id_is(5)
 
 class OneGrainWithoutMineral(SeleniumTests):
     fixtures = [
@@ -1753,18 +1769,13 @@ class OneGrainWithoutMineral(SeleniumTests):
         self.sign_in(self.project_user)
         samples = ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_mica_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/4/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/5/')
+        counting = samples.go_sample('s1').go_mica_count(1).check().check_grain_id_is(1)
+        counting.next().check().check_grain_id_is(4)
+        counting.next().check().check_grain_id_is(5)
         samples = ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/5/')
+        counting = samples.go_sample('s1').go_count(1).check().check_grain_id_is(1)
+        counting.next().check().check_grain_id_is(5)
 
 class OneGrainWithoutMica(SeleniumTests):
     fixtures = [
@@ -1835,13 +1846,11 @@ class GrainsWithDifferentlySizedRegions(SeleniumTests):
         self.sign_in(self.project_user)
         samples = ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
+        counting = samples.go_sample('s1').go_count(1).check().check_grain_id_is(1)
         self.assert_all_markers_are_close_to_edge(counting)
         samples = ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_count(6).check()
-        assert self.driver.current_url.endswith('/6/')
+        counting = samples.go_sample('s1').go_count(6).check().check_grain_id_is(6)
         self.assert_all_markers_are_close_to_edge(counting)
 
 class RegionWithHole(SeleniumTests):
