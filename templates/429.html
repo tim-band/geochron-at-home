@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{% translate 'Too Many Requests' %}{% endblock %}
+
+{% block content %}
+
+<h2>{% translate 'Too Many Requests' %}</h2>
+
+<p>{% translate 'Please make requests slower!' %}</p>
+
+{% endblock %}

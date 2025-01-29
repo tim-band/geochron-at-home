@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import ftc
@@ -1139,6 +1140,7 @@ class WebUploader:
         edit_projects = navbar.go_edit_projects()
         project_page = edit_projects.create_project().create('p1', 'description', 1, False)
         sample_page = project_page.create_sample().create('s1', 'T', 1, 1, False)
+        time.sleep(0.3)  # attempting to avoid 429 (too many requests) errors
         grain_detail_page = sample_page.create_grain().create(files)
         grain_page = grain_detail_page.go_zstack().edit()
         grain_page.drag_marker(0, 0, 0.01, 0.01)
@@ -1184,6 +1186,12 @@ class SeleniumTests(LiveServerTestCase):
         return SignInPage(self.driver, self.live_server_url).go().sign_in(user)
 
     def tearDown(self):
+        if (any(map(lambda v: v[0] == self, self._outcome.result.errors))
+            or any(map(lambda v: v[0] == self, self._outcome.result.failures))
+        ):
+            Path('./test/screenshots').mkdir(parents=True, exist_ok=True)
+            if not self.driver.save_screenshot(f'./test/screenshots/{self._testMethodName}.png'):
+                print("failed to save screenshot")
         self.driver.close()
         if self.tmp is not None:
             os.rmdir(self.tmp)
@@ -1269,6 +1277,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
         join_page.check().fill_in(self.test_user).check(self.test_user)
         sign_in_page = ConfirmPage(self.driver, self.live_server_url).go().check(self.test_user).confirm()
 
+        time.sleep(0.4)  # it seems we're in danger of causing a 429 (too many requests)
         sign_in_page.check().sign_in(self.test_user).check()
         counting = profile.go_start_counting().check()
         self.assertEqual(uploader.get_index(counting.image_displayed_url()), 1)

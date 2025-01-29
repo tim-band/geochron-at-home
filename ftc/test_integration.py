@@ -463,7 +463,6 @@ class PublicPageCase(GahCase):
       reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 }),
       # Check access to images in this grain
       reverse('get_image', kwargs={'pk': 1}),
-      reverse('grain_user_result', kwargs={'grain': 1, 'user': 101})
     ])
 
   def test_sample_publicness_controls_access_to_grain_image(self):
