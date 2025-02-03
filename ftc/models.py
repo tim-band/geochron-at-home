@@ -86,7 +86,51 @@ class Transform2D(models.Model):
     y1 = models.FloatField()
     t1 = models.FloatField()
 
-#
+
+class RegionOfInterest:
+    """
+    A Region Of Interest, a collection of Regions.
+
+    Either the generic ROI from a grain or a specific user's ROI.
+    """
+    def __init__(self, region_queryset):
+        self._regions = region_queryset
+
+    def queryset(self):
+        return self._regions
+
+    def count(self):
+        return self._regions.count()
+
+    def exists(self):
+        return self._regions.exists()
+
+    def roi_area_pixels(self):
+        """
+        Find the area of the ROI in pixels.
+
+        Currently this does not take account of negative ROI regions.
+        """
+        total = 0
+        for r in self._regions:
+            total += r.area()
+        return total
+
+    def roi_contains_point(self, x, y):
+        """
+        Find if the point at (x,y) pixels is within this grain's Region of Interest.
+
+        If a point is within two sub-regions it counts as not being within
+        the region-of-interest; a region within a region is counted as
+        a hole.
+        """
+        count = 0
+        for r in self._regions:
+            if r.contains_point(x, y):
+                count += 1
+        return count % 2 == 1
+
+
 class Grain(models.Model):
     sample = models.ForeignKey(Sample, on_delete=models.CASCADE)
     index = models.IntegerField()
@@ -104,6 +148,14 @@ class Grain(models.Model):
 
     class Meta:
         unique_together = ('sample', 'index',)
+
+    def get_regions_generic(self):
+        return RegionOfInterest(self.region_set.filter(result__isnull=True))
+
+    def get_regions_specific(self, user: User):
+        if user == self.get_owner():
+            return self.get_regions_generic()
+        return RegionOfInterest(self.region_set.filter(result__worker=user))
 
     def get_absolute_url(self):
         return reverse('grain_images', args=[self.pk])
@@ -153,43 +205,6 @@ class Grain(models.Model):
     def owners_result_mica(self):
         return self.owners_result_of('I')
 
-    def roi_area_pixels(self):
-        """
-        Find the area of the ROI in pixels.
-
-        Currently this does not take account of negative ROI regions.
-        """
-        total = 0
-        for r in self.region_set.all():
-            total += r.area()
-        return total
-
-    def roi_area_mm2(self):
-        """
-        Find the area of the ROI in pixels.
-
-        Currently this does not take account of negative ROI regions.
-        """
-        scale_x = self.scale_x
-        scale_y = self.scale_y
-        if scale_x is None or scale_y is None:
-            return None
-        return scale_x * scale_y * self.roi_area_pixels() * 1e6
-
-    def roi_contains_point(self, x, y):
-        """
-        Find if the point at (x,y) pixels is within this grain's Region of Interest.
-
-        If a point is within two sub-regions it counts as not being within
-        the region-of-interest; a region within a region is counted as
-        a hole.
-        """
-        count = 0
-        for r in self.region_set.all():
-            if r.contains_point(x, y):
-                count += 1
-        return count % 2 == 1
-
     def get_analyses(self):
         return FissionTrackNumbering.objects.filter(
             grain__sample=self.sample,
@@ -198,84 +213,17 @@ class Grain(models.Model):
             analyst__isnull=False
         )
 
-#
-class Region(models.Model):
-    grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
+    def pixels_to_mm2(self, pixels):
+        """
+        Convert area in pixels to millimeters square, based on the grain's scale.
+        """
+        scale_x = self.scale_x
+        scale_y = self.scale_y
+        if scale_x is None or scale_y is None:
+            return None
+        return scale_x * scale_y * pixels * 1e6
 
-    def area(self):
-        """ Returns the region's area in pixels """
-        vs = list(self.vertex_set.all())
-        vs.sort(key=lambda v: v.pk)
-        n = len(vs)
-        if n == 0:
-            return 0
-        last_v = vs[n - 1]
-        total = 0
-        for v in vs:
-            total += v.x * last_v.y - last_v.x * v.y
-            last_v = v
-        return abs(total / 2)
 
-    def contains_point(self, x, y):
-        """Find if the point at (x,y) pixels is contained within this region"""
-        vs = list(self.vertex_set.all())
-        vs.sort(key=lambda v: v.pk)
-        n = len(vs)
-        if n == 0:
-            return 0
-        last_v = vs[n - 1]
-        total = 0
-        for v in vs:
-            if (
-                ((v.x <= x and x < last_v.x) or (last_v.x <= x and x < v.x))
-                and (y < last_v.y + (v.y - last_v.y) * (x - last_v.x) / (v.x - last_v.x))
-            ):
-                total += 1
-            last_v = v
-        return total % 2 == 1
-
-#
-class Vertex(models.Model):
-    region = models.ForeignKey(Region, on_delete=models.CASCADE)
-    x = models.IntegerField()
-    y = models.IntegerField()
-
-#
-class Image(ExportModelOperationsMixin('image'), models.Model):
-    IMAGE_FORMAT=(
-        ('J', 'JPEG'),
-        ('P', 'PNG'),
-    )
-    FT_TYPE = (
-        ('S', 'Spontaneous Fission Tracks'),
-        ('I', 'Induced Fission Tracks'),
-    )
-    LIGHT_PATH = (
-        ('T', 'Transmitted Light'),
-        ('R', 'Reflected Light'),
-    )
-    grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
-    format = models.CharField(max_length=1, choices=IMAGE_FORMAT)
-    ft_type = models.CharField(max_length=1, choices=FT_TYPE)
-    index = models.IntegerField()
-    data = models.BinaryField()
-    light_path = models.CharField(max_length=1, choices=LIGHT_PATH, null=True)
-    focus = models.FloatField(null=True)
-
-    class Meta:
-        unique_together = ('grain', 'index', 'ft_type')
-
-    def get_owner(self):
-        return self.grain.get_owner()
-
-    def user_has_access(self, user: User):
-        return self.grain.user_has_access(user)
-
-    @classmethod
-    def filter_owned_by(cls, qs, user):
-        return qs.filter(grain__sample__in_project__creator=user)
-
-#
 class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     FT_TYPE = (
         ('S', 'Spontaneous Fission Tracks'),
@@ -312,11 +260,21 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     def objects_owned_by(cls, user):
         return cls.objects.filter(grain__sample__in_project__creator=user)
 
+    def roi_area_pixels(self):
+        regions = self.region_set.all()
+        if regions.exist():
+            return sum(map(lambda r: r.area(), regions))
+        return self.grain.get_regions_generic().roi_area_mm2()
+
+    def roi_area_mm2(self):
+        area_pixels = self.roi_area_pixels()
+        return self.grain.pixels_to_mm2(area_pixels)
+
     def roi_area_micron2(self):
-        a = self.grain.roi_area_mm2()
-        if a is None:
+        area_mm2 = self.roi_area_mm2()
+        if area_mm2 is None:
             return None
-        return a * 1e6
+        return area_mm2 * 1e6
 
     def points(self):
         return [
@@ -337,17 +295,20 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
             for gp in self.grainpoint_set.filter(category__name='track')
         ]
 
-    def get_latlngs_within_roi(self):
-        # if there are no regions we will count every marker as being
-        # within the ROI, otherwise nothing will be.
-        if 0 == self.grain.region_set.count():
+    def get_latlngs_within_roi(self, regions: RegionOfInterest | None):
+        """
+        Returns a list of [lat,lng]s that are within the Region of Interest.
+        param: user: if None, use the generic ROI, otherwise use this users's ROI.
+        If there is no such ROI, return all latlngs.
+        """
+        if regions is None or not regions.exists():
             return self.get_latlngs()
         width = self.grain.image_width
         height = self.grain.image_height
         return [
             [ (height - gp.y_pixels) / width, gp.x_pixels / width ]
             for gp in self.grainpoint_set.filter(category__name='track')
-            if self.grain.roi_contains_point(gp.x_pixels, gp.y_pixels)
+            if regions.roi_contains_point(gp.x_pixels, gp.y_pixels)
         ]
 
     @property
@@ -458,7 +419,87 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     def get_track_count(self):
         return self.grainpoint_set.count()
 
+
+class Region(models.Model):
+    grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
+    # NULL result means this is part of the generic ROI
+    # A set result means that this user has specified this ROI for their count.
+    result = models.ForeignKey(FissionTrackNumbering, on_delete=models.CASCADE, null=True)
+
+    def area(self):
+        """ Returns the region's area in pixels """
+        vs = list(self.vertex_set.all())
+        vs.sort(key=lambda v: v.pk)
+        n = len(vs)
+        if n == 0:
+            return 0
+        last_v = vs[n - 1]
+        total = 0
+        for v in vs:
+            total += v.x * last_v.y - last_v.x * v.y
+            last_v = v
+        return abs(total / 2)
+
+    def contains_point(self, x, y):
+        """Find if the point at (x,y) pixels is contained within this region"""
+        vs = list(self.vertex_set.all())
+        vs.sort(key=lambda v: v.pk)
+        n = len(vs)
+        if n == 0:
+            return 0
+        last_v = vs[n - 1]
+        total = 0
+        for v in vs:
+            if (
+                ((v.x <= x and x < last_v.x) or (last_v.x <= x and x < v.x))
+                and (y < last_v.y + (v.y - last_v.y) * (x - last_v.x) / (v.x - last_v.x))
+            ):
+                total += 1
+            last_v = v
+        return total % 2 == 1
+
 #
+class Vertex(models.Model):
+    region = models.ForeignKey(Region, on_delete=models.CASCADE)
+    x = models.IntegerField()
+    y = models.IntegerField()
+
+#
+class Image(ExportModelOperationsMixin('image'), models.Model):
+    IMAGE_FORMAT=(
+        ('J', 'JPEG'),
+        ('P', 'PNG'),
+    )
+    FT_TYPE = (
+        ('S', 'Spontaneous Fission Tracks'),
+        ('I', 'Induced Fission Tracks'),
+    )
+    LIGHT_PATH = (
+        ('T', 'Transmitted Light'),
+        ('R', 'Reflected Light'),
+    )
+    grain = models.ForeignKey(Grain, on_delete=models.CASCADE)
+    format = models.CharField(max_length=1, choices=IMAGE_FORMAT)
+    ft_type = models.CharField(max_length=1, choices=FT_TYPE)
+    index = models.IntegerField()
+    data = models.BinaryField()
+    light_path = models.CharField(max_length=1, choices=LIGHT_PATH, null=True)
+    focus = models.FloatField(null=True)
+
+    class Meta:
+        unique_together = ('grain', 'index', 'ft_type')
+
+    def get_owner(self):
+        return self.grain.get_owner()
+
+    def user_has_access(self, user: User):
+        return self.grain.user_has_access(user)
+
+    @classmethod
+    def filter_owned_by(cls, qs, user):
+        return qs.filter(grain__sample__in_project__creator=user)
+
+
 class TutorialResult(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     session = models.TextField()

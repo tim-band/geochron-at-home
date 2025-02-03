@@ -23,10 +23,10 @@ from django.shortcuts import redirect
 from ftc.apiviews import request_roiss
 from ftc.get_image_size import get_image_size_from_handle
 from ftc.grain_uinfo import choose_working_grain
-from ftc.load_rois import get_rois, load_rois
+from ftc.load_rois import get_rois, load_rois_from_regions
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex, GrainPointCategory,
-    TutorialPage)
+    TutorialPage, RegionOfInterest)
 from ftc.parse_image_name import parse_upload_name
 from geochron.gah.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
@@ -42,16 +42,22 @@ def home(request):
 def projects_user_can_access(user: User):
     if user.is_superuser:
         return Project.objects.all()
-    groups = Group.objects.filter(user=user)
     if user_is_staff(user):
         return Project.objects.filter(
-            Q(groups_who_have_access__in=groups)
+            Q(groups_who_have_access__user=user)
             | Q(creator=user)
         )
-    return Project.objects.filter(groups_who_have_access__in=groups)
+    return Project.objects.filter(groups_who_have_access__user=user)
 
 def user_has_access_to_any_projects(user: User):
     return projects_user_can_access(user).exists()
+
+def user_is_in_access_group_for_project(user: User, project: Project):
+    # Does a group g exist such that
+    # user in g.user_set and g in project.groups_who_have_access
+    return Project.objects.filter(
+        groups_who_have_access__user=user
+    )
 
 # the view for /accounts/profile/
 def profile(request):
@@ -225,7 +231,9 @@ class GrainDetailView(UserHasProjectAccess, DetailView):
                 self.json_latlng((h - vertex.y) / w, vertex.x / w)
                 for vertex in region.vertex_set.order_by('id').iterator()
             ])
-            for region in self.object.region_set.order_by('id').iterator()
+            for region in self.object.get_regions_specific(
+                self.request.user
+            ).queryset().order_by('id').iterator()
         ])
     def get_context_data(self, *args, **kwargs):
         ctx = super().get_context_data(*args, **kwargs)
@@ -668,11 +676,7 @@ def grainAnalystResult(request, grain, analyst):
 
 @csrf_protect
 def grain_update_roi(request, pk):
-    if not user_is_staff(request.user):
-        raise PermissionDenied
     grain = Grain.objects.get(pk=pk)
-    if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
-        return HttpResponse("Grain update forbidden", status=403)
     regions = {}
     for k,v in request.POST.items():
         ps = k.rsplit("_", 3)
@@ -696,9 +700,42 @@ def grain_update_roi(request, pk):
     w = grain.image_width
     h = grain.image_height
     with transaction.atomic():
-        Region.objects.filter(grain=grain).delete()
+        if request.user == grain.sample.in_project.creator:
+            result = None
+        elif user_is_in_access_group_for_project(
+            request.user,
+            grain.sample.in_project,
+        ):
+            result_filter = FissionTrackNumbering.objects.filter(
+                grain=grain,
+                worker=request.user,
+            )
+            result_count = result_filter.count()
+            if 1 < result_count:
+                result_filter.limit(result_count - 1).delete()
+            if 0 < result_count:
+                result = result_filter.first()
+            else:
+                result = FissionTrackNumbering(
+                    grain=grain,
+                    ft_type='S',
+                    worker=request.user,
+                    result=-1,
+                ).save()
+        elif request.user.is_superuser:
+            # superusers can still edit the generic ROI if they
+            # aren't project users
+            result = None
+        else:
+            raise PermissionDenied
+        region_filter = Q(grain=grain)
+        if result is None:
+            region_filter &= Q(result__isnull=True)
+        else:
+            region_filter &= Q(result=result)
+        Region.objects.filter(region_filter).delete()
         for _, vertices in sorted(regions.items()):
-            region = Region(grain=grain)
+            region = Region(grain=grain, result=result)
             region.save()
             for _, v in sorted(vertices.items()):
                 x = float(v['x']) * w
@@ -770,14 +807,15 @@ def json_grain_result(grain):
             },
             'latlngs': result.get_latlngs()
         })
+    area_pixels = result.roi_area_pixels()
     j = {
         'grain': grain.id,
         'sample': grain.sample.id,
         'sample_name': grain.sample.sample_name,
         'project_name': grain.sample.in_project.project_name,
         'results': res,
-        'area_pixels': grain.roi_area_pixels(),
-        'area_mm2': grain.roi_area_mm2()
+        'area_pixels': area_pixels,
+        'area_mm2': grain.pixels_to_mm2(area_pixels)
     }
     for field in [
         'id', 'index', 'image_width', 'image_height',
@@ -876,6 +914,7 @@ def getCsvResults(request):
             name = result.worker.get_full_name()
             if not name:
                 name = result.worker.email
+            area_pixels = result.roi_area_pixels()
             writer.writerow([
                 grain.sample.in_project.project_name,
                 grain.sample.sample_name,
@@ -885,8 +924,8 @@ def getCsvResults(request):
                 name,
                 result.create_date,
                 result.result,
-                grain.roi_area_pixels(),
-                grain.roi_area_mm2()
+                area_pixels,
+                grain.pixels_to_mm2(area_pixels)
             ])
     return response
 
@@ -927,7 +966,7 @@ def redirect_to_count(request):
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def add_grain_info_markers(info, grain, ft_type, worker, analyst = None):
+def add_grain_info_markers(info, grain, ft_type, worker, analyst, regions: RegionOfInterest):
     objects = FissionTrackNumbering.objects.filter(
         grain=grain,
         ft_type=ft_type
@@ -938,11 +977,11 @@ def add_grain_info_markers(info, grain, ft_type, worker, analyst = None):
         objects = objects.filter(analyst=analyst)
     save = objects.order_by('result').first()
     if save:
-        info['marker_latlngs'] = save.get_latlngs_within_roi()
+        info['marker_latlngs'] = save.get_latlngs_within_roi(regions)
         info['points'] = save.points()
         info['lengths'] = save.contained_tracks_latlngs
 
-def get_grain_info(user, pk, ft_type, analyst = None, **kwargs):
+def get_grain_info(user, pk, ft_type, analyst = None, specific = False, **kwargs):
     if pk == 'done':
         return {
             'grain_info': 'null',
@@ -955,7 +994,11 @@ def get_grain_info(user, pk, ft_type, analyst = None, **kwargs):
     ft_type = ft_type
     [images_list, indices_list] = get_grain_images_list(grain, ft_type)
     matrix = grain.mica_transform_matrix if ft_type == 'I' else None
-    rois = load_rois(grain, ft_type, matrix)
+    if specific:
+        regions = grain.get_regions_specific(user)
+    else:
+        regions = grain.get_regions_generic()
+    rois = load_rois_from_regions(grain, ft_type, matrix, regions)
     if rois is None:
         return {
             'grain_info': 'null',
@@ -979,7 +1022,7 @@ def get_grain_info(user, pk, ft_type, analyst = None, **kwargs):
         'indices': indices_list,
         'rois': rois
     }
-    add_grain_info_markers(info, grain, ft_type, user, analyst)
+    add_grain_info_markers(info, grain, ft_type, user, analyst, regions)
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,
@@ -994,7 +1037,7 @@ def count_grain(request, pk):
     return render(
         request,
         'ftc/counting.html',
-        get_grain_info(request.user, pk, 'S', submit_url=reverse('counting'))
+        get_grain_info(request.user, pk, 'S', submit_redirect_url=reverse('counting'))
     )
 
 
@@ -1039,14 +1082,14 @@ def count_my_grain_extra_links(user: User, current_id: int, ft_type: str):
     (prev_grain, next_grain) = prev_and_next_grains(user, current_id, ft_type)
     back = reverse('grain', args=[current_id])
     r = {
-        'submit_url': back,
+        'submit_redirect_url': back,
         'cancel_url': back
     }
     view_name = 'count_my_mica' if ft_type == 'I' else 'count_my'
     if next_grain != None:
         url = reverse(view_name, args=[next_grain.id])
         r['next_url'] = url
-        r['submit_url'] = url
+        r['submit_redirect_url'] = url
     if prev_grain != None:
         r['prev_url'] = reverse(view_name, args=[prev_grain.id])
     return r
@@ -1074,6 +1117,7 @@ class CountMyGrainView(UserHasProjectAccess, DetailView):
             self.request.user,
             pk,
             self.ft_type,
+            specific=True,
             **count_my_grain_extra_links(self.request.user, pk, self.ft_type)
         ))
         addGrainPointCategories(ctx)
@@ -1192,13 +1236,6 @@ def saveWorkingGrain(request):
             res = json.loads(json_str)
             grain = Grain.objects.get(sample__id=res['sample_id'], index=res['grain_num'])
             ft_type = res['ft_type']
-            if user.username != 'guest':
-                # Remove any previous or partial save state
-                FissionTrackNumbering.objects.filter(
-                    grain=grain,
-                    worker=user,
-                    ft_type=ft_type
-                ).delete()
             # Save the new state
             ftn = FissionTrackNumbering(
                 grain=grain,
@@ -1207,6 +1244,18 @@ def saveWorkingGrain(request):
                 result=-1,
             )
             ftn.save()
+            if user.username != 'guest':
+                # Remove any previous or partial save state
+                previous = FissionTrackNumbering.objects.filter(
+                    ~Q(id=ftn.pk) & Q(grain=grain, worker=user, ft_type=ft_type)
+                )
+                if previous.exists():
+                    # But rescue any regions attached to it beforehand
+                    # (we'll assume there's only one)
+                    p1 = previous.last()
+                    for r in Region.objects.filter(result=p1):
+                        r.result = ftn
+                    previous.delete()
             addGrainPoints(ftn, res)
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
         return HttpResponse(myjson, content_type='application/json')

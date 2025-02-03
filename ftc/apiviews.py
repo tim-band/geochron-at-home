@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
-from ftc.load_rois import get_rois, get_roiss
+from ftc.load_rois import get_rois, get_rois_user, get_roiss
 from ftc.models import (
     Project, Sample, Grain, Image, FissionTrackNumbering,
     Transform2D, GrainPoint, GrainPointCategory, ContainedTrack
@@ -296,6 +296,17 @@ def get_image(request, pk):
 def get_grain_rois(request, pk):
     grain = Grain.objects.get(id=pk)
     return Response(get_rois(grain))
+
+
+@api_view()
+@permission_classes([IsAuthenticated])
+def get_grain_rois_user(request, pk, user):
+    grain = Grain.objects.get(id=pk)
+    if user.isnumeric():
+        user_obj = User.objects.get(pk=int(user))
+    else:
+        user_obj = User.objects.get(username=user)
+    return Response(get_rois_user(grain, user_obj))
 
 
 def request_roiss(request):

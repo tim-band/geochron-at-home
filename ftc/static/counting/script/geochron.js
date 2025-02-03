@@ -622,6 +622,12 @@ function grain_view(options) {
                 maxy = Math.max(maxy, v[0]);
             });
         });
+        if (minx == Infinity) {
+            minx = 0.2;
+            miny = 0.2;
+            maxx = 0.8;
+            maxy = 0.8;
+        }
         var map_window = document.getElementById('map');
         var scale_to_fit_height = map_window.clientHeight / (maxy - miny);
         var scale_to_fit_width = map_window.clientWidth / (maxx - minx);

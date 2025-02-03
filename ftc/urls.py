@@ -22,7 +22,8 @@ from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
     ImageListView, GrainListView, FissionTrackNumberingView,
     FissionTrackNumberingViewLatLngs,
-    get_grain_rois, get_many_roiss, SampleGrainInfoView)
+    get_grain_rois, get_many_roiss, SampleGrainInfoView,
+    get_grain_rois_user)
 
 urlpatterns = [
     path('', home, name='home'),
@@ -56,7 +57,6 @@ urlpatterns = [
     path('getJsonResults/', getJsonResults, name='getJsonResults'),
     path('getCsvResults/', getCsvResults, name='getCsvResults'),
     path('updateFtnResult/', updateFtnResult, name='updateFtnResult'),
-    path('updateTFNResult/', updateFtnResult, name='updateFtnResult'), # deprecated, remove soon!
     path('counting/guest/', counting, name='guest_counting', kwargs={ 'uname': 'guest' }),
     path('counting/', counting, name='counting'),
     path('count/<pk>/', count_grain, name='count'),
@@ -88,6 +88,7 @@ urlpatterns = [
     path('api/grain/', GrainListView.as_view(), name='api_grain_list'),
     path('api/grain/<pk>/', GrainInfoView.as_view(), name='api_grain_info'),
     path('api/grain/<pk>/rois/', get_grain_rois, name='api_grain_rois'),
+    path('api/grain/<pk>/rois/<user>/', get_grain_rois_user, name='api_grain_rois_user'),
     path('api/rois/', get_many_roiss, name='api_roiss'),
     path('api/grain/<grain>/image/', GrainImageListView.as_view(), name='api_grain_image_list'),
     path('api/image/', ImageListView.as_view(), name='api_image_list'),

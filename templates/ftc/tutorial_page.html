@@ -230,19 +230,6 @@ function setup() {
         iconAnchor: [20, 20],
         iconPopup: [20, 0]
     });
-    /* map.setTrackCounterElement(document.getElementById('tracknum'));
-    document.getElementById('tracknum-submit').onclick = function() {
-        var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
-        map.submitTrackCount("{% url 'updateFtnResult'%}", submit_url);
-    };
-    document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
-    var save = document.getElementById('tracknum-save');
-    if (save) {
-        save.onclick = function() {
-            map.saveTrackCount("{% url 'saveWorkingGrain'%}", null);
-        };
-    }
-    map.resetUndo(); */
     {% if object.page_type == "S" or object.page_type == "I" %}
     map.enableEditing();
     {% endif %}
