@@ -721,7 +721,8 @@ def grain_update_roi(request, pk):
                     ft_type='S',
                     worker=request.user,
                     result=-1,
-                ).save()
+                )
+                result.save()
         elif request.user.is_superuser:
             # superusers can still edit the generic ROI if they
             # aren't project users
@@ -1260,7 +1261,7 @@ def saveWorkingGrain(request):
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
         return HttpResponse(myjson, content_type='application/json')
     else:
-        return HttpResponse("Sorry, you have to active your account first.")
+        return HttpResponse("Sorry, you have to activate your account first.")
 
 @login_required
 def saveTutorialResult(request):

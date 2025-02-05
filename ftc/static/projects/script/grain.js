@@ -409,6 +409,8 @@ function cancelEdit(crystal) {
 
 function beginEdit(crystal) {
     removeRegionMarkers(crystal);
+    crystal.region_points = normalizeRegions(crystal.region_points);
+    crystal.region_layer.setLatLngs(crystal.region_points);
     addRegionMarkers(crystal);
     disable_element('edit');
     enable_element('save');
@@ -444,7 +446,6 @@ function beginShiftEdit(crystal) {
         iconAnchor: [13, 41],
         className: 'region-vertex-marker',
     });
-    crystal.region_points = normalizeRegions(crystal.region_points);
     var centroid = getCentroid(crystal.region_points);
     centroid.lat -= crystal.shift_y / crystal.image_width;
     centroid.lng += crystal.shift_x / crystal.image_width;

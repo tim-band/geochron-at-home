@@ -198,6 +198,7 @@ After=network.target
 Type=simple
 User=wwwrunner
 WorkingDirectory=/var/www/repos/geochron-at-home
+ExecStartPre=/usr/bin/python3 -m pipenv install
 ExecStartPre=/usr/bin/python3 -m pipenv run collect
 ExecStartPre=/usr/bin/python3 -m pipenv run migrate
 ExecStart=/usr/bin/python3 -m pipenv run gunicorn --log-level info --bind 127.0.0.1:39401 --workers=2 geochron.wsgi

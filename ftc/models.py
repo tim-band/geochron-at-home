@@ -262,9 +262,9 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
 
     def roi_area_pixels(self):
         regions = self.region_set.all()
-        if regions.exist():
+        if regions.exists():
             return sum(map(lambda r: r.area(), regions))
-        return self.grain.get_regions_generic().roi_area_mm2()
+        return self.grain.get_regions_generic().roi_area_pixels()
 
     def roi_area_mm2(self):
         area_pixels = self.roi_area_pixels()

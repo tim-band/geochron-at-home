@@ -58,7 +58,7 @@ def transform2d_as_matrix(transform):
         [ transform.x1, transform.y1, transform.t1 ]
     ]
 
-def get_rois_from_regions(grain: Grain, regions):
+def get_rois_from_regions(grain: Grain, regions: RegionOfInterest):
     return {
         "grain_id": grain.id,
         "image_width": grain.image_width,
@@ -71,7 +71,7 @@ def get_rois_from_regions(grain: Grain, regions):
         "mica_stage_y": grain.mica_stage_y,
         "regions": list([
             rois_region(region, grain)
-            for region in regions
+            for region in regions.queryset()
         ]),
         "mica_transform_matrix": transform2d_as_matrix(
             grain.mica_transform_matrix
