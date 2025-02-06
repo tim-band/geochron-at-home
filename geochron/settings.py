@@ -27,6 +27,7 @@ TEMPLATE_DEBUG = DEBUG
 
 allowed_hosts = os.getenv('ALLOWED_HOSTS') or '127.0.0.1,localhost,testserver'
 ALLOWED_HOSTS = allowed_hosts.split(',')
+CSRF_TRUSTED_ORIGINS = ALLOWED_HOSTS
 
 sslOnly = os.getenv('SSL_ONLY') in ['1', 'true', 'True', 'TRUE']
 SECURE_SSL_REDIRECT = sslOnly
