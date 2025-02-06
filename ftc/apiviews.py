@@ -7,6 +7,7 @@ from django.forms import ValidationError
 from django.shortcuts import get_object_or_404
 import json
 import logging
+import numbers
 from rest_framework import exceptions
 from rest_framework import generics, serializers
 from rest_framework.decorators import api_view, permission_classes
@@ -17,7 +18,8 @@ from rest_framework.views import exception_handler
 from ftc.load_rois import get_rois, get_rois_user, get_roiss
 from ftc.models import (
     Project, Sample, Grain, Image, FissionTrackNumbering,
-    Transform2D, GrainPoint, GrainPointCategory, ContainedTrack
+    Transform2D, GrainPoint, GrainPointCategory, ContainedTrack,
+    Region, Vertex
 )
 from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
@@ -474,6 +476,20 @@ class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
         ret["grainpoints"] = gps
         ret["result"] = data.get("result", len(gps))
         ret["contained_tracks"] = self.validate_contained_tracks(data)
+        regions = data.get("regions", [])
+        if type(regions) is str:
+            regions = json.loads(regions)
+        elif type(regions) is list:
+            regions = [json.loads(r) for r in regions]
+        if type(regions) is not list:
+            raise ValidationError("regions should be a list")
+        for reg in regions:
+            if type(reg) is not list or len(reg) == 0:
+                raise ValidationError("Each region should be a nonempty list")
+            for v in reg:
+                if not(type(v) is list and len(v) == 2 and isinstance(v[0], numbers.Number) and isinstance(v[1], numbers.Number)):
+                    raise ValidationError("Each vertex should be a list of two numbers")
+        ret["regions"] = regions
         return ret
 
     def validate_contained_tracks(self, data):
@@ -520,6 +536,7 @@ class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
     def create(self, validated_data):
         points = validated_data.pop('grainpoints')
         contained_tracks = validated_data.pop('contained_tracks')
+        regions = validated_data.pop('regions')
         worker = validated_data['worker']
         delete_params = {
             "grain": validated_data['grain'],
@@ -538,6 +555,10 @@ class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
             GrainPoint.objects.create(result=ftn, **point)
         for ct in contained_tracks:
             ContainedTrack.objects.create(result=ftn, **ct)
+        for reg in regions:
+            region = Region.objects.create(grain=ftn.grain, result=ftn)
+            for v in reg:
+                Vertex.objects.create(region=region, x=v[0], y=v[1])
         return ftn
 
 

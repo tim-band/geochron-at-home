@@ -1,6 +1,6 @@
 from django.test import Client, TestCase, tag, override_settings
 import django
-from ftc.models import Grain, FissionTrackNumbering
+from ftc.models import Grain, FissionTrackNumbering, Region, Vertex
 from geochron.settings import SIMPLE_JWT
 
 import abc
@@ -642,6 +642,14 @@ class ApiCount(ApiTestMixin):
         self.assertSetAlmostEqual(jl, self.points2, self.points_close)
         self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
 
+    def latlngs_to_points(self, grain, latlngs):
+        return [{
+            'x_pixels': latlng[1] * grain.image_width,
+            'y_pixels': grain.image_height - latlng[0] * grain.image_width,
+            'category': 'track',
+            'comment': ''
+        } for latlng in latlngs]
+
     def test_upload_count(self):
         """
         Uploads a count, downloads it as both latlngs and grainpoints
@@ -656,12 +664,7 @@ class ApiCount(ApiTestMixin):
         sample = 2
         index = 1
         grain = Grain.objects.get(sample__pk=sample, index=index)
-        points = [{
-            'x_pixels': latlng[1] * grain.image_width,
-            'y_pixels': grain.image_height - latlng[0] * grain.image_width,
-            'category': 'track',
-            'comment': ''
-        } for latlng in latlngs]
+        points = self.latlngs_to_points(grain, latlngs)
         data = {
             'grain': '{0}/{1}'.format(sample, index),
             'ft_type': 'S',
@@ -692,6 +695,40 @@ class ApiCount(ApiTestMixin):
         jgp = jo2[0]['grainpoints']
         self.assertSetAlmostEqual(jgp, points, ApiCountGrainPoint.points_close)
         self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, jo2[0]['worker'])
+
+    def test_upload_count_with_roi(self):
+        """
+        Uploads a count with an ROI (by both APIs which should do the same thing).
+        """
+        sample = 2
+        index = 1
+        grain = Grain.objects.get(sample__pk=sample, index=index)
+        regions = [  # each item should have a different length, please
+            [[10, 10], [30, 10], [20, 30]],
+            [[10, 50], [50, 30], [80, 90], [15, 99]]
+        ]
+        data = {
+            'grain': '{0}/{1}'.format(sample, index),
+            'ft_type': 'S',
+            'worker': 'admin',
+            'create_date': '2023-11-14',
+            'grainpoints': json.dumps(self.latlngs_to_points(grain, [[0.2, 0.3]])),
+            'regions': json.dumps(regions),
+        }
+        r = self.client.post(self.count_url, data, **self.super_headers)
+        self.assertEqual(r.status_code, 201)
+        region_objects = Region.objects.filter(
+            result__worker__username='admin',
+            grain__sample__pk=sample,
+        )
+        self.assertEqual(region_objects.count(), 2)
+        for r in region_objects:
+            vertices = Vertex.objects.filter(region=r)
+            # Find the item in regions that has this length
+            vertex_count = vertices.count()
+            vs = next(filter(lambda reg: len(reg) == vertex_count, regions))
+            self.assertListEqual(vs, [[v.x, v.y] for v in vertices])
+
 
     def upload_contained_tracks(self, use_dict: bool):
         cts = [
