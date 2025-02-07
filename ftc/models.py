@@ -152,10 +152,12 @@ class Grain(models.Model):
     def get_regions_generic(self):
         return RegionOfInterest(self.region_set.filter(result__isnull=True))
 
-    def get_regions_specific(self, user: User):
+    def get_regions_specific(self, user: User, analyst: str | None = None):
         if user == self.get_owner():
             return self.get_regions_generic()
-        return RegionOfInterest(self.region_set.filter(result__worker=user))
+        if analyst:
+            return RegionOfInterest(self.region_set.filter(result__worker=user, result__analyst=analyst))
+        return RegionOfInterest(self.region_set.filter(result__worker=user, result__analyst__isnull=True))
 
     def get_absolute_url(self):
         return reverse('grain_images', args=[self.pk])

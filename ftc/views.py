@@ -1,4 +1,3 @@
-from typing import Any, Dict
 from django.shortcuts import render, get_object_or_404
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, Subquery, Prefetch
@@ -32,6 +31,7 @@ from geochron.gah.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 
 import csv
+import enum
 import io
 import json
 
@@ -670,7 +670,8 @@ def grainAnalystResult(request, grain, analyst):
         User.objects.get(username__exact='guest'),
         grain,
         'S',
-        analyst=analyst
+        analyst=analyst,
+        specific=RoiSpecificity.SPECIFIC_IF_AVAILABLE,
     )
     return render(request, 'ftc/public.html', ctx)
 
@@ -982,7 +983,19 @@ def add_grain_info_markers(info, grain, ft_type, worker, analyst, regions: Regio
         info['points'] = save.points()
         info['lengths'] = save.contained_tracks_latlngs
 
-def get_grain_info(user, pk, ft_type, analyst = None, specific = False, **kwargs):
+class RoiSpecificity(enum.Enum):
+    GENERIC = 0
+    SPECIFIC = 1
+    SPECIFIC_IF_AVAILABLE = 2
+
+def get_grain_info(
+    user,
+    pk,
+    ft_type,
+    analyst = None,
+    specific = RoiSpecificity.GENERIC,
+    **kwargs,
+):
     if pk == 'done':
         return {
             'grain_info': 'null',
@@ -995,10 +1008,14 @@ def get_grain_info(user, pk, ft_type, analyst = None, specific = False, **kwargs
     ft_type = ft_type
     [images_list, indices_list] = get_grain_images_list(grain, ft_type)
     matrix = grain.mica_transform_matrix if ft_type == 'I' else None
-    if specific:
-        regions = grain.get_regions_specific(user)
-    else:
+    if specific == RoiSpecificity.GENERIC:
+        regions = grain.get_regions_specific(user, analyst)
+    elif specific == RoiSpecificity.SPECIFIC:
         regions = grain.get_regions_generic()
+    else:
+        regions = grain.get_regions_specific(user, analyst)
+        if not regions.exists():
+            regions = grain.get_regions_generic()
     rois = load_rois_from_regions(grain, ft_type, matrix, regions)
     if rois is None:
         return {
@@ -1118,7 +1135,7 @@ class CountMyGrainView(UserHasProjectAccess, DetailView):
             self.request.user,
             pk,
             self.ft_type,
-            specific=True,
+            specific=RoiSpecificity.SPECIFIC,
             **count_my_grain_extra_links(self.request.user, pk, self.ft_type)
         ))
         addGrainPointCategories(ctx)

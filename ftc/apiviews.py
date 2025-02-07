@@ -483,13 +483,16 @@ class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
             regions = [json.loads(r) for r in regions]
         if type(regions) is not list:
             raise ValidationError("regions should be a list")
+        ret["regions"] = []
         for reg in regions:
+            if type(reg) is dict and 'vertices' in reg:
+                reg = reg['vertices']
             if type(reg) is not list or len(reg) == 0:
-                raise ValidationError("Each region should be a nonempty list")
+                raise ValidationError('Each region should be an object with a "vertices" key or a nonempty list')
             for v in reg:
                 if not(type(v) is list and len(v) == 2 and isinstance(v[0], numbers.Number) and isinstance(v[1], numbers.Number)):
                     raise ValidationError("Each vertex should be a list of two numbers")
-        ret["regions"] = regions
+            ret["regions"].append(reg)
         return ret
 
     def validate_contained_tracks(self, data):

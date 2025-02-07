@@ -55,7 +55,7 @@ class GrainPointCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
-    list_display = ['grain', 'result']
+    list_display = ['id', 'grain', 'result']
     list_filter = ['grain__sample', 'grain__sample__in_project', 'grain', 'result']
 
 admin.site.register(Grain, admin.ModelAdmin)

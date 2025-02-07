@@ -696,30 +696,27 @@ class ApiCount(ApiTestMixin):
         self.assertSetAlmostEqual(jgp, points, ApiCountGrainPoint.points_close)
         self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, jo2[0]['worker'])
 
-    def test_upload_count_with_roi(self):
+    def _upload_count_with_roi(self, grain, regions, region_repr):
         """
         Uploads a count with an ROI (by both APIs which should do the same thing).
+        grain: The grain to upload for
+        regions: list of lists of vertices, each of which is a list of two co-ordinates.
+            Each element of this list must have a different length!
+        region_repr: The representation of this
         """
-        sample = 2
-        index = 1
-        grain = Grain.objects.get(sample__pk=sample, index=index)
-        regions = [  # each item should have a different length, please
-            [[10, 10], [30, 10], [20, 30]],
-            [[10, 50], [50, 30], [80, 90], [15, 99]]
-        ]
         data = {
-            'grain': '{0}/{1}'.format(sample, index),
+            'grain': '{0}/{1}'.format(grain.sample.pk, grain.index),
             'ft_type': 'S',
             'worker': 'admin',
             'create_date': '2023-11-14',
             'grainpoints': json.dumps(self.latlngs_to_points(grain, [[0.2, 0.3]])),
-            'regions': json.dumps(regions),
+            'regions': region_repr,
         }
         r = self.client.post(self.count_url, data, **self.super_headers)
         self.assertEqual(r.status_code, 201)
         region_objects = Region.objects.filter(
             result__worker__username='admin',
-            grain__sample__pk=sample,
+            grain__sample=grain.sample,
         )
         self.assertEqual(region_objects.count(), 2)
         for r in region_objects:
@@ -729,6 +726,36 @@ class ApiCount(ApiTestMixin):
             vs = next(filter(lambda reg: len(reg) == vertex_count, regions))
             self.assertListEqual(vs, [[v.x, v.y] for v in vertices])
 
+    def test_upload_count_with_roi(self):
+        """
+        Uploads a count with an ROI (by both APIs which should do the same thing).
+        """
+        regions = [
+            [[10, 10], [30, 10], [20, 30]],
+            [[10, 50], [50, 30], [80, 90], [15, 99]]
+        ]
+        self._upload_count_with_roi(
+            Grain.objects.get(sample__pk=2, index=1),
+            regions,
+            json.dumps(regions),
+        )
+
+    def test_upload_count_with_dict_roi(self):
+        """
+        Uploads a count with an ROI (by both APIs which should do the same thing).
+        """
+        regions = [
+            [[10, 10], [30, 10], [20, 30]],
+            [[10, 50], [50, 30], [80, 90], [15, 99]]
+        ]
+        self._upload_count_with_roi(
+            Grain.objects.get(sample__pk=2, index=1),
+            regions,
+            json.dumps([
+                {"vertices": region, "shift": [0, 0]}
+                for region in regions
+            ]),
+        )
 
     def upload_contained_tracks(self, use_dict: bool):
         cts = [
