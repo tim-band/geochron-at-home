@@ -460,7 +460,7 @@ class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
     result = serializers.IntegerField(default=ResultSizeDefault())
     grain = GrainField()
     contained_tracks = serializers.SerializerMethodField()
-
+    regions = serializers.SerializerMethodField()
 
     def get_contained_tracks(self, obj):
         return [
@@ -468,6 +468,15 @@ class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
             for gp in obj.containedtrack_set.values()
         ]
 
+    def get_regions(self, obj):
+        region_qs = obj.region_set.all()
+        if not region_qs.exists():
+            return None
+        return [
+            [[vertex.x, vertex.y]
+            for vertex in region.vertex_set.all()]
+            for region in region_qs
+        ]
 
     def run_validation(self, data=...):
         ret = super().run_validation(data)
@@ -476,14 +485,19 @@ class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
         ret["grainpoints"] = gps
         ret["result"] = data.get("result", len(gps))
         ret["contained_tracks"] = self.validate_contained_tracks(data)
-        regions = data.get("regions", [])
+        ret["regions"] = self.validate_regions(data.get("regions", None))
+        return ret
+
+    def validate_regions(self, regions):
+        if regions is None:
+            return None
         if type(regions) is str:
             regions = json.loads(regions)
         elif type(regions) is list:
             regions = [json.loads(r) for r in regions]
         if type(regions) is not list:
-            raise ValidationError("regions should be a list")
-        ret["regions"] = []
+            raise ValidationError("regions should be a list or null")
+        regions_out = []
         for reg in regions:
             if type(reg) is dict and 'vertices' in reg:
                 reg = reg['vertices']
@@ -492,8 +506,8 @@ class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
             for v in reg:
                 if not(type(v) is list and len(v) == 2 and isinstance(v[0], numbers.Number) and isinstance(v[1], numbers.Number)):
                     raise ValidationError("Each vertex should be a list of two numbers")
-            ret["regions"].append(reg)
-        return ret
+            regions_out.append(reg)
+        return regions_out
 
     def validate_contained_tracks(self, data):
         ct_keys = ["x1_pixels", "y1_pixels", "z1_level", "x2_pixels", "y2_pixels", "z2_level"]
@@ -571,8 +585,8 @@ class FissionTrackNumberingSerializerLatLngs(FissionTrackNumberingSerializerBase
     """
     class Meta:
         model = FissionTrackNumbering
-        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst',
-            'result', 'create_date', 'latlngs', 'contained_tracks']
+        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst', 'regions',
+            'result', 'create_date', 'latlngs', 'contained_tracks',]
 
     latlngs = serializers.CharField(read_only=True)
 
@@ -583,7 +597,7 @@ class FissionTrackNumberingSerializerGps(FissionTrackNumberingSerializerBase):
     """
     class Meta:
         model = FissionTrackNumbering
-        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst',
+        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst', 'regions',
             'result', 'create_date', 'contained_tracks', 'grainpoints']
 
     grainpoints = serializers.SerializerMethodField()
