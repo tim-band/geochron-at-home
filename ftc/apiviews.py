@@ -553,7 +553,7 @@ class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
     def create(self, validated_data):
         points = validated_data.pop('grainpoints')
         contained_tracks = validated_data.pop('contained_tracks')
-        regions = validated_data.pop('regions')
+        regions = validated_data.pop('regions') or []
         worker = validated_data['worker']
         delete_params = {
             "grain": validated_data['grain'],

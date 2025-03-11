@@ -1008,9 +1008,9 @@ def get_grain_info(
     ft_type = ft_type
     [images_list, indices_list] = get_grain_images_list(grain, ft_type)
     matrix = grain.mica_transform_matrix if ft_type == 'I' else None
-    if specific == RoiSpecificity.GENERIC:
+    if specific == RoiSpecificity.SPECIFIC:
         regions = grain.get_regions_specific(user, analyst)
-    elif specific == RoiSpecificity.SPECIFIC:
+    elif specific == RoiSpecificity.GENERIC:
         regions = grain.get_regions_generic()
     else:
         regions = grain.get_regions_specific(user, analyst)
