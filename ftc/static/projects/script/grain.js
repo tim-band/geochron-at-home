@@ -261,7 +261,7 @@ function moveShift(ev, crystal) {
  * Returns normalized array of regions. This will remove repeated vertices
  * within the same region, exclude regions with fewer than three (unique)
  * vertices and reverse all anticlockwise regions. If no regions remain,
- * will return a single region with a single vertex at (0.5, 0.5).
+ * will return a default square.
  * @param {Array<Array<Array<number>>>} regions Array of regions, each of
  * which is an array of vertices, each of which is [lat,lng]
  * @returns 
@@ -294,7 +294,8 @@ function normalizeRegions(regions) {
         }
     });
     if (count === 0) {
-        regions = [[[0.5,0.5]]];
+        // Make a default square
+        regions = [[[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]]];
     }
     return regions;
 }
@@ -407,6 +408,9 @@ function cancelEdit(crystal) {
 }
 
 function beginEdit(crystal) {
+    removeRegionMarkers(crystal);
+    crystal.region_points = normalizeRegions(crystal.region_points);
+    crystal.region_layer.setLatLngs(crystal.region_points);
     addRegionMarkers(crystal);
     disable_element('edit');
     enable_element('save');
@@ -442,7 +446,6 @@ function beginShiftEdit(crystal) {
         iconAnchor: [13, 41],
         className: 'region-vertex-marker',
     });
-    crystal.region_points = normalizeRegions(crystal.region_points);
     var centroid = getCentroid(crystal.region_points);
     centroid.lat -= crystal.shift_y / crystal.image_width;
     centroid.lng += crystal.shift_x / crystal.image_width;

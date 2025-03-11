@@ -127,8 +127,8 @@ function setup() {
     });
     map.setTrackCounterElement(document.getElementById('tracknum'));
     document.getElementById('tracknum-submit').onclick = function() {
-        var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
-        map.submitTrackCount("{% url 'updateFtnResult'%}", submit_url);
+        var submit_redirect_url = "{{ submit_redirect_url }}" || "{% url 'counting' %}";
+        map.submitTrackCount("{% url 'updateFtnResult'%}", submit_redirect_url);
     };
     document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
     var save = document.getElementById('tracknum-save');
@@ -159,7 +159,7 @@ function setup() {
     if (cancel) {
         cancel.onclick = function() {
             map.cancelWithConfirm(
-                "{% url 'sample' sample_id %}"
+                "{{cancel_url}}"
             );
         };
     }

@@ -89,7 +89,7 @@
             </td>
             <td><a id="count-link-{{ g.index }}" href="{% url 'count_my' g.pk %}">Count</a></td>
             <td><a id="count-mica-link-{{ g.index }}" href="{% url 'count_my_mica' g.pk %}">Count Mica</a></td>
-            <td><a id="download-rois-{{ g.index }}" href="{% url 'download_grain_rois' g.pk %}" download="rois.json">Download ROI</a></td>
+            <td><a id="roi-page-{{ g.index }}" href="{% url 'grain' g.pk %}">ROI page</a></td>
             <td>
                 {% if result %}
                     <a id="public-{{ g.index }}" href="{% url 'public_sample' object.pk g.index %}">

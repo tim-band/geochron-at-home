@@ -1,8 +1,7 @@
-import os
-import json
-from ftc.models import Grain, Region, Vertex, Sample, Project
+from django.contrib.auth.models import User
+from ftc.models import Grain, RegionOfInterest
 
-def load_rois(grain, ft_type, matrix):
+def load_rois_from_regions(grain: Grain, ft_type: str, matrix, regions: RegionOfInterest):
     w = grain.image_width
     h = grain.image_height
     shift_x = 0
@@ -13,7 +12,7 @@ def load_rois(grain, ft_type, matrix):
         if grain.shift_y:
             shift_y = grain.shift_y / w
     rois = list()
-    for index, item in enumerate(grain.region_set.all()):
+    for _index, item in enumerate(regions.queryset()):
         vertices = item.vertex_set.order_by('id')
         latlng = list()
         # only 'Induced Fission Tracks' will shift coordinates
@@ -59,11 +58,7 @@ def transform2d_as_matrix(transform):
         [ transform.x1, transform.y1, transform.t1 ]
     ]
 
-def get_rois(grain):
-    """
-    Returns a python object that represents ROIs (and other
-    metadata) about the Grain.
-    """
+def get_rois_from_regions(grain: Grain, regions: RegionOfInterest):
     return {
         "grain_id": grain.id,
         "image_width": grain.image_width,
@@ -76,12 +71,30 @@ def get_rois(grain):
         "mica_stage_y": grain.mica_stage_y,
         "regions": list([
             rois_region(region, grain)
-            for region in grain.region_set.all()
+            for region in regions.queryset()
         ]),
         "mica_transform_matrix": transform2d_as_matrix(
             grain.mica_transform_matrix
         )
     }
+
+def get_rois(grain: Grain):
+    """
+    Returns a python object that represents ROIs (and other
+    metadata) about the Grain.
+
+    Only the generic ROI, not any user's.
+    """
+    return get_rois_from_regions(grain, grain.get_regions_generic())
+
+def get_rois_user(grain: Grain, user: User):
+    """
+    Returns a python object that represents ROIs (and other
+    metadata) about the Grain.
+
+    The ROI is the specified user's.
+    """
+    return get_rois_from_regions(grain, grain.get_regions_specific(user))
 
 def get_roiss(grains):
     return list([

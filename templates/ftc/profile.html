@@ -130,6 +130,8 @@ footer {
               <p>Download your project results. Download the results for offline analysis.</p>
               <p><a class="btn btn-default" href="{% url 'report'%}" role="button">View results &raquo;</a></p>
             </div>
+            {% endif%}
+            {% if user.is_staff or user_can_access_projects %}
             <div class="col-6 col-sm-6 col-lg-4">
               <h2>Manage projects</h2>
               <p>Add, remove and update your projects; upload crystal stacks.</p>
@@ -138,10 +140,9 @@ footer {
             {% endif%}
           </div>
         </div>
-
         <div class="col-xs-6 col-sm-3 sidebar-offcanvas" id="sidebar" role="navigation">
           <div class="list-group">
-            <a href="#" onclick="document.getElementById('logout-form').submit()" class="list-group-item active">Logout</a>
+            <a id="logout-button" href="#" onclick="document.getElementById('logout-form').submit()" class="list-group-item active">Logout</a>
             {% if user.username != "guest" %}
             <a href="{% url 'account_change_password'%}" class="list-group-item">Change password</a>
             {% endif %}

@@ -198,6 +198,7 @@ After=network.target
 Type=simple
 User=wwwrunner
 WorkingDirectory=/var/www/repos/geochron-at-home
+ExecStartPre=/usr/bin/python3 -m pipenv install
 ExecStartPre=/usr/bin/python3 -m pipenv run collect
 ExecStartPre=/usr/bin/python3 -m pipenv run migrate
 ExecStart=/usr/bin/python3 -m pipenv run gunicorn --log-level info --bind 127.0.0.1:39401 --workers=2 geochron.wsgi
@@ -408,18 +409,27 @@ the new samples.
 
 ## Running tests
 
-From the pipenv shell:
+From a normal shell:
 
 ```sh
-(geochron-at-home) $ pipenv requirements >requirements.txt
-(geochron-at-home) $ ./manage.py collectstatic
-(geochron-at-home) $ ./manage.py test
+pipenv run collect
+pipenv run test --shuffle 123
 ```
 
-You can test only the API tests by adding the option `--tag api` or
-only the selenium test by adding the option `--tag selenium`.
+or within a `pipenv` shell you can use:
 
-At present there are only these two types of test.
+```
+(geochron-at-home) $ ./manage collectstatic
+(geochron-at-home) $ ./manage test --shuffle 123
+```
+
+You only need to use the first line in each of these if the JavaScript, CSS
+and images have changed since last time this line was run.
+
+Running all the tests as `pipenv run test` (without the `--shuffle [SEED]`)
+causes failures in the Selenium tests for some reason. Perhaps Selenium
+has some throttling in it that is defeated when a lot of tests are not using
+Selenium at the start of the run.
 
 ### Running the tests with a different browser
 

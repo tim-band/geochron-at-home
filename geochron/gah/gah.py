@@ -758,7 +758,7 @@ def grain_new(opts, config):
 def output_json(opts, object):
     v = json.loads(object)
     indent = None if opts.compact else opts.indent
-    print(json.dumps(v, indent=indent), file=options.file)
+    print(json.dumps(v, indent=indent), file=opts.file)
 
 
 @token_refresh
@@ -1211,20 +1211,35 @@ def count_post(config, count: dict[any]):
         grain = str(count['grain'])
     else:
         raise Exception(f'A count should either have "grain": <grain_id> or "sample": <sample_id> and "index": <grain_index_within_sample>')
-    worker = count.get('user', count['worker']['username'])
-    create_date = count.get('date', count['create_date'])
+    worker = count.get('user', count.get('worker', {}).get('username', None))
+    create_date = count.get('date', count.get('create_date', None))
+    analyst = count.get('analyst')
+    if analyst:
+        if not worker:
+            worker = 'guest'
+        elif worker != 'guest':
+            print(f'Problem with grain {grain} If an analyst is set, worker (or user) must be "guest" (or unset)')
+            exit(2)
+    extra = {}
+    regions = count.get('regions', None)
+    if not regions:
+        regions = count.get('roi', {}).get('regions', None)
+    if regions:
+        extra['regions'] = json.dumps(regions)
+        print(f'with {len(regions)} regions')
     with api_post(
         config,
         'count',
         grain=grain,
         ft_type=count['ft_type'],
         worker=worker,
-        analyst=count.get('analyst'),
+        analyst=analyst,
         create_date=create_date,
         # points can be "points" or "grainpoints"
         grainpoints=json.dumps(count.get('grainpoints', count.get('points', []))),
         # contained tracks can be "lines" or "contained_tracks"
-        contained_tracks=json.dumps(count.get('contained_tracks', count.get('lines', [])))
+        contained_tracks=json.dumps(count.get('contained_tracks', count.get('lines', []))),
+        **extra
     ) as response:
         body = response.read()
         result = json.loads(body)
@@ -1241,11 +1256,10 @@ def count_upload(opts, config):
                 for obj in j:
                     if (type(obj) is not dict):
                         raise Exception("Item {} in the array is not an object".format(count))
-                    print("File {} iteration {}: grain {}, user {}".format(
+                    print("File {} iteration {}: grain {}".format(
                         file,
                         count,
                         obj['grain'] if 'grain' in obj else f"{obj['sample']}/{obj['index']}",
-                        obj.get('user', obj['worker'].get('username', 'not specified'))
                     ))
                     count_post(config, obj)
                     count += 1

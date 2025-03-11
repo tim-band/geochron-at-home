@@ -1,3 +1,4 @@
+from django.contrib import auth
 from django.core import mail
 from django.test import tag, LiveServerTestCase
 from django.urls import reverse
@@ -6,15 +7,19 @@ from selenium import webdriver
 from selenium.common import exceptions
 from selenium.webdriver.common.alert import Alert
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.remote.webdriver import WebDriver
 import glob
+import inspect
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
+import ftc
+import ftc.models
 
 def retrying(retries, f, delay=1):
     if retries == 1:
@@ -108,6 +113,10 @@ class BasePage:
         timeout seconds is reached (in which case an exception
         is thrown) or fn returns a truthy value.
         """
+        if len(inspect.signature(fn).parameters) == 0:
+            func = lambda _: fn()
+        else:
+            func = fn
         return WebDriverWait(
             self.driver,
             timeout=timeout,
@@ -116,7 +125,7 @@ class BasePage:
                 exceptions.ElementNotInteractableException,
                 exceptions.WebDriverException,
             ]
-        ).until(fn)
+        ).until(func)
 
     def get(self, url):
         def get_fn(driver):
@@ -150,6 +159,13 @@ class BasePage:
 
     def send_keys_to_css(self, css, keys):
         self.send_keys_by(By.CSS_SELECTOR, css, keys)
+
+    def assert_id_is(self, id):
+        """
+        Asserts that the last part of the URL is /{id}/
+        """
+        assert self.driver.current_url.endswith(f'/{id}/'), f'current URL {self.driver.current_url} does not end with /{id}/'
+        return self
 
 
 class HomePage(BasePage):
@@ -235,6 +251,10 @@ class SignInPage(BasePage):
         self.get(self.url + "/accounts/login")
         return self
 
+    def check(self):
+        self.find_by_css('form.form-sign input[name="password"]')
+        return self
+
     def sign_in(self, user):
         self.driver.find_element(
             By.CSS_SELECTOR,
@@ -304,9 +324,7 @@ class TutorialPage(BasePage):
         return self
 
     def check_markers_not_shown(self):
-        return WebDriverWait(self.driver, 2).until(
-            lambda _: self.are_markers_not_shown()
-        )
+        return self.wait_until(self.are_markers_not_shown)
 
     def click_hide_boxes(self):
         self.click_by_id('hide-boxes')
@@ -316,8 +334,20 @@ class ProfilePage(BasePage):
     def login_name(self):
         return self.driver.find_element(By.CLASS_NAME, 'fa-user').text
 
+    def logout(self):
+        self.click_by_id('logout-button')
+
     def check(self):
         self.find_by_xpath("//*[contains(@class,jumbotron)]/h2[contains(.,'Welcome')]")
+        return self
+
+    def check_manage_button_visible(self):
+        assert self.find_by_id('manage-link').is_displayed()
+        return self
+
+    def check_manage_button_not_visible(self):
+        self.check()
+        assert len(self.driver.find_elements(By.ID, 'manage-link')) == 0
         return self
 
     def go(self):
@@ -446,6 +476,9 @@ class CountingPage(GrainViewPage):
         )
         return self
 
+    def check_grain_id_is(self, id):
+        return self.assert_id_is(id)
+
     def try_click_at(self, x, y):
         mp = self.driver.find_element(By.ID, "map")
         lil = mp.find_element(By.CSS_SELECTOR,  'img.leaflet-image-layer')
@@ -526,7 +559,7 @@ class CountingPage(GrainViewPage):
         self.click_by_id("tracknum-cancel")
         if confirm:
             Alert(self.driver).accept()
-        return SamplePage(self.driver, self.url)
+        return GrainPage(self.driver, self.url)
 
     def drag_layer_handle(self, offset):
         track = self.driver.find_element(By.ID, "focus-slider")
@@ -648,12 +681,27 @@ class ProjectsPage(BasePage):
         self.click_by_id('create-project')
         return ProjectCreatePage(self.driver, self.url)
 
+    @staticmethod
+    def _project_xpath(name):
+        return '//tbody[@id="project-list"]/tr/td/a[text()="{0}"]'.format(name)
+
     def go_project(self, name):
         self.click_element(
             By.XPATH,
-            '//tbody[@id="project-list"]/tr/td/a[text()="{0}"]'.format(name)
+            self._project_xpath(name),
         )
         return ProjectPage(self.driver, self.url)
+
+    def check_project_is_link(self, name):
+        self.find_by_xpath(self._project_xpath(name))
+        return self
+
+    def check_project_does_not_have_link(self, name):
+        assert len(self.driver.find_elements(
+            By.XPATH,
+            '//tbody[@id="project-list"]/tr/td/a[text()="{0}"]'.format(name)
+        )) == 0
+        return self
 
 
 class SampleCreatePage(BasePage):
@@ -693,31 +741,23 @@ class SamplePage(BasePage):
         return GrainDetailPage(self.driver, self.url)
 
     def go_count(self, index):
-        self.click_element(
-            By.XPATH,
-            '//table[@id="grain-set"]/tbody/tr/td/a[@id="count-link-{0}"]'.format(index)
-        )
+        self.click_by_id('count-link-{0}'.format(index))
         return CountingPage(self.driver, self.url)
 
     def go_mica_count(self, index):
-        self.click_element(
-            By.XPATH,
-            '//table[@id="grain-set"]/tbody/tr/td/a[@id="count-mica-link-{0}"]'.format(index)
-        )
+        self.click_by_id('count-mica-link-{0}'.format(index))
         return CountingPage(self.driver, self.url)
 
     def go_public(self, index):
-        self.click_element(
-            By.XPATH,
-            '//table[@id="grain-set"]/tbody/tr/td/a[@id="public-{0}"]'.format(index)
-        )
+        self.click_by_id('public-{0}'.format(index))
         return PublicPage(self.driver, self.url)
 
+    def go_roi(self, index):
+        self.click_by_id('roi-page-{0}'.format(index))
+        return GrainPage(self.driver, self.url)
+
     def go_analyses(self, index):
-        self.click_element(
-            By.XPATH,
-            '//table[@id="grain-set"]/tbody/tr/td/a[@id="analyses-link-{0}"]'.format(index)
-        )
+        self.click_by_id('analyses-link-{0}'.format(index))
         return AnalysesPage(self.driver, self.url)
 
     def grain_present(self, pk):
@@ -895,6 +935,7 @@ def centre_y(elt):
 
 
 class GrainPage(BasePage):
+    # Page from which we can edit the ROI or count minerals or mica
     def get_image_width(self):
         return WebDriverWait(
             self.driver,
@@ -911,8 +952,12 @@ class GrainPage(BasePage):
         self.click_by_id('go_mica')
         return self
 
-    def go_grain(self):
-        self.click_by_id('go_grain')
+    def count_mineral(self):
+        self.click_by_id('count')
+        return self
+
+    def count_mica(self):
+        self.click_by_id('count-mica')
         return self
 
     #def go_update_metadata(self):
@@ -951,6 +996,35 @@ class GrainPage(BasePage):
         self.click_by_id('save')
         return self
 
+    def check_has_next_grain(self):
+        self.find_by_id('go_next')
+        return self
+
+    def check_has_no_next_grain(self):
+        elts = self.driver.find_elements(By.ID, 'go_next')
+        assert len(elts) == 0
+        return self
+
+    def check_has_previous_grain(self):
+        self.find_by_id('go_prev')
+        return self
+
+    def check_has_no_previous_grain(self):
+        elts = self.driver.find_elements(By.ID, 'go_prev')
+        assert len(elts) == 0
+        return self
+
+    def go_next_grain(self):
+        self.click_by_id('go_next')
+        return self
+
+    def go_previous_grain(self):
+        self.click_by_id('go_prev')
+        return self
+
+    def check_grain_id_is(self, id):
+        return self.assert_id_is(id)
+
     def check_saved(self):
         self.find_by_css('#edit:not([disabled])')
         self.find_by_css('#save[disabled]')
@@ -980,7 +1054,7 @@ class GrainPage(BasePage):
 
     def do_drag(self, dragee, dest_x, dest_y):
         def begin_drag(driver):
-            ActionChains(self.driver).click_and_hold(
+            ActionChains(driver).click_and_hold(
                 dragee
             ).move_by_offset(2, 2).move_by_offset(-2, -2).perform()
             # It seems selenium can grab the image below the marker
@@ -992,22 +1066,23 @@ class GrainPage(BasePage):
                 # Success! We have the marker!
                 return True
             # Failure! Let's drop whatever we did pick up.
-            ActionChains(self.driver).release().perform()
+            ActionChains(driver).release().perform()
             return False
-        WebDriverWait(
-            self.driver,
-            timeout=2
-        ).until(
-            begin_drag
-        )
+        self.wait_until(begin_drag)
         while self.do_partial_drag(dragee, dest_x, dest_y):
             pass
         ActionChains(self.driver).release().perform()
 
-    def marker_elements(self):
+    def marker_elements(self) -> list[WebDriver]:
         return self.driver.find_elements(
             By.CSS_SELECTOR,
             'img.region-vertex-marker'
+        )
+
+    def mid_marker_elements(self) -> list[WebDriver]:
+        return self.driver.find_elements(
+            By.CSS_SELECTOR,
+            'img.region-mid-marker'
         )
 
     def drag_marker(self, from_x_approx, from_y_approx, to_x, to_y):
@@ -1023,6 +1098,36 @@ class GrainPage(BasePage):
             to_x * rect['width'] + rect['x'],
             to_y * rect['height'] + rect['y']
         )
+        return self
+
+    def drag_mid_marker(self, from_x_approx, from_y_approx, to_x, to_y):
+        img = self.driver.find_element(By.CSS_SELECTOR, 'img.leaflet-image-layer')
+        rect = img.rect
+        markers = self.mid_marker_elements()
+        marker = find_best(markers, lambda m: sum_squares(
+            from_x_approx * rect['width'] + rect['x'] - pin_x(m),
+            from_y_approx * rect['height'] + rect['y'] - pin_y(m)
+        ))
+        self.do_drag(
+            marker,
+            to_x * rect['width'] + rect['x'],
+            to_y * rect['height'] + rect['y']
+        )
+        return self
+
+    def are_markers_square(self):
+        elts = self.marker_elements()
+        if len(elts) != 4:
+            return False
+        elt_xs = sorted([pin_x(e) for e in elts])
+        elt_ys = sorted([pin_y(e) for e in elts])
+        return (almost_equal(elt_xs[0], elt_xs[1])
+            and almost_equal(elt_xs[2], elt_xs[3])
+            and almost_equal(elt_ys[0], elt_ys[1])
+            and almost_equal(elt_ys[2], elt_ys[3]))
+
+    def check_markers_are_square(self):
+        self.wait_until(self.are_markers_square)
         return self
 
 
@@ -1069,6 +1174,7 @@ class WebUploader:
                 hash_ = hash(contents)
                 self.hashes[hash_] = number
         navbar = NavBar(self.driver, self.url)
+        time.sleep(0.3)  # attempting to avoid 429 (too many requests) errors
         edit_projects = navbar.go_edit_projects()
         project_page = edit_projects.create_project().create('p1', 'description', 1, False)
         sample_page = project_page.create_sample().create('s1', 'T', 1, 1, False)
@@ -1090,6 +1196,7 @@ class SeleniumTests(LiveServerTestCase):
     def setUp(self):
         self.project_user = User("admin", "admin@uni.ac.uk", "admin_password")
         self.test_user = User("tester", "tester@test.com", "MyPaSsW0rd")
+        self.counter_user = User("counter", "counter@uni.ac.uk", "counter_password")
         self.tmp = None
         browser = os.environ.get('BROWSER')
         if browser == 'firefox':
@@ -1102,20 +1209,43 @@ class SeleniumTests(LiveServerTestCase):
                 ],
             )
             self.driver = webdriver.Firefox(service=self.service)
-        elif browser == 'chrome':
-            self.driver = webdriver.Chrome()
-        else:
-            self.driver = webdriver.chromium.webdriver.ChromiumDriver(
-                service=webdriver.chromium.service.ChromiumService(
-                    'chromium.chromedriver',
-                    start_error_message='Failed to start chromedriver for Geochron@Home'
-                )
+        elif browser == 'chromium':
+            options = webdriver.ChromeOptions()
+            options.binary_location = shutil.which("chromium")
+            service = webdriver.ChromeService(
+                executable_path=shutil.which("chromium.chromedriver")
             )
+            self.driver = webdriver.Chrome(options=options, service=service)
+        else:
+            self.driver = webdriver.Chrome()
 
     def sign_in(self, user):
         return SignInPage(self.driver, self.live_server_url).go().sign_in(user)
 
+    def sign_out(self):
+        pp = self.go_profile_page()
+        pp.logout()
+
+    def go_profile_page(self):
+        return ProfilePage(self.driver, self.live_server_url).go()
+
+    def navbar(self):
+        return NavBar(self.driver, self.live_server_url)
+
+    def home_page(self):
+        return HomePage(self.driver, self.live_server_url).go()
+
+    def go_project(self, p):
+        return ProjectsPage(self.driver, self.live_server_url).go(
+        ).check().go_project(p)
+
     def tearDown(self):
+        if (any(map(lambda v: v[0] == self, self._outcome.result.errors))
+            or any(map(lambda v: v[0] == self, self._outcome.result.failures))
+        ):
+            Path('./test/screenshots').mkdir(parents=True, exist_ok=True)
+            if not self.driver.save_screenshot(f'./test/screenshots/{self._testMethodName}.png'):
+                print("failed to save screenshot")
         self.driver.close()
         if self.tmp is not None:
             os.rmdir(self.tmp)
@@ -1132,8 +1262,8 @@ class WithTutorials(SeleniumTests):
     ]
     def test_tutorial_makes_counting_possible(self):
         # sign in as this new user
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
-        navbar = NavBar(self.driver, self.live_server_url)
+        profile = self.sign_in(self.test_user)
+        navbar = self.navbar()
 
         # attempt to count, get a refusal, so do the tutorial
         profile.check_cannot_count()
@@ -1145,7 +1275,7 @@ class WithTutorials(SeleniumTests):
         navbar.logout()
 
         # do the same thing with John (checking that test_user's completion does not interfere)
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
+        profile = self.sign_in(self.project_user)
         profile.check_cannot_count().go_tutorial(
         ).check_markers_shown(
         ).get_to_end_and_finish().check()
@@ -1153,26 +1283,26 @@ class WithTutorials(SeleniumTests):
         navbar.logout()
 
         # check guest cannot count
-        HomePage(self.driver, self.live_server_url).become_guest().check_cannot_count(
+        home_page = self.home_page()
+        home_page.become_guest().check_cannot_count(
         ).go_tutorial(
         ).check_markers_shown(
         ).get_to_end_and_finish().check()
         # but then can
-        HomePage(self.driver, self.live_server_url).become_guest()
+        home_page.become_guest()
         CountingPage(self.driver, self.live_server_url).check()
         # but then cannot
         navbar.logout()
-        HomePage(self.driver, self.live_server_url).become_guest().check_cannot_count()
+        home_page.become_guest().check_cannot_count()
 
         # check we can still get counting after logging back in as test_user
         navbar.logout()
-        SignInPage(self.driver, self.live_server_url).go().sign_in(
+        self.sign_in(
             self.test_user
         ).go_start_counting().check()
 
     def test_user_can_hide_boxes_in_tutorial(self):
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
-
+        profile = self.sign_in(self.test_user)
         # attempt to count, get a refusal, so do the tutorial
         profile.check_cannot_count()
         tutorial = profile.go_tutorial()
@@ -1190,19 +1320,18 @@ class FromCleanWithTutorialsDone(SeleniumTests):
     ]
     def test_onboard(self):
         # Upload Z-Stack images
-        HomePage(self.driver, self.live_server_url).go()
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
+        profile = self.sign_in(self.project_user)
         uploader = WebUploader(self.driver, self.live_server_url)
         uploader.upload_projects('test/crystals')
-        navbar = NavBar(self.driver, self.live_server_url)
-        navbar.logout()
+        self.sign_out()
 
         # create user
-        join_page = HomePage(self.driver, self.live_server_url).go().join()
+        join_page = self.home_page().join()
         join_page.check().fill_in(self.test_user).check(self.test_user)
-        ConfirmPage(self.driver, self.live_server_url).go().check(self.test_user).confirm()
+        sign_in_page = ConfirmPage(self.driver, self.live_server_url).go().check(self.test_user).confirm()
 
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
+        time.sleep(0.4)  # it seems we're in danger of causing a 429 (too many requests)
+        sign_in_page.check().sign_in(self.test_user).check()
         counting = profile.go_start_counting().check()
         self.assertEqual(uploader.get_index(counting.image_displayed_url()), 1)
         self.assertEqual(uploader.get_index(counting.drag_layer_handle(0.33).image_displayed_url()), 2)
@@ -1222,21 +1351,8 @@ class FromCleanWithTutorialsDone(SeleniumTests):
     def rois_file_name(self):
         return os.path.abspath('test/crystals/john/p1/s1/Grain01/rois.json')
 
-    def markers_are_square(self, driver):
-        zstack = GrainPage(driver)
-        elts = zstack.marker_elements()
-        if len(elts) != 4:
-            return False
-        elt_xs = sorted([pin_x(e) for e in elts])
-        elt_ys = sorted([pin_y(e) for e in elts])
-        return (almost_equal(elt_xs[0], elt_xs[1])
-            and almost_equal(elt_xs[2], elt_xs[3])
-            and almost_equal(elt_ys[0], elt_ys[1])
-            and almost_equal(elt_ys[2], elt_ys[3]))
-
     def test_manage(self):
-        HomePage(self.driver, self.live_server_url).go()
-        project = SignInPage(self.driver, self.live_server_url).go().sign_in(
+        project = self.sign_in(
             self.project_user
         ).go_manage().create_project().create(
             "test_manage",
@@ -1271,8 +1387,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
             images[1]
         )
         # Go to the zstack and check the rois is a rectangle
-        zstack = grain.go_zstack().edit()
-        WebDriverWait(self.driver, 2).until(self.markers_are_square)
+        zstack = grain.go_zstack().edit().check_markers_are_square()
         zstack.cancel().go_mica().edit_shift()
         elts = zstack.marker_elements()
         self.assertEqual(len(elts), 1, msg="should have one marker for mica shift editing")
@@ -1379,8 +1494,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
         self.assertNotAlmostEqual(float(y), 45)
 
     def test_explicit_grain_index(self):
-        HomePage(self.driver, self.live_server_url).go()
-        project = SignInPage(self.driver, self.live_server_url).go().sign_in(
+        project = self.sign_in(
             self.project_user
         ).go_manage().create_project().create(
             "test_explicit_grain_index",
@@ -1399,7 +1513,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
         self.assertEqual(grain.get_grain_index(), explicit_index)
         sample_page = SamplePage(self.driver, self.live_server_url).go(sample_pk).check()
         other_explicit_index = 22
-        grain2 = sample_page.create_grain().create([
+        sample_page.create_grain().create([
             self.grain_file_name(2),
             self.mica_file_name(1),
             self.grain_file_name(3)
@@ -1409,6 +1523,34 @@ class FromCleanWithTutorialsDone(SeleniumTests):
         ).delete().confirm_delete()
         assert sample.grain_present(other_explicit_index)
         assert not sample.grain_present(explicit_index)
+
+
+class WithProjectsAndTwoNonStaffUsers(SeleniumTests):
+    fixtures = [
+        'essential.json',
+        'users.json',
+        'test_user.json',
+        'counter_verification.json',
+        'projects.json',
+        'samples.json',
+        'grains.json',
+    ]
+    def test_non_staff_on_projects_can_access_grain_count(self):
+        profile_page = self.sign_in(
+            self.counter_user
+        ).check_manage_button_not_visible()
+        counter = auth.models.User.objects.get(pk=103)
+        workg = auth.models.Group.objects.create(name="work")
+        workg.user_set.add(counter)
+        profile_page.go().check_manage_button_not_visible()
+        project1 = ftc.models.Project.objects.get(pk=1)
+        project1.groups_who_have_access.add(workg)
+        manage_page = profile_page.go().check_manage_button_visible().go_manage()
+        manage_page.check_project_is_link(project1.project_name)
+        project2 = ftc.models.Project.objects.get(pk=2)
+        manage_page.check_project_does_not_have_link(project2.project_name)
+        project_page = manage_page.go_project(project1.project_name).check()
+        project_page.go_sample('adm_samp').go_count(1).check()
 
 
 class WithOneGrainUploaded(SeleniumTests):
@@ -1490,11 +1632,11 @@ class WithOneGrainUploaded(SeleniumTests):
 
         # save intermediate result and logout
         counting.save()
-        navbar = NavBar(self.driver)
+        navbar = self.navbar()
         navbar.logout()
 
         # login, check no results yet
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.project_user)
+        profile = self.sign_in(self.project_user)
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
@@ -1506,7 +1648,7 @@ class WithOneGrainUploaded(SeleniumTests):
         navbar.check().logout()
 
         # login as test user, we should still see the saved result
-        profile = SignInPage(self.driver, self.live_server_url).go().sign_in(self.test_user)
+        profile = self.sign_in(self.test_user)
         counting = profile.go_start_counting().check()
         counting.check_count("004")
 
@@ -1515,8 +1657,7 @@ class WithOneGrainUploaded(SeleniumTests):
 
         # see this result, as project admin
         navbar.check().logout().check()
-        profile = SignInPage(self.driver, self.live_server_url).go()
-        profile.check().sign_in(self.project_user)
+        profile = self.sign_in(self.project_user)
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
@@ -1533,15 +1674,13 @@ class WithTwoGrainsUploaded(SeleniumTests):
 
     def test_count_link(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
+        samples = self.go_project('p1')
         counting = samples.go_sample('s1').check().go_count(1)
         counting.check()
 
     def test_revisit_own_count(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
+        samples = self.go_project('p1')
         counting = samples.go_sample('s1').go_count(1).check()
         self.assertFalse(counting.undo_available())
         self.assertFalse(counting.redo_available())
@@ -1549,21 +1688,20 @@ class WithTwoGrainsUploaded(SeleniumTests):
         counting.click_at(0.5, 0.25)
         counting.check_count("002")
         counting.next(confirm=True)
-        counting.check_count("000")
+        counting.check_count("000").check_grain_id_is(5)
         counting.click_at(0.51, 0.44)
         counting.check_count("001")
         counting.previous(confirm=True)
-        counting.check_count("002")
-        counting.next()
-        counting.check_count("001")
-        counting.cancel(confirm=False).check(grain_present=1).go_count(1).check()
+        counting.check_count("002").check_grain_id_is(1)
+        counting.next().check_count("001").check_grain_id_is(5)
+        grain_page = counting.cancel(confirm=False).check()
+        grain_page.check_grain_id_is(5).count_mineral()
         counting.click_at(0.51, 0.24)
-        counting.cancel(confirm=True).check(grain_present=1)
+        counting.cancel(confirm=True).check().check_grain_id_is(5)
 
     def test_can_count_mica(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
+        samples = self.go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1)
         counting.click_at(0.6, 0.35)
         counting.click_at(0.5, 0.25)
@@ -1600,8 +1738,7 @@ class WithTwoGrainsUploaded(SeleniumTests):
         })
         assert r.status_code < 400
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
+        samples = self.go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1).check()
         # This position is not within the shifted ROI
         counting.click_at(0.75, 0.7)
@@ -1620,9 +1757,7 @@ class WithTwoGrainsUploaded(SeleniumTests):
         counting.check_count("002").submit()
         # we must wait for the new grain to appear
         retrying(3, lambda: counting.check_count("000"))
-        projects.go()
-        projects.check()
-        samples = projects.go_project('p1')
+        samples = projects.go().check().go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1)
         counting.check_count("000").next().check_count("000")
         counting.click_at(0.75, 0.7).check_count("001")
@@ -1630,8 +1765,7 @@ class WithTwoGrainsUploaded(SeleniumTests):
         retrying(3, lambda: counting.check_count("000"))
         counting.next()
         counting.check_count("001").submit()
-        projects.go()
-        report = NavBar(self.driver).go_manage_projects()
+        report = self.navbar().go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
         self.assertEqual(report.result("1"), "2")
@@ -1649,20 +1783,13 @@ class OneGrainWithoutMica(SeleniumTests):
 
     def test_mica_count_goes_past_grain_with_no_mica_images(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/3/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/5/')
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_mica_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/5/')
+        samples = self.go_project('p1')
+        counting = samples.go_sample('s1').go_count(1).check().check_grain_id_is(1)
+        counting.next().check().check_grain_id_is(3)
+        counting.next().check().check_grain_id_is(5)
+        samples = self.go_project('p1')
+        counting = samples.go_sample('s1').go_mica_count(1).check().check_grain_id_is(1)
+        counting.next().check().check_grain_id_is(5)
 
 class OneGrainWithoutMineral(SeleniumTests):
     fixtures = [
@@ -1676,20 +1803,86 @@ class OneGrainWithoutMineral(SeleniumTests):
 
     def test_mineral_count_goes_past_grain_with_no_mineral_images(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_mica_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/4/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/5/')
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
-        counting.next().check()
-        assert self.driver.current_url.endswith('/5/')
+        samples = self.go_project('p1')
+        counting = samples.go_sample('s1').go_mica_count(1).check().check_grain_id_is(1)
+        counting.next().check().check_grain_id_is(4)
+        counting.next().check().check_grain_id_is(5)
+        samples = self.go_project('p1')
+        counting = samples.go_sample('s1').go_count(1).check().check_grain_id_is(1)
+        counting.next().check().check_grain_id_is(5)
+
+class WithGroups(SeleniumTests):
+    fixtures = [
+        'essential.json',
+        'groups.json',
+        'grain_with_images.json',
+        'grain_with_images_mineral_only.json',
+        'grain_with_images5.json',
+        'tutorial_result_admin.json',
+        'tutorial_result_tester.json',
+        'counter_verification.json',
+    ]
+
+    def setUp(self):
+        counter = auth.models.User.objects.get(pk=103)
+        workg = auth.models.Group.objects.get(pk=1)
+        workg.user_set.add(counter)
+        self.project1 = ftc.models.Project.objects.get(pk=1)
+        self.project1.groups_who_have_access.add(workg)
+        return super().setUp()
+
+    def test_user_with_project_access_can_navigate_grains(self):
+        project_page = self.sign_in(self.counter_user).go_manage().check(
+        ).go_project(self.project1.project_name)
+        sample_page = project_page.go_sample('s1').check()
+        grain_page = sample_page.go_roi(1).check()
+        grain_page.check_has_no_previous_grain().check_grain_id_is(1).go_next_grain()
+        grain_page.check_has_next_grain().check_has_previous_grain().check_grain_id_is(3)
+        grain_page.check_has_previous_grain().go_next_grain().check_grain_id_is(5)
+        grain_page.check_has_no_next_grain().go_previous_grain().check_grain_id_is(3)
+        grain_page.go_previous_grain().check_grain_id_is(1).check_has_no_previous_grain()
+
+    def go_to_grain_edit_as_user(self, user):
+        project_page = self.sign_in(user).go_manage().check(
+        ).go_project(self.project1.project_name)
+        sample_page = project_page.go_sample('s1').check()
+        return sample_page.go_roi(1).check().edit()
+
+    def go_to_grain_edit_as_counter(self):
+        return self.go_to_grain_edit_as_user(self.counter_user)
+
+    def go_to_grain_edit_as_project_owner(self):
+        return self.go_to_grain_edit_as_user(self.project_user)
+
+    def test_user_can_edit_own_roi(self):
+        navbar = self.navbar()
+        zstack = self.go_to_grain_edit_as_project_owner()
+        # Make  it some sort of pentagon
+        zstack.drag_mid_marker(0.5, 0.5, 0.8, 0.8
+        ).drag_mid_marker(0.1, 0.5, 0.2, 0.4).save()
+        navbar.logout()
+        self.go_to_grain_edit_as_counter()
+        # The default rois is a rectangle
+        zstack.check_markers_are_square()
+        # Make ROI a triangle
+        time.sleep(0.5)  # sorry
+        zstack.drag_marker(0.8, 0.8, 0.2, 0.8).save()
+        navbar.logout()
+        self.go_to_grain_edit_as_project_owner()
+        # Check it has the previous ROI
+        self.assertEqual(len(zstack.marker_elements()), 5)
+        navbar.logout()
+        self.go_to_grain_edit_as_counter()
+        # Check the rois is still a triangle
+        elts = zstack.marker_elements()
+        self.assertEqual(len(elts), 3, msg="not three markers")
+        elt_xs = sorted([pin_x(e) for e in elts])
+        elt_ys = sorted([pin_y(e) for e in elts])
+        self.assertAlmostEqual(elt_xs[0], elt_xs[1], msg="left side not straight")
+        self.assertNotAlmostEqual(elt_xs[2], elt_xs[1], msg="triangle is flat")
+        self.assertNotAlmostEqual(elt_ys[1], elt_ys[2], msg="triangle is flat")
+        self.assertAlmostEqual(elt_ys[0], elt_ys[1], msg="bottom side not straight")
+
 
 class GrainsWithDifferentlySizedRegions(SeleniumTests):
     fixtures = [
@@ -1727,15 +1920,11 @@ class GrainsWithDifferentlySizedRegions(SeleniumTests):
 
     def test_region_is_zoomed_to_fit(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_count(1).check()
-        assert self.driver.current_url.endswith('/1/')
+        samples = self.go_project('p1')
+        counting = samples.go_sample('s1').go_count(1).check().check_grain_id_is(1)
         self.assert_all_markers_are_close_to_edge(counting)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
-        counting = samples.go_sample('s1').go_count(6).check()
-        assert self.driver.current_url.endswith('/6/')
+        samples = self.go_project('p1')
+        counting = samples.go_sample('s1').go_count(6).check().check_grain_id_is(6)
         self.assert_all_markers_are_close_to_edge(counting)
 
 class RegionWithHole(SeleniumTests):
@@ -1770,8 +1959,7 @@ class PublicPageResults(SeleniumTests):
     ]
     def test_public_results_count(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('p1')
+        samples = self.go_project('p1')
         public_page = samples.go_sample('s1').go_public(3).check()
         # There are three tracks, but only two are within the ROI
         assert public_page.track_count() == 2
@@ -1785,8 +1973,7 @@ class AnalysesWithoutRegions(SeleniumTests):
     ]
     def test_analyses_without_regions_shows_all_markers(self):
         self.sign_in(self.project_user)
-        samples = ProjectsPage(self.driver, self.live_server_url).go(
-        ).check().go_project('proj1')
+        samples = self.go_project('proj1')
         anayses_page = samples.go_sample('adm_samp').go_analyses(1).check()
         grain_view = anayses_page.go_analysis('terry')
         self.assertEqual(len(grain_view.all_markers()), 3)

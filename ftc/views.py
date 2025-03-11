@@ -1,4 +1,3 @@
-from typing import Any, Dict
 from django.shortcuts import render, get_object_or_404
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, Subquery, Prefetch
@@ -13,22 +12,26 @@ from django.urls import reverse
 from django.http import (HttpResponse, HttpResponseRedirect,
     HttpResponseForbidden)
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import redirect
 
 from ftc.apiviews import request_roiss
 from ftc.get_image_size import get_image_size_from_handle
-from ftc.load_rois import get_rois
+from ftc.grain_uinfo import choose_working_grain
+from ftc.load_rois import get_rois, load_rois_from_regions
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex, GrainPointCategory,
-    TutorialPage)
+    TutorialPage, RegionOfInterest)
 from ftc.parse_image_name import parse_upload_name
 from geochron.gah.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
 
 import csv
+import enum
 import io
 import json
 
@@ -36,11 +39,32 @@ import json
 def home(request):
     return render(request, 'ftc/home.html', {})
 
+def projects_user_can_access(user: User):
+    if user.is_superuser:
+        return Project.objects.all()
+    if user_is_staff(user):
+        return Project.objects.filter(
+            Q(groups_who_have_access__user=user)
+            | Q(creator=user)
+        )
+    return Project.objects.filter(groups_who_have_access__user=user)
+
+def user_has_access_to_any_projects(user: User):
+    return projects_user_can_access(user).exists()
+
+def user_is_in_access_group_for_project(user: User, project: Project):
+    # Does a group g exist such that
+    # user in g.user_set and g in project.groups_who_have_access
+    return Project.objects.filter(
+        groups_who_have_access__user=user
+    )
+
 # the view for /accounts/profile/
 def profile(request):
     if request.user.is_authenticated:
         return render(request, 'ftc/profile.html', {
-            'tutorial_completed': tutorialCompleted(request)
+            'tutorial_completed': tutorialCompleted(request),
+            'user_can_access_projects': user_has_access_to_any_projects(request.user),
         })
     else:
         return redirect('account_login') # 'home'
@@ -57,13 +81,9 @@ def tutorial(request):
     tp = TutorialPage.objects.filter(active=True).order_by('sequence_number', 'pk').first()
     return redirect('tutorial_page', tp.pk)
 
-# Fission tracks measuring report
-from django.contrib.auth.decorators import login_required, user_passes_test
-
 def user_is_staff(user):
     return user.is_active and user.is_staff
 
-#@user_passes_test(user_is_staff)
 @login_required
 def report(request):
     if request.user.is_active and request.user.is_staff:
@@ -77,14 +97,14 @@ def report(request):
         else:
             return render(request, 'ftc/report.html', {'projects': projects})
     else:
-        return HttpResponse("Sorry, You don't have permission to access the requested page.",
-            status=403)
+        raise PermissionDenied
 
 
-@user_passes_test(user_is_staff)
 def projects(request):
+    if not (user_is_staff(request.user) or user_has_access_to_any_projects(request.user)):
+        raise PermissionDenied
     return render(request, "ftc/projects.html", {
-        'projects': Project.objects.all()
+        'projects': projects_user_can_access(request.user)
     })
 
 
@@ -99,6 +119,17 @@ class CreatorOrSuperuserMixin(UserPassesTestMixin):
         return (
             self.request.user == self.object.get_owner()
             or self.request.user.is_superuser
+        )
+
+
+class UserHasProjectAccess(UserPassesTestMixin):
+    def test_func(self):
+        object = self.model.objects.get(pk=self.kwargs['pk'])
+        user = self.request.user
+        return (
+            user == object.get_owner()
+            or user.is_superuser
+            or object.user_has_access(user)
         )
 
 
@@ -125,7 +156,7 @@ class ParentCreatorOrSuperuserMixin(UserPassesTestMixin):
         )
 
 
-class ProjectDetailView(StaffRequiredMixin, DetailView):
+class ProjectDetailView(UserHasProjectAccess, DetailView):
     model = Project
     template_name = "ftc/project.html"
 
@@ -153,7 +184,7 @@ class ProjectUpdateView(CreatorOrSuperuserMixin, UpdateView):
     template_name = "ftc/project_update.html"
 
 
-class SampleDetailView(CreatorOrSuperuserMixin, DetailView):
+class SampleDetailView(UserHasProjectAccess, DetailView):
     model = Sample
     template_name = "ftc/sample.html"
 
@@ -186,7 +217,7 @@ def json_array(arr):
     return '[' + ','.join(arr) + ']'
 
 
-class GrainDetailView(StaffRequiredMixin, DetailView):
+class GrainDetailView(UserHasProjectAccess, DetailView):
     model = Grain
     template_name = "ftc/grain.html"
     ft_type = 'S'
@@ -200,7 +231,9 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
                 self.json_latlng((h - vertex.y) / w, vertex.x / w)
                 for vertex in region.vertex_set.order_by('id').iterator()
             ])
-            for region in self.object.region_set.order_by('id').iterator()
+            for region in self.object.get_regions_specific(
+                self.request.user
+            ).queryset().order_by('id').iterator()
         ])
     def get_context_data(self, *args, **kwargs):
         ctx = super().get_context_data(*args, **kwargs)
@@ -212,6 +245,15 @@ class GrainDetailView(StaffRequiredMixin, DetailView):
         shift = self.get_shift()
         ctx['shift_x'] = shift[0]
         ctx['shift_y'] = shift[1]
+        (prev_grain, next_grain) = prev_and_next_grains(
+            self.request.user,
+            self.kwargs['pk'],
+            self.ft_type
+        )
+        if prev_grain is not None:
+            ctx['previous_pk'] = prev_grain.pk
+        if next_grain is not None:
+            ctx['next_pk'] = next_grain.pk
         return ctx
 
 class MicaDetailView(GrainDetailView):
@@ -432,14 +474,6 @@ class GrainForm(ModelForm):
             max_index = 0
         self.grain_index = max_index + 1
 
-    def explicit_grain(self, grain):
-        """
-        Set the grain explicitly
-        """
-        self.sample = None
-        self.grain = grain
-        self.grain_index = grain.index
-
     def delete_regions(self):
         Region.objects.filter(grain=self.instance).delete()
 
@@ -463,9 +497,11 @@ class GrainForm(ModelForm):
                 )
 
     def save(self, commit=True):
-        self.instance.index = self.grain_index
-        if self.sample is not None:
-            self.instance.sample = self.sample
+        if hasattr(self, 'grain_index'):
+            self.instance.index = self.grain_index
+        sample = getattr(self, 'sample', None)
+        if sample is not None:
+            self.instance.sample = sample
         for attr in ['image_width', 'image_height', 'scale_x', 'scale_y',
             'stage_x', 'stage_y', 'shift_x', 'shift_y']:
             if attr in self.cleaned_data:
@@ -527,18 +563,10 @@ class GrainDeleteView(CreatorOrSuperuserMixin, DeleteView):
     def get_success_url(self):
         return reverse('sample', args=[self.object.sample.id])
 
-class GrainImagesView(CreatorOrSuperuserMixin, UpdateView):
+class GrainImagesView(UserHasProjectAccess, UpdateView):
     model = Grain
     template_name = "ftc/grain_images.html"
     form_class = GrainForm
-    def post(self, request, *args, **kwargs):
-        form_class = self.get_form_class()
-        form = self.get_form(form_class)
-        form.explicit_grain(self.object)
-        if not form.is_valid():
-            return self.form_invalid(form)
-        return self.form_valid(form)
-
     def get_success_url(self):
         return reverse('grain_images', kwargs={'pk': self.object.pk})
 
@@ -610,18 +638,6 @@ def publicSample(request, sample, grain):
     )
     return render(request, 'ftc/public.html', ctx)
 
-@csrf_protect
-def grainUserResult(request, grain, user):
-    g = Grain.objects.get(pk=grain)
-    if not request.user.is_authenticated and not g.sample.public:
-        raise PermissionDenied('not a public grain')
-    ctx = get_grain_info(
-        user,
-        grain,
-        'S',
-    )
-    return render(request, 'ftc/public.html', ctx)
-
 class GrainAnalysesView(UserPassesTestMixin, ListView):
     model = FissionTrackNumbering
     template_name = "ftc/grain_analysts_list.html"
@@ -654,16 +670,14 @@ def grainAnalystResult(request, grain, analyst):
         User.objects.get(username__exact='guest'),
         grain,
         'S',
-        analyst=analyst
+        analyst=analyst,
+        specific=RoiSpecificity.SPECIFIC_IF_AVAILABLE,
     )
     return render(request, 'ftc/public.html', ctx)
 
 @csrf_protect
-@user_passes_test(user_is_staff)
 def grain_update_roi(request, pk):
     grain = Grain.objects.get(pk=pk)
-    if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
-        return HttpResponse("Grain update forbidden", status=403)
     regions = {}
     for k,v in request.POST.items():
         ps = k.rsplit("_", 3)
@@ -687,9 +701,43 @@ def grain_update_roi(request, pk):
     w = grain.image_width
     h = grain.image_height
     with transaction.atomic():
-        Region.objects.filter(grain=grain).delete()
+        if request.user == grain.sample.in_project.creator:
+            result = None
+        elif user_is_in_access_group_for_project(
+            request.user,
+            grain.sample.in_project,
+        ):
+            result_filter = FissionTrackNumbering.objects.filter(
+                grain=grain,
+                worker=request.user,
+            )
+            result_count = result_filter.count()
+            if 1 < result_count:
+                result_filter.limit(result_count - 1).delete()
+            if 0 < result_count:
+                result = result_filter.first()
+            else:
+                result = FissionTrackNumbering(
+                    grain=grain,
+                    ft_type='S',
+                    worker=request.user,
+                    result=-1,
+                )
+                result.save()
+        elif request.user.is_superuser:
+            # superusers can still edit the generic ROI if they
+            # aren't project users
+            result = None
+        else:
+            raise PermissionDenied
+        region_filter = Q(grain=grain)
+        if result is None:
+            region_filter &= Q(result__isnull=True)
+        else:
+            region_filter &= Q(result=result)
+        Region.objects.filter(region_filter).delete()
         for _, vertices in sorted(regions.items()):
-            region = Region(grain=grain)
+            region = Region(grain=grain, result=result)
             region.save()
             for _, v in sorted(vertices.items()):
                 x = float(v['x']) * w
@@ -700,8 +748,9 @@ def grain_update_roi(request, pk):
     return redirect('grain', pk=pk)
 
 @csrf_protect
-@user_passes_test(user_is_staff)
 def grain_update_shift(request, pk):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     grain = Grain.objects.get(pk=pk)
     if not request.user.is_superuser and not request.user == grain.sample.in_project.creator:
         return HttpResponse("Grain update forbidden", status=403)
@@ -711,8 +760,9 @@ def grain_update_shift(request, pk):
     return redirect('mica', pk=pk)
 
 @login_required
-@user_passes_test(user_is_staff)
 def getTableData(request):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     # http://owtrsnc.blogspot.co.uk/2013/12/sending-ajax-data-json-to-django.html
     # http://jonblack.org/2012/06/22/django-ajax-class-based-views/
     # assuming request.body contains json data which is UTF-8 encoded
@@ -759,14 +809,15 @@ def json_grain_result(grain):
             },
             'latlngs': result.get_latlngs()
         })
+    area_pixels = result.roi_area_pixels()
     j = {
         'grain': grain.id,
         'sample': grain.sample.id,
         'sample_name': grain.sample.sample_name,
         'project_name': grain.sample.in_project.project_name,
         'results': res,
-        'area_pixels': grain.roi_area_pixels(),
-        'area_mm2': grain.roi_area_mm2()
+        'area_pixels': area_pixels,
+        'area_mm2': grain.pixels_to_mm2(area_pixels)
     }
     for field in [
         'id', 'index', 'image_width', 'image_height',
@@ -807,8 +858,9 @@ def getGrainsWithResults(request):
     return grains
 
 @login_required
-@user_passes_test(user_is_staff)
 def download_rois(request, pk):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     grain = Grain.objects.get(id=pk)
     return HttpResponse(
         json.dumps(get_rois(grain)),
@@ -816,16 +868,18 @@ def download_rois(request, pk):
     )
 
 @login_required
-@user_passes_test(user_is_staff)
 def download_roiss(request):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     return HttpResponse(
         json.dumps(request_roiss(request)),
         content_type='application/json'
     )
 
 @login_required
-@user_passes_test(user_is_staff)
 def getJsonResults(request):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     grains = getGrainsWithResults(request)
     result = [json_grain_result(g) for g in grains.values()]
     return HttpResponse(
@@ -834,8 +888,9 @@ def getJsonResults(request):
     )
 
 @login_required
-@user_passes_test(user_is_staff)
 def getCsvResults(request):
+    if not user_is_staff(request.user):
+        raise PermissionDenied
     grains = getGrainsWithResults(request)
     response = HttpResponse(
         content_type='text/csv',
@@ -861,6 +916,7 @@ def getCsvResults(request):
             name = result.worker.get_full_name()
             if not name:
                 name = result.worker.email
+            area_pixels = result.roi_area_pixels()
             writer.writerow([
                 grain.sample.in_project.project_name,
                 grain.sample.sample_name,
@@ -870,14 +926,11 @@ def getCsvResults(request):
                 name,
                 result.create_date,
                 result.result,
-                grain.roi_area_pixels(),
-                grain.roi_area_mm2()
+                area_pixels,
+                grain.pixels_to_mm2(area_pixels)
             ])
     return response
 
-
-from .grain_uinfo import choose_working_grain
-from .load_rois import load_rois
 
 def get_grain_images_list(grain, ft_type):
     images = grain.image_set.filter(
@@ -915,7 +968,7 @@ def redirect_to_count(request):
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def add_grain_info_markers(info, grain, ft_type, worker, analyst = None):
+def add_grain_info_markers(info, grain, ft_type, worker, analyst, regions: RegionOfInterest):
     objects = FissionTrackNumbering.objects.filter(
         grain=grain,
         ft_type=ft_type
@@ -926,11 +979,23 @@ def add_grain_info_markers(info, grain, ft_type, worker, analyst = None):
         objects = objects.filter(analyst=analyst)
     save = objects.order_by('result').first()
     if save:
-        info['marker_latlngs'] = save.get_latlngs_within_roi()
+        info['marker_latlngs'] = save.get_latlngs_within_roi(regions)
         info['points'] = save.points()
         info['lengths'] = save.contained_tracks_latlngs
 
-def get_grain_info(user, pk, ft_type, analyst = None, **kwargs):
+class RoiSpecificity(enum.Enum):
+    GENERIC = 0
+    SPECIFIC = 1
+    SPECIFIC_IF_AVAILABLE = 2
+
+def get_grain_info(
+    user,
+    pk,
+    ft_type,
+    analyst = None,
+    specific = RoiSpecificity.GENERIC,
+    **kwargs,
+):
     if pk == 'done':
         return {
             'grain_info': 'null',
@@ -943,7 +1008,15 @@ def get_grain_info(user, pk, ft_type, analyst = None, **kwargs):
     ft_type = ft_type
     [images_list, indices_list] = get_grain_images_list(grain, ft_type)
     matrix = grain.mica_transform_matrix if ft_type == 'I' else None
-    rois = load_rois(grain, ft_type, matrix)
+    if specific == RoiSpecificity.SPECIFIC:
+        regions = grain.get_regions_specific(user, analyst)
+    elif specific == RoiSpecificity.GENERIC:
+        regions = grain.get_regions_generic()
+    else:
+        regions = grain.get_regions_specific(user, analyst)
+        if not regions.exists():
+            regions = grain.get_regions_generic()
+    rois = load_rois_from_regions(grain, ft_type, matrix, regions)
     if rois is None:
         return {
             'grain_info': 'null',
@@ -967,7 +1040,7 @@ def get_grain_info(user, pk, ft_type, analyst = None, **kwargs):
         'indices': indices_list,
         'rois': rois
     }
-    add_grain_info_markers(info, grain, ft_type, user, analyst)
+    add_grain_info_markers(info, grain, ft_type, user, analyst, regions)
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,
@@ -982,17 +1055,16 @@ def count_grain(request, pk):
     return render(
         request,
         'ftc/counting.html',
-        get_grain_info(request.user, pk, 'S', submit_url=reverse('counting'))
+        get_grain_info(request.user, pk, 'S', submit_redirect_url=reverse('counting'))
     )
 
 
-def count_my_grain_extra_links(user, current_id, ft_type):
+def prev_and_next_grains(worker: User, current_id: int, ft_type: str):
     current_grain = Grain.objects.get(id=current_id)
     sample = current_grain.sample
-    project = sample.in_project
     index = current_grain.index
     done_query = Subquery(FissionTrackNumbering.objects.filter(
-        worker=user,
+        worker=worker,
         grain=OuterRef('id'),
         ft_type=ft_type,
         result__gte=0
@@ -1005,8 +1077,6 @@ def count_my_grain_extra_links(user, current_id, ft_type):
         done=Exists(done_query)
     ).filter(
         Q(Exists(has_backref_image)),
-        sample__in_project__creator=user,
-        sample__in_project=project,
         sample=sample,
         index__gt=index,
         done=False
@@ -1017,24 +1087,27 @@ def count_my_grain_extra_links(user, current_id, ft_type):
         done=Exists(done_query)
     ).filter(
         Q(Exists(has_backref_image)),
-        sample__in_project__creator=user,
-        sample__in_project=project,
         sample=sample,
         index__lt=index,
         done=False
     ).order_by(
         '-index'
     ).first()
+    return (prev_grain, next_grain)
+
+
+def count_my_grain_extra_links(user: User, current_id: int, ft_type: str):
+    (prev_grain, next_grain) = prev_and_next_grains(user, current_id, ft_type)
     back = reverse('grain', args=[current_id])
     r = {
-        'submit_url': back,
+        'submit_redirect_url': back,
         'cancel_url': back
     }
     view_name = 'count_my_mica' if ft_type == 'I' else 'count_my'
     if next_grain != None:
         url = reverse(view_name, args=[next_grain.id])
         r['next_url'] = url
-        r['submit_url'] = url
+        r['submit_redirect_url'] = url
     if prev_grain != None:
         r['prev_url'] = reverse(view_name, args=[prev_grain.id])
     return r
@@ -1051,7 +1124,7 @@ def addGrainPointCategories(ctx):
         for gpc in GrainPointCategory.objects.all()
     ]})
 
-class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
+class CountMyGrainView(UserHasProjectAccess, DetailView):
     ft_type = 'S'
     model = Grain
     template_name = "ftc/counting.html"
@@ -1062,6 +1135,7 @@ class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
             self.request.user,
             pk,
             self.ft_type,
+            specific=RoiSpecificity.SPECIFIC,
             **count_my_grain_extra_links(self.request.user, pk, self.ft_type)
         ))
         addGrainPointCategories(ctx)
@@ -1070,7 +1144,7 @@ class CountMyGrainView(CreatorOrSuperuserMixin, DetailView):
 class CountMyGrainMicaView(CountMyGrainView):
     ft_type = 'I'
 
-from django.contrib.auth.models import User
+
 def tutorialCompleted(request):
     if not TutorialPage.objects.filter(active=True).exists():
         return True
@@ -1180,13 +1254,6 @@ def saveWorkingGrain(request):
             res = json.loads(json_str)
             grain = Grain.objects.get(sample__id=res['sample_id'], index=res['grain_num'])
             ft_type = res['ft_type']
-            if user.username != 'guest':
-                # Remove any previous or partial save state
-                FissionTrackNumbering.objects.filter(
-                    grain=grain,
-                    worker=user,
-                    ft_type=ft_type
-                ).delete()
             # Save the new state
             ftn = FissionTrackNumbering(
                 grain=grain,
@@ -1195,11 +1262,23 @@ def saveWorkingGrain(request):
                 result=-1,
             )
             ftn.save()
+            if user.username != 'guest':
+                # Remove any previous or partial save state
+                previous = FissionTrackNumbering.objects.filter(
+                    ~Q(id=ftn.pk) & Q(grain=grain, worker=user, ft_type=ft_type)
+                )
+                if previous.exists():
+                    # But rescue any regions attached to it beforehand
+                    # (we'll assume there's only one)
+                    p1 = previous.last()
+                    for r in Region.objects.filter(result=p1):
+                        r.result = ftn
+                    previous.delete()
             addGrainPoints(ftn, res)
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
         return HttpResponse(myjson, content_type='application/json')
     else:
-        return HttpResponse("Sorry, you have to active your account first.")
+        return HttpResponse("Sorry, you have to activate your account first.")
 
 @login_required
 def saveTutorialResult(request):

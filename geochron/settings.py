@@ -26,7 +26,13 @@ DEBUG = os.getenv('DJANGO_DEBUG') not in ['0', 'false', 'False', 'FALSE', 'no', 
 TEMPLATE_DEBUG = DEBUG
 
 allowed_hosts = os.getenv('ALLOWED_HOSTS') or '127.0.0.1,localhost,testserver'
-ALLOWED_HOSTS = allowed_hosts.split(',')
+allowed_host_list = allowed_hosts.split(',')
+ALLOWED_HOSTS = allowed_host_list
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{host}"
+    for host in allowed_host_list
+    if allowed_host_list not in ['127.0.0.1', 'localhost']
+]
 
 sslOnly = os.getenv('SSL_ONLY') in ['1', 'true', 'True', 'TRUE']
 SECURE_SSL_REDIRECT = sslOnly

@@ -11,3 +11,4 @@ __pycache__
 /geochron/gah/build/
 /geochron/geochron_at_home_cli.egg-info/
 /geochron/gah/geochron_at_home_cli.egg-info/
+/test/screenshots/

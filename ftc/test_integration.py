@@ -1,5 +1,6 @@
 from django.test import TestCase, tag
 from django.urls import reverse
+from django.contrib.auth.models import User, Group
 
 import csv
 import io
@@ -8,8 +9,8 @@ from random import uniform
 import re
 
 from ftc.models import (
-  GrainPoint,
-  TutorialPage, Sample, Region
+  GrainPoint, FissionTrackNumbering,
+  TutorialPage, Sample, Region, Project,
 )
 
 def gen_latlng():
@@ -461,9 +462,6 @@ class PublicPageCase(GahCase):
   def test_sample_publicness_controls_access_to_public_page(self):
     self.run_publicness(gets = [
       reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 }),
-      # Check access to images in this grain
-      reverse('get_image', kwargs={'pk': 1}),
-      reverse('grain_user_result', kwargs={'grain': 1, 'user': 101})
     ])
 
   def test_sample_publicness_controls_access_to_grain_image(self):
@@ -506,3 +504,92 @@ class PublicPageCase(GahCase):
       grain_info_json = grain_info_json.replace("\\u0022", '"')
       j = json.loads(grain_info_json)
       return j
+
+class GroupsTestCaseBase(GahCase):
+  fixtures = [
+    'essential.json',
+    'users.json',
+    'projects.json',
+    'samples.json',
+    'grains.json',
+    'results.json',
+    'results_analyst.json',
+    'images.json',
+    'groups.json',
+    'counter_verification.json',
+    'test_user.json',
+    'results_counter_user.json',
+    'results_test_user.json',
+  ]
+
+  def setUp(self):
+      counter = User.objects.get(pk=103)
+      self.workg = Group.objects.get(pk=1)
+      self.workg.user_set.add(counter)
+      self.project1 = Project.objects.get(pk=1)
+      self.project1.groups_who_have_access.add(self.workg)
+      return super().setUp()
+
+
+class GroupsTestCase(GroupsTestCaseBase):
+  def test_save_project_user_roi(self):
+    self.login_counter()
+    grain_pk = 1
+    user = User.objects.get(username='counter')
+    FissionTrackNumbering.objects.filter(grain__pk=grain_pk, worker=user).delete()
+    r1 = self.client.post(
+      reverse('grain_update_roi', kwargs={ 'pk': grain_pk }), {
+      'vertex_0_0_x': 0.1,
+      'vertex_0_0_y': 0.1,
+      'vertex_0_1_x': 0.5,
+      'vertex_0_1_y': 0.1,
+      'vertex_0_2_x': 0.3,
+      'vertex_0_2_y': 0.6,
+    })
+    self.assertLess(r1.status_code, 400)
+    ftn = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=user)
+    grain_regions = Region.objects.filter(grain__pk=grain_pk, result=ftn)
+    self.assertEqual(grain_regions.count(), 1)
+    self.assertIsNotNone(grain_regions.first().result)
+
+
+class GroupsAndRoisTestCase(GroupsTestCaseBase):
+  fixtures = GroupsTestCaseBase.fixtures + [
+    'grain1_region.json',
+    'grain1_region_hole.json',
+    'grain1_user_regions.json',
+  ]
+
+  def test_saving_project_user_roi_drops_only_that_users_previous_roi(self):
+    tester = User.objects.get(pk=104)
+    self.workg.user_set.add(tester)
+    self.login_counter()
+    grain_pk = 1
+    counter = User.objects.get(username='counter')
+    counter_ftn = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=counter)
+    tester_ftn  = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=tester)
+    counter_region_pks = Region.objects.filter(result=counter_ftn).values_list('id', flat=True)
+    tester_region_pks = Region.objects.filter(result=tester_ftn).values_list('id', flat=True)
+    owner_region_pks = Region.objects.filter(result__isnull=True).values_list('id', flat=True)
+    # want some regions to play with so that this test is interesting
+    self.assertGreater(len(counter_region_pks), 0)
+    self.assertGreater(len(tester_region_pks), 0)
+    self.assertGreater(len(owner_region_pks), 0)
+    r = self.client.post(
+      reverse('grain_update_roi', kwargs={ 'pk': grain_pk }), {
+      'vertex_0_0_x': 0.1,
+      'vertex_0_0_y': 0.1,
+      'vertex_0_1_x': 0.5,
+      'vertex_0_1_y': 0.1,
+      'vertex_0_2_x': 0.3,
+      'vertex_0_2_y': 0.6,
+    })
+    self.assertLess(r.status_code, 400)
+    counter_region_pks2 = Region.objects.filter(result=counter_ftn).values_list('id', flat=True)
+    tester_region_pks2 = Region.objects.filter(result=tester_ftn).values_list('id', flat=True)
+    owner_region_pks2 = Region.objects.filter(result__isnull=True).values_list('id', flat=True)
+    self.assertGreater(len(counter_region_pks2), 0)
+    self.assertSetEqual(set(tester_region_pks), set(tester_region_pks2))
+    self.assertSetEqual(set(owner_region_pks), set(owner_region_pks2))
+    # All the previous counter regions should have disappeared
+    self.assertEqual(len(set(counter_region_pks) & set(counter_region_pks2)), 0)

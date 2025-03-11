@@ -27,6 +27,9 @@ class ProjectAdmin(admin.ModelAdmin):
         'project_name', 'creator', 'create_date',
         'project_description', 'closed', 'priority'
     )
+    filter_horizontal = (
+        'groups_who_have_access',
+    )
 
 class GrainPointInline(admin.TabularInline):
     model = GrainPoint
@@ -52,8 +55,8 @@ class GrainPointCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Region)
 class RegionAdmin(admin.ModelAdmin):
-    list_display = ['grain']
-    list_filter = ['grain__sample', 'grain__sample__in_project', 'grain']
+    list_display = ['id', 'grain', 'result']
+    list_filter = ['grain__sample', 'grain__sample__in_project', 'grain', 'result']
 
 admin.site.register(Grain, admin.ModelAdmin)
 
