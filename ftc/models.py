@@ -360,7 +360,7 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
             category = p.get('category', 'track')
             gpc = GrainPointCategory.objects.get(pk=category)
             if gpc is None:
-                logging.warn('No such category {0}'.format(category))
+                logging.warning('No such category {0}'.format(category))
                 gpc = GrainPointCategory.objects.get(pk='track')
             gp = GrainPoint(
                 result=self,

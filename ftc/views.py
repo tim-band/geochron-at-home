@@ -1190,7 +1190,6 @@ def grainPointCount(res_dic):
         return len(res_dic['grainpoints'])
     return len(res_dic['marker_latlngs'])
 
-
 @login_required
 @transaction.atomic
 def updateFtnResult(request):
@@ -1207,16 +1206,10 @@ def updateFtnResult(request):
             has_backref_tutorial_page = TutorialPage.objects.filter(
                 marks=OuterRef('pk')
             )
-            # Remove any previous or partial save state that does not
+            # Remove all but one previous or partial save state that does not
             # have an attached TutorialPage
-            FissionTrackNumbering.objects.filter(
-                ~Q(Exists(has_backref_tutorial_page)),
-                grain=grain,
-                worker=request.user,
-                ft_type=ft_type
-            ).delete()
-            # Remove all but one remaining previous or partial save states
             ftss = FissionTrackNumbering.objects.filter(
+                ~Q(Exists(has_backref_tutorial_page)),
                 grain=grain,
                 worker=request.user,
                 ft_type=ft_type
@@ -1273,6 +1266,7 @@ def saveWorkingGrain(request):
                     p1 = previous.last()
                     for r in Region.objects.filter(result=p1):
                         r.result = ftn
+                        r.save()
                     previous.delete()
             addGrainPoints(ftn, res)
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)

@@ -593,3 +593,22 @@ class GroupsAndRoisTestCase(GroupsTestCaseBase):
     self.assertSetEqual(set(owner_region_pks), set(owner_region_pks2))
     # All the previous counter regions should have disappeared
     self.assertEqual(len(set(counter_region_pks) & set(counter_region_pks2)), 0)
+
+  def test_updating_count_retains_roi(self):
+    self.login_counter()
+    grain_pk = 1
+    counter = User.objects.get(username='counter')
+    counter_ftn = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=counter)
+    counter_region_pks = Region.objects.filter(result=counter_ftn).values_list('id', flat=True)
+    self.assertGreater(len(counter_region_pks), 0)
+    r = self.client.post(
+      reverse('updateFtnResult'), content_type= 'application/json', data={
+        'sample_id': counter_ftn.grain.sample.id,
+        'grain_num': counter_ftn.grain.index,
+        'ft_type': counter_ftn.ft_type,
+        'marker_latlngs': [[0.5,0.5]],
+    })
+    self.assertLess(r.status_code, 400)
+    counter_ftn2 = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=counter)
+    counter_region_pks2 = Region.objects.filter(result=counter_ftn2).values_list('id', flat=True)
+    self.assertSetEqual(set(counter_region_pks), set(counter_region_pks2))
