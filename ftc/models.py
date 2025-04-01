@@ -245,6 +245,9 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     result = models.IntegerField() #-1 means this is a partial save state
     create_date = models.DateTimeField(auto_now_add=True)
 
+    def get_absolute_url(self):
+        return reverse('grain_result', args=[self.pk])
+
     def project_name(self):
         return self.grain.sample.in_project
 

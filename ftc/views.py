@@ -676,6 +676,20 @@ def grainAnalystResult(request, grain, analyst):
     return render(request, 'ftc/public.html', ctx)
 
 @csrf_protect
+def grainResult(request, result_id):
+    result = FissionTrackNumbering.objects.get(pk=result_id)
+    if not request.user.is_authenticated and not result.grain.sample.public:
+        raise PermissionDenied('not a public grain')
+    ctx = get_grain_info(
+        User.objects.get(username__exact='guest'),
+        result.grain.pk,
+        'S',
+        specific=RoiSpecificity.SPECIFIC_IF_AVAILABLE,
+        result=result,
+    )
+    return render(request, 'ftc/public.html', ctx)
+
+@csrf_protect
 def grain_update_roi(request, pk):
     grain = Grain.objects.get(pk=pk)
     regions = {}
@@ -968,7 +982,7 @@ def redirect_to_count(request):
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def add_grain_info_markers(info, grain, ft_type, worker, analyst, regions: RegionOfInterest):
+def get_result(grain, ft_type, worker, analyst):
     objects = FissionTrackNumbering.objects.filter(
         grain=grain,
         ft_type=ft_type
@@ -977,11 +991,12 @@ def add_grain_info_markers(info, grain, ft_type, worker, analyst, regions: Regio
         objects = objects.filter(worker=worker)
     if analyst is not None:
         objects = objects.filter(analyst=analyst)
-    save = objects.order_by('result').first()
-    if save:
-        info['marker_latlngs'] = save.get_latlngs_within_roi(regions)
-        info['points'] = save.points()
-        info['lengths'] = save.contained_tracks_latlngs
+    return objects.order_by('result').first()
+
+def add_grain_info_markers_from_result(info, result, regions):
+    info['marker_latlngs'] = result.get_latlngs_within_roi(regions)
+    info['points'] = result.points()
+    info['lengths'] = result.contained_tracks_latlngs
 
 class RoiSpecificity(enum.Enum):
     GENERIC = 0
@@ -994,6 +1009,7 @@ def get_grain_info(
     ft_type,
     analyst = None,
     specific = RoiSpecificity.GENERIC,
+    result: FissionTrackNumbering | None = None,
     **kwargs,
 ):
     if pk == 'done':
@@ -1040,7 +1056,10 @@ def get_grain_info(
         'indices': indices_list,
         'rois': rois
     }
-    add_grain_info_markers(info, grain, ft_type, user, analyst, regions)
+    if result is None:
+        result = get_result(grain, ft_type, user, analyst)
+    if result:
+        add_grain_info_markers_from_result(info, result, regions)
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,
