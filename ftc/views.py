@@ -635,18 +635,24 @@ def publicSample(request, sample, grain, ft_type):
     type_set = {ftt for ftts in types for ftt in ftts}
     if len(type_set) == 0:
         raise ObjectDoesNotExist('No such result')
-    is_singular = len(type_set) == 1
-    if is_singular:
+    has_mica_button = False
+    has_mineral_button = False
+    if len(type_set) == 1:
         ft_type = type_set.pop()
+    else:
+        type_set.remove(ft_type)
+        if type_set.pop() == 'S':
+            has_mineral_button = True
+        else:
+            has_mica_button = True
     ctx = get_grain_info(
         user,
         g.pk,
         ft_type,
         next_page=next,
         prev_page=prev,
-        index=grain,
-        type=ft_type,
-        is_singular=is_singular,
+        has_mineral_button=has_mineral_button,
+        has_mica_button=has_mica_button,
     )
     return render(request, 'ftc/public.html', ctx)
 
@@ -1075,6 +1081,8 @@ def get_grain_info(
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,
+        'ft_type': ft_type,
+        'index': the_grain,
         'messages': [],
         'track_count': len(info.get('marker_latlngs', [])),
         **kwargs
