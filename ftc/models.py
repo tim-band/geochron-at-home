@@ -265,6 +265,9 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     def objects_owned_by(cls, user):
         return cls.objects.filter(grain__sample__in_project__creator=user)
 
+    def get_regions(self):
+        return RegionOfInterest(self.region_set.all())
+
     def roi_area_pixels(self):
         regions = self.region_set.all()
         if regions.exists():
