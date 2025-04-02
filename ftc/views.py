@@ -14,8 +14,8 @@ from django.http import (HttpResponse, HttpResponseRedirect,
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin
-from django.contrib.auth.models import Group, User
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import redirect
 
@@ -25,7 +25,7 @@ from ftc.grain_uinfo import choose_working_grain
 from ftc.load_rois import get_rois, load_rois_from_regions
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex, GrainPointCategory,
-    TutorialPage, RegionOfInterest)
+    TutorialPage)
 from ftc.parse_image_name import parse_upload_name
 from geochron.gah.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
@@ -603,38 +603,50 @@ def tutorialEnd(request):
     return render(request, 'ftc/tutorial_end.html')
 
 @csrf_protect
-def publicSample(request, sample, grain):
+def publicSample(request, sample, grain, ft_type):
     g = Grain.objects.get(sample=sample, index=grain)
     user = g.sample.in_project.creator
     if not g.sample.public:
         # it's not public, but the creator and superusers can see it
         if user != request.user and not request.user.is_superuser:
             raise PermissionDenied('This sample is not public')
-    ft_type = 'S'
     result_query = Subquery(FissionTrackNumbering.objects.filter(
         worker=user,
         grain=OuterRef('id'),
-        ft_type=ft_type,
         result__gte=0
     ))
-    samples = Grain.objects.annotate(
+    grains_in_sample = Grain.objects.annotate(
         result_exists=Exists(result_query)
     ).filter(
         sample=sample,
         result_exists=True
     )
-    next = samples.filter(
+    next = grains_in_sample.filter(
         index__gt=grain
     ).order_by('index').first()
-    prev = samples.filter(
+    prev = grains_in_sample.filter(
         index__lt=grain
     ).order_by('-index').first()
+    types = FissionTrackNumbering.objects.filter(
+        worker=user,
+        grain=g.pk,
+        result__gte=0,
+    ).order_by('-ft_type').values_list('ft_type').distinct()
+    type_set = {ftt for ftts in types for ftt in ftts}
+    if len(type_set) == 0:
+        raise ObjectDoesNotExist('No such result')
+    is_singular = len(type_set) == 1
+    if is_singular:
+        ft_type = type_set.pop()
     ctx = get_grain_info(
         user,
         g.pk,
         ft_type,
         next_page=next,
-        prev_page=prev
+        prev_page=prev,
+        index=grain,
+        type=ft_type,
+        is_singular=is_singular,
     )
     return render(request, 'ftc/public.html', ctx)
 

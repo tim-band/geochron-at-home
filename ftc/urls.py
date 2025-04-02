@@ -75,7 +75,8 @@ urlpatterns = [
     path('tutorialpage/<pk>/update/', TutorialUpdateView.as_view(), name='tutorial_update'),
     path('tutorialpage/<pk>/delete/', TutorialDeleteView.as_view(), name='tutorial_delete'),
     path('tutorialpage_create/', TutorialCreateView.as_view(), name='tutorial_create'),
-    path('public/<sample>/<grain>/', publicSample, name='public_sample'),
+    path('public/<sample>/<grain>/', publicSample, name='public_sample', kwargs={ 'ft_type': 'S' }),
+    path('public/<sample>/<grain>/mica', publicSample, name='public_sample_mica', kwargs={ 'ft_type': 'I' }),
     path('result/<result_id>/', grainResult, name='grain_result'),
 
     path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get_jwt_token'),
