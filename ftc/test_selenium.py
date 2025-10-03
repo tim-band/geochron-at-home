@@ -1989,7 +1989,7 @@ class AnalysesWithoutRegions(SeleniumTests):
         'grains.json', 'images.json', 'results_analyst.json'
     ]
     def test_analyses_without_regions_shows_all_markers(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         samples = self.go_project('proj1')
         anayses_page = samples.go_sample('adm_samp').go_analyses(1).check()
         grain_view = anayses_page.go_analysis('terry')
