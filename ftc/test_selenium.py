@@ -723,11 +723,18 @@ class SampleCreatePage(BasePage):
 
 class SamplePage(BasePage):
     def check(self, grain_present=None):
-        h1text = self.find_by_css("h1").text
-        assert "Sample " in h1text and " of project " in h1text
-        if grain_present is not None:
-            assert self.grain_present(grain_present)
+        WebDriverWait(self.driver, timeout=2).until(
+            lambda _: self.check_passes(grain_present)
+        )
         return self
+
+    def check_passes(self, grain_present=None):
+        h1text = self.find_by_css("h1").text
+        if "Sample " not in h1text or " of project " not in h1text:
+            return False
+        if grain_present is not None and not self.grain_present(grain_present):
+            return False
+        return True
 
     def go(self, pk):
         self.get(self.url + "/ftc/sample/{0}/".format(pk))
@@ -1285,7 +1292,7 @@ class WithTutorials(SeleniumTests):
         navbar.logout()
 
         # do the same thing with John (checking that test_user's completion does not interfere)
-        profile = self.sign_in(self.project_user)
+        profile = self.sign_in(self.project_user).check()
         profile.check_cannot_count().go_tutorial(
         ).check_markers_shown(
         ).get_to_end_and_finish().check()
@@ -1330,7 +1337,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
     ]
     def test_onboard(self):
         # Upload Z-Stack images
-        profile = self.sign_in(self.project_user)
+        profile = self.sign_in(self.project_user).check()
         uploader = WebUploader(self.driver, self.live_server_url)
         uploader.upload_projects('test/crystals')
         self.sign_out()
@@ -1506,7 +1513,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
     def test_explicit_grain_index(self):
         project = self.sign_in(
             self.project_user
-        ).go_manage().create_project().create(
+        ).check().go_manage().create_project().create(
             "test_explicit_grain_index",
             "project created by test_explicit_grain_index",
             20,
@@ -1523,7 +1530,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
         self.assertEqual(grain.get_grain_index(), explicit_index)
         sample_page = SamplePage(self.driver, self.live_server_url).go(sample_pk).check()
         other_explicit_index = 22
-        sample_page.create_grain().create([
+        sample_page.create_grain().check().create([
             self.grain_file_name(2),
             self.mica_file_name(1),
             self.grain_file_name(3)
@@ -1531,6 +1538,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
         sample_page.go(sample_pk).check().go_grain(
             explicit_index
         ).delete().confirm_delete()
+        sample.check()
         assert sample.grain_present(other_explicit_index)
         assert not sample.grain_present(explicit_index)
 
@@ -1646,7 +1654,7 @@ class WithOneGrainUploaded(SeleniumTests):
         navbar.logout()
 
         # login, check no results yet
-        profile = self.sign_in(self.project_user)
+        profile = self.sign_in(self.project_user).check()
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
@@ -1667,7 +1675,7 @@ class WithOneGrainUploaded(SeleniumTests):
 
         # see this result, as project admin
         navbar.check().logout().check()
-        profile = self.sign_in(self.project_user)
+        profile = self.sign_in(self.project_user).check()
         report = navbar.go_manage_projects()
         report.toggle_tree_node("p1")
         report.select_tree_node("s1")
@@ -1683,13 +1691,13 @@ class WithTwoGrainsUploaded(SeleniumTests):
     ]
 
     def test_count_link(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         samples = self.go_project('p1')
         counting = samples.go_sample('s1').check().go_count(1)
         counting.check()
 
     def test_revisit_own_count(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         samples = self.go_project('p1')
         counting = samples.go_sample('s1').go_count(1).check()
         self.assertFalse(counting.undo_available())
@@ -1710,7 +1718,7 @@ class WithTwoGrainsUploaded(SeleniumTests):
         counting.cancel(confirm=True).check().check_grain_id_is(5)
 
     def test_can_count_mica(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         samples = self.go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1)
         counting.click_at(0.6, 0.35)
@@ -1747,7 +1755,7 @@ class WithTwoGrainsUploaded(SeleniumTests):
             'y': 20
         })
         assert r.status_code < 400
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         samples = self.go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1).check()
         # This position is not within the shifted ROI
@@ -1758,7 +1766,7 @@ class WithTwoGrainsUploaded(SeleniumTests):
         counting.check_count("001")
 
     def test_mineral_does_not_interfere_with_mica_counting(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         projects = ProjectsPage(self.driver, self.live_server_url)
         samples = projects.go().check().go_project('p1')
         counting = samples.go_sample('s1').go_count(1)
@@ -1792,7 +1800,7 @@ class OneGrainWithoutMica(SeleniumTests):
     ]
 
     def test_mica_count_goes_past_grain_with_no_mica_images(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         samples = self.go_project('p1')
         counting = samples.go_sample('s1').go_count(1).check().check_grain_id_is(1)
         counting.next().check().check_grain_id_is(3)
@@ -1812,7 +1820,7 @@ class OneGrainWithoutMineral(SeleniumTests):
     ]
 
     def test_mineral_count_goes_past_grain_with_no_mineral_images(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         samples = self.go_project('p1')
         counting = samples.go_sample('s1').go_mica_count(1).check().check_grain_id_is(1)
         counting.next().check().check_grain_id_is(4)
@@ -1929,7 +1937,7 @@ class GrainsWithDifferentlySizedRegions(SeleniumTests):
         )
 
     def test_region_is_zoomed_to_fit(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         samples = self.go_project('p1')
         counting = samples.go_sample('s1').go_count(1).check().check_grain_id_is(1)
         self.assert_all_markers_are_close_to_edge(counting)
@@ -1968,14 +1976,14 @@ class PublicPageResults(SeleniumTests):
         'results_for_gwi_m.json'
     ]
     def test_public_results_count(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         samples = self.go_project('p1')
         public_page = samples.go_sample('s1').go_public(3).check()
         # There are three tracks, but only two are within the ROI
         assert public_page.track_count() == 2
 
     def test_direct_users_count(self):
-        self.sign_in(self.project_user)
+        self.sign_in(self.project_user).check()
         public_page = self.go_grain_user_result(3, 102)
         self.assertEqual(public_page.track_count(), 2)
         public_page2 = self.go_grain_user_result(3, 101)
