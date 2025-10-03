@@ -25,7 +25,7 @@ from ftc.grain_uinfo import choose_working_grain
 from ftc.load_rois import get_rois, load_rois_from_regions
 from ftc.models import (Project, Sample, FissionTrackNumbering, Image, Grain,
     TutorialResult, Region, Vertex, GrainPointCategory,
-    TutorialPage)
+    TutorialPage, RegionOfInterest)
 from ftc.parse_image_name import parse_upload_name
 from geochron.gah.gah import parse_metadata_grain, parse_metadata_image
 from geochron.settings import IMAGE_UPLOAD_SIZE_LIMIT
@@ -1013,7 +1013,7 @@ def redirect_to_count(request):
         return HttpResponseRedirect(reverse('count', args=[grain.pk]))
     return HttpResponseRedirect(reverse('count', args=['done']))
 
-def get_result(grain, ft_type, worker, analyst):
+def add_grain_info_markers(info, grain, ft_type, worker, analyst, regions: RegionOfInterest):
     objects = FissionTrackNumbering.objects.filter(
         grain=grain,
         ft_type=ft_type
@@ -1022,12 +1022,11 @@ def get_result(grain, ft_type, worker, analyst):
         objects = objects.filter(worker=worker)
     if analyst is not None:
         objects = objects.filter(analyst=analyst)
-    return objects.order_by('result').first()
-
-def add_grain_info_markers_from_result(info, result, regions):
-    info['marker_latlngs'] = result.get_latlngs_within_roi(regions)
-    info['points'] = result.points()
-    info['lengths'] = result.contained_tracks_latlngs
+    save = objects.order_by('result').first()
+    if save:
+        info['marker_latlngs'] = save.get_latlngs_within_roi(regions)
+        info['points'] = save.points()
+        info['lengths'] = save.contained_tracks_latlngs
 
 class RoiSpecificity(enum.Enum):
     GENERIC = 0
@@ -1040,7 +1039,6 @@ def get_grain_info(
     ft_type,
     analyst = None,
     specific = RoiSpecificity.GENERIC,
-    result: FissionTrackNumbering | None = None,
     **kwargs,
 ):
     if pk == 'done':
@@ -1055,12 +1053,7 @@ def get_grain_info(
     ft_type = ft_type
     [images_list, indices_list] = get_grain_images_list(grain, ft_type)
     matrix = grain.mica_transform_matrix if ft_type == 'I' else None
-    regions = None
-    if result:
-        regions = result.get_regions()
-    if regions and regions.exists():
-        pass
-    elif specific == RoiSpecificity.SPECIFIC:
+    if specific == RoiSpecificity.SPECIFIC:
         regions = grain.get_regions_specific(user, analyst)
     elif specific == RoiSpecificity.GENERIC:
         regions = grain.get_regions_generic()
@@ -1092,10 +1085,7 @@ def get_grain_info(
         'indices': indices_list,
         'rois': rois
     }
-    if result is None:
-        result = get_result(grain, ft_type, user, analyst)
-    if result:
-        add_grain_info_markers_from_result(info, result, regions)
+    add_grain_info_markers(info, grain, ft_type, user, analyst, regions)
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,
