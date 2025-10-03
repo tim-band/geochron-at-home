@@ -245,6 +245,9 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     result = models.IntegerField() #-1 means this is a partial save state
     create_date = models.DateTimeField(auto_now_add=True)
 
+    def get_absolute_url(self):
+        return reverse('grain_result', args=[self.pk])
+
     def project_name(self):
         return self.grain.sample.in_project
 
@@ -261,6 +264,9 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
     @classmethod
     def objects_owned_by(cls, user):
         return cls.objects.filter(grain__sample__in_project__creator=user)
+
+    def get_regions(self):
+        return RegionOfInterest(self.region_set.all())
 
     def roi_area_pixels(self):
         regions = self.region_set.all()
@@ -360,7 +366,7 @@ class FissionTrackNumbering(ExportModelOperationsMixin('result'), models.Model):
             category = p.get('category', 'track')
             gpc = GrainPointCategory.objects.get(pk=category)
             if gpc is None:
-                logging.warn('No such category {0}'.format(category))
+                logging.warning('No such category {0}'.format(category))
                 gpc = GrainPointCategory.objects.get(pk='track')
             gp = GrainPoint(
                 result=self,

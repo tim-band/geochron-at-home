@@ -14,8 +14,8 @@ from django.http import (HttpResponse, HttpResponseRedirect,
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin
-from django.contrib.auth.models import Group, User
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.models import User
+from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import redirect
 
@@ -603,38 +603,56 @@ def tutorialEnd(request):
     return render(request, 'ftc/tutorial_end.html')
 
 @csrf_protect
-def publicSample(request, sample, grain):
+def publicSample(request, sample, grain, ft_type):
     g = Grain.objects.get(sample=sample, index=grain)
     user = g.sample.in_project.creator
     if not g.sample.public:
         # it's not public, but the creator and superusers can see it
         if user != request.user and not request.user.is_superuser:
             raise PermissionDenied('This sample is not public')
-    ft_type = 'S'
     result_query = Subquery(FissionTrackNumbering.objects.filter(
         worker=user,
         grain=OuterRef('id'),
-        ft_type=ft_type,
         result__gte=0
     ))
-    samples = Grain.objects.annotate(
+    grains_in_sample = Grain.objects.annotate(
         result_exists=Exists(result_query)
     ).filter(
         sample=sample,
         result_exists=True
     )
-    next = samples.filter(
+    next = grains_in_sample.filter(
         index__gt=grain
     ).order_by('index').first()
-    prev = samples.filter(
+    prev = grains_in_sample.filter(
         index__lt=grain
     ).order_by('-index').first()
+    types = FissionTrackNumbering.objects.filter(
+        worker=user,
+        grain=g.pk,
+        result__gte=0,
+    ).order_by('-ft_type').values_list('ft_type').distinct()
+    type_set = {ftt for ftts in types for ftt in ftts}
+    if len(type_set) == 0:
+        raise ObjectDoesNotExist('No such result')
+    has_mica_button = False
+    has_mineral_button = False
+    if len(type_set) == 1:
+        ft_type = type_set.pop()
+    else:
+        type_set.remove(ft_type)
+        if type_set.pop() == 'S':
+            has_mineral_button = True
+        else:
+            has_mica_button = True
     ctx = get_grain_info(
         user,
         g.pk,
         ft_type,
         next_page=next,
-        prev_page=prev
+        prev_page=prev,
+        has_mineral_button=has_mineral_button,
+        has_mica_button=has_mica_button,
     )
     return render(request, 'ftc/public.html', ctx)
 
@@ -672,6 +690,33 @@ def grainAnalystResult(request, grain, analyst):
         'S',
         analyst=analyst,
         specific=RoiSpecificity.SPECIFIC_IF_AVAILABLE,
+    )
+    return render(request, 'ftc/public.html', ctx)
+
+@csrf_protect
+def grainUserResult(request, grain, user):
+    g = Grain.objects.get(pk=grain)
+    if not request.user.is_authenticated and not g.sample.public:
+        raise PermissionDenied('not a public grain')
+    ctx = get_grain_info(
+        User.objects.get(id=user),
+        grain,
+        'S',
+        specific=RoiSpecificity.SPECIFIC_IF_AVAILABLE,
+    )
+    return render(request, 'ftc/public.html', ctx)
+
+@csrf_protect
+def grainResult(request, result_id):
+    result = FissionTrackNumbering.objects.get(pk=result_id)
+    if not request.user.is_authenticated and not result.grain.sample.public:
+        raise PermissionDenied('not a public grain')
+    ctx = get_grain_info(
+        User.objects.get(username__exact='guest'),
+        result.grain.pk,
+        'S',
+        specific=RoiSpecificity.SPECIFIC_IF_AVAILABLE,
+        result=result,
     )
     return render(request, 'ftc/public.html', ctx)
 
@@ -1044,6 +1089,8 @@ def get_grain_info(
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,
+        'ft_type': ft_type,
+        'index': the_grain,
         'messages': [],
         'track_count': len(info.get('marker_latlngs', [])),
         **kwargs
@@ -1190,7 +1237,6 @@ def grainPointCount(res_dic):
         return len(res_dic['grainpoints'])
     return len(res_dic['marker_latlngs'])
 
-
 @login_required
 @transaction.atomic
 def updateFtnResult(request):
@@ -1207,16 +1253,10 @@ def updateFtnResult(request):
             has_backref_tutorial_page = TutorialPage.objects.filter(
                 marks=OuterRef('pk')
             )
-            # Remove any previous or partial save state that does not
+            # Remove all but one previous or partial save state that does not
             # have an attached TutorialPage
-            FissionTrackNumbering.objects.filter(
-                ~Q(Exists(has_backref_tutorial_page)),
-                grain=grain,
-                worker=request.user,
-                ft_type=ft_type
-            ).delete()
-            # Remove all but one remaining previous or partial save states
             ftss = FissionTrackNumbering.objects.filter(
+                ~Q(Exists(has_backref_tutorial_page)),
                 grain=grain,
                 worker=request.user,
                 ft_type=ft_type
@@ -1224,8 +1264,11 @@ def updateFtnResult(request):
             count = ftss.count()
             if 1 < count:
                 ftss.limit(count - 1).delete()
-            if 0 < count:
-                fts = ftss.first()
+            fts = FissionTrackNumbering.objects.filter(
+                grain=grain,
+                worker=request.user,
+                ft_type=ft_type
+            ).first()
         result = grainPointCount(res_dic)
         if fts is None:
             fts = FissionTrackNumbering(
@@ -1273,6 +1316,7 @@ def saveWorkingGrain(request):
                     p1 = previous.last()
                     for r in Region.objects.filter(result=p1):
                         r.result = ftn
+                        r.save()
                     previous.delete()
             addGrainPoints(ftn, res)
         myjson = json.dumps({ 'reply' : 'Done and thank you' }, cls=DjangoJSONEncoder)
