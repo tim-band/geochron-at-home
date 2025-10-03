@@ -51,6 +51,7 @@ urlpatterns = [
     path('grain/<pk>/images', GrainImagesView.as_view(), name='grain_images'),
     path('grain/<pk>/analyst/', GrainAnalysesView.as_view(), name='analyses_page'),
     path('grain/<grain>/analyst/<analyst>/', grainAnalystResult, name='grain_analyst_result'),
+    # Not navigable to, but referenced in README.md
     path('grain/<grain>/user/<user>/', grainUserResult, name='grain_user_result'),
     path('projects/', projects, name='projects'),
     path('create_project/', ProjectCreateView.as_view(), name='project_create'),
