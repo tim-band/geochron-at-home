@@ -694,6 +694,19 @@ def grainAnalystResult(request, grain, analyst):
     return render(request, 'ftc/public.html', ctx)
 
 @csrf_protect
+def grainUserResult(request, grain, user):
+    g = Grain.objects.get(pk=grain)
+    if not request.user.is_authenticated and not g.sample.public:
+        raise PermissionDenied('not a public grain')
+    ctx = get_grain_info(
+        User.objects.get(id=user),
+        grain,
+        'S',
+        specific=RoiSpecificity.SPECIFIC_IF_AVAILABLE,
+    )
+    return render(request, 'ftc/public.html', ctx)
+
+@csrf_protect
 def grainResult(request, result_id):
     result = FissionTrackNumbering.objects.get(pk=result_id)
     if not request.user.is_authenticated and not result.grain.sample.public:
@@ -1261,8 +1274,11 @@ def updateFtnResult(request):
             count = ftss.count()
             if 1 < count:
                 ftss.limit(count - 1).delete()
-            if 0 < count:
-                fts = ftss.first()
+            fts = FissionTrackNumbering.objects.filter(
+                grain=grain,
+                worker=request.user,
+                ft_type=ft_type
+            ).first()
         result = grainPointCount(res_dic)
         if fts is None:
             fts = FissionTrackNumbering(

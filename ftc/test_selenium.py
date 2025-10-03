@@ -216,9 +216,9 @@ class JoinPage(BasePage):
 
 class VerifyPage(BasePage):
     def check(self, user):
-        assert "Verify" in self.driver.title
+        self.wait_until(lambda _: "Verify" in self.driver.title)
         info = self.driver.find_element(By.CSS_SELECTOR,  "div.alert-info")
-        assert user.email in info.text
+        self.wait_until(lambda _: user.email in info.text)
         return self
 
 
@@ -392,6 +392,10 @@ class PublicPage(BasePage):
         if elt.text.isnumeric:
             return int(elt.text)
         return None
+
+    def go_grain_user(self, grain_id, user_id):
+        self.get(f"{self.url}/ftc/grain/{grain_id}/user/{user_id}/")
+        return self
 
 
 class GrainViewPage(BasePage):
@@ -1239,6 +1243,12 @@ class SeleniumTests(LiveServerTestCase):
         return ProjectsPage(self.driver, self.live_server_url).go(
         ).check().go_project(p)
 
+    def go_grain_user_result(self, grain_id, user_id):
+        return PublicPage(
+            self.driver,
+            self.live_server_url,
+        ).go_grain_user(grain_id, user_id)
+
     def tearDown(self):
         if (any(map(lambda v: v[0] == self, self._outcome.result.errors))
             or any(map(lambda v: v[0] == self, self._outcome.result.failures))
@@ -1963,6 +1973,13 @@ class PublicPageResults(SeleniumTests):
         public_page = samples.go_sample('s1').go_public(3).check()
         # There are three tracks, but only two are within the ROI
         assert public_page.track_count() == 2
+
+    def test_direct_users_count(self):
+        self.sign_in(self.project_user)
+        public_page = self.go_grain_user_result(3, 102)
+        self.assertEqual(public_page.track_count(), 2)
+        public_page2 = self.go_grain_user_result(3, 101)
+        self.assertEqual(public_page2.track_count(), 1)
 
 
 class AnalysesWithoutRegions(SeleniumTests):

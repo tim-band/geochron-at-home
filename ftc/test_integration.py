@@ -364,7 +364,7 @@ class TutorialPageCase(GahCase):
       content_type='application/json'
     )
     self.assertEqual(r.status_code, 200)
-    tps = TutorialPage.objects.all()
+    tps.all()
     self.assertEqual(len(tps), 1, 'should still be one tutorial page')
     tp = tps[0]
     gp_count = GrainPoint.objects.filter(result=tp.marks.pk).count()
