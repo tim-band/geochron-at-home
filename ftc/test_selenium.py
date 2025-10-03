@@ -1580,7 +1580,7 @@ class WithOneGrainUploaded(SeleniumTests):
     ]
 
     def test_can_count_tracks(self):
-        counting = self.sign_in(self.test_user).go_start_counting().check()
+        counting = self.sign_in(self.test_user).check().go_start_counting().check()
         # start counting tracks
         counting.check_count("000")
         self.assertFalse(counting.undo_available())
