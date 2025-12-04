@@ -927,7 +927,7 @@ def image_upload(opts, config):
 def images_upload(opts, config):
     images = sorted(opts.image)
     last_error = None
-    for attempt in [1,2,3]:
+    for _attempt in [1,2,3]:
         for_retry = []
         for i in images:
             opts.image = i
@@ -965,50 +965,81 @@ skeleton_metadata_template ="""<ImageMetadata>
 <Position Status="Valid" Unit="µm">{focus}</Position>
 </ParameterCollection>
 </HardwareSetting>
+<Information>
+<Image>
+<SizeX>{image_width}</SizeX>
+<SizeY>{image_height}</SizeY>
+</Image>
+</Information>
+<Scaling>
+<Items>
+<Distance Id="X">
+<Value>{scale_x}</Value>
+</Distance>
+<Distance Id="Y">
+<Value>{scale_y}</Value>
+</Distance>
+</Items>
+</Scaling>
 </ImageMetadata>
 """
 
 
 @token_refresh
 def images_download(opts, config):
-    with api_get(config, 'grain', opts.id or '-', 'image') as response:
+    with api_get(config, 'grain', opts.id) as response:
         body = response.read()
-        result = json.loads(body)
-        if type(result) is list:
-            if opts.dir:
-                os.makedirs(opts.dir, exist_ok=True)
-            for v in result:
-                extension = '.jpg'
-                if v['format'] == 'P':
-                    extension = '.png'
-                index = int(v.get('index'))
-                index_text = f'-{index:02d}'
-                if index < -9:
-                    index += 100
-                    index_text = f'-{index:02d}'
-                prefix = 'Mica' if v.get('ft_type') == 'I' else ''
-                if v['light_path'] == 'R':
-                    prefix += 'Refl'
-                file_name = f'{prefix}Stack{index_text}{extension}'
-                if opts.dir:
-                    file_name = os.path.join(opts.dir, file_name)
-                download_image(opts, config, v.get('id'), file_name)
-                # make a metadata file if applicable
-                if v.get('focus') and v.get('light_path'):
-                    with open(file_name + '_metadata.xml', 'w') as fh:
-                        print(
-                            skeleton_metadata_template.format(**v),
-                            file=fh,
-                        )
-            file_name = 'rois.json'
-            if opts.dir:
-                file_name = os.path.join(opts.dir, file_name)
-            with open(file_name, 'w') as fh:
-                opts.file = fh
-                opts.indent = 2
-                opts.compact = False
-                print(f'Downloading {file_name}')
-                grain_rois_download(opts, config)
+        grain_result = json.loads(body)
+        essential = {"image_width", "image_height", "scale_x", "scale_y"}
+        if (
+            not isinstance(grain_result, dict)
+            or not essential.issubset(grain_result.keys())
+        ):
+            print("Did not understand /api/grain/<id> response")
+        grain_stats = {
+            k: grain_result[k]
+            for k in essential
+        }
+    with api_get(config, 'grain', opts.id, 'image') as response:
+        body = response.read()
+        image_result = json.loads(body)
+    if not isinstance(image_result, list):
+        print("Did not understand /api/grain/<id>/image response")
+        return
+    if opts.dir:
+        os.makedirs(opts.dir, exist_ok=True)
+    for v in image_result:
+        extension = '.jpg'
+        if v['format'] == 'P':
+            extension = '.png'
+        index = int(v.get('index'))
+        index_text = f'-{index:02d}'
+        if index < -9:
+            index += 100
+            index_text = f'-{index:02d}'
+        prefix = 'Mica' if v.get('ft_type') == 'I' else ''
+        if v['light_path'] == 'R':
+            prefix += 'Refl'
+        file_name = f'{prefix}Stack{index_text}{extension}'
+        if opts.dir:
+            file_name = os.path.join(opts.dir, file_name)
+        download_image(opts, config, v.get('id'), file_name)
+        # make a metadata file if applicable
+        if v.get('focus') and v.get('light_path'):
+            with open(file_name + '_metadata.xml', 'w') as fh:
+                print(
+                    skeleton_metadata_template.format(**v, **grain_stats),
+                    file=fh,
+                )
+    file_name = 'rois.json'
+    if opts.dir:
+        file_name = os.path.join(opts.dir, file_name)
+    with open(file_name, 'w') as fh:
+        opts.file = fh
+        opts.indent = 2
+        opts.compact = False
+        print(f'Downloading {file_name}')
+        grain_rois_download(opts, config)
 
 
 def get_sample_and_index_from_path(path):
