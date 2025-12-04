@@ -253,6 +253,18 @@ class SampleGrainListView(ListCreateView):
             qs = qs.filter(sample__sample_name=sample)
         return qs.order_by('id')
 
+    def create(self, request, *args, **kwargs):
+        index = request.data.get("index")
+        if (
+            not isinstance(index, str)
+            or not index.isdecimal()
+        ) and "sample" in kwargs:
+            max_index = Grain.objects.filter(
+                sample__pk=kwargs["sample"]
+            ).aggregate(mi=Max("index", default=0))
+            request.data["index"] = max_index["mi"] + 1
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         serializer.do_create(self.request, self.kwargs['sample'])
 
