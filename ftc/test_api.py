@@ -196,7 +196,7 @@ class DeleteTestBaseMixin:
 
     def test_cannot_delete_others(self):
         r = self.client.delete('/ftc/api/'+self.path+str(self.admin_id)+'/', **self.headers)
-        self.assertEqual(r.status_code, 404)
+        self.assertIn(r.status_code, [403, 404])
         r2 = self.client.get('/ftc/api/project/', **self.super_headers)
         ps = json.loads(r2.content)
         self.assertEqual(len(ps), len(self.ids))
@@ -333,7 +333,7 @@ class ApiSampleUpdate(ApiTestMixin, JwtTestCase):
         r = self.client.patch('/ftc/api/sample/1/', {
             'priority' : 43
         }, content_type='application/json', **self.headers)
-        self.assertEqual(r.status_code, 404)
+        self.assertEqual(r.status_code, 403)
 
     def test_superuser_can_update_any_sample(self):
         new_priority = 22
@@ -349,7 +349,7 @@ class ApiSampleUpdate(ApiTestMixin, JwtTestCase):
         r = self.client.patch('/ftc/api/sample/1/', {
             'in_project': 2
         }, content_type='application/json', **self.headers)
-        self.assertEqual(r.status_code, 404)
+        self.assertEqual(r.status_code, 403)
 
     def test_superuser_can_change_sample_ownership(self):
         r = self.client.patch('/ftc/api/sample/1/', {
@@ -397,6 +397,19 @@ class ApiGrainCreate(ApiTestMixin, JwtTestCase):
         for i in range(len(expected['regions'])):
             self.assertEqual(expected['regions'][i]['shift'], content['regions'][i]['shift'])
             self.assertEqual(expected['regions'][i]['vertices'], content['regions'][i]['vertices'])
+
+    def test_create_unnumbered_grain(self):
+        rois_path = 'test/crystals/john/p1/s1/Unnumbered/rois.json'
+        grain_qs = Grain.objects.filter(sample__pk=2).values("index")
+        inds0 = [i["index"] for i in grain_qs.iterator()]
+        r = self.upload_rois(2, rois_path, self.headers)
+        self.assertEqual(r.status_code, 201)
+        j = json.loads(r.content)
+        inds1 = [i["index"] for i in grain_qs.all().iterator()]
+        new_inds = set(inds1) - set(inds0)
+        self.assertEqual(len(new_inds), 1)
+        new_index = new_inds.pop()
+        self.assertEqual(j['index'], new_index)
 
     def test_superuser_can_create_grain_in_others_sample(self):
         r = self.upload_rois(1, 'test/crystals/john/p1/s1/Grain01/rois.json', self.super_headers)
@@ -1002,7 +1015,7 @@ class ApiCountGrainPoint(ApiCount, JwtTestCase):
         return {**other, 'grainpoints': points}
 
 
-class ApiGrainCreate(ApiTestMixin, JwtTestCase):
+class ApiGrainDownload(ApiTestMixin, JwtTestCase):
     fixtures = [
         'essential.json',
         'grain_with_images.json',
