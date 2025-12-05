@@ -1,6 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt import views as jwt_views
 
+from ftc import apiviews
 from ftc.views import (home, signmeup, report, getTableData,
     count_grain, updateFtnResult, counting, saveWorkingGrain,
     get_image, projects, ProjectCreateView,
@@ -9,9 +10,10 @@ from ftc.views import (home, signmeup, report, getTableData,
     GrainDetailView, MicaDetailView, GrainCreateView,
     grain_update_roi, grain_update_shift,
     GrainDetailUpdateView, GrainImagesView,
+    GrainAnalysesView, grainAnalystResult, grainResult,
     ImageDeleteView, tutorial, saveTutorialResult,
     CountMyGrainView, CountMyGrainMicaView, getJsonResults,
-    download_rois, download_roiss,
+    download_rois, download_roiss, grainUserResult,
     getCsvResults, GrainDeleteView, tutorialPage, tutorialEnd,
     TutorialCreateView, TutorialUpdateView, TutorialListView,
     TutorialDeleteView, publicSample)
@@ -19,7 +21,9 @@ from ftc.apiviews import (ProjectListView, ProjectInfoView,
     SampleListView, SampleInfoView, ImageInfoView,
     SampleGrainListView, GrainInfoView, GrainImageListView,
     ImageListView, GrainListView, FissionTrackNumberingView,
-    get_grain_rois, get_many_roiss, SampleGrainInfoView)
+    FissionTrackNumberingViewLatLngs,
+    get_grain_rois, get_many_roiss, SampleGrainInfoView,
+    get_grain_rois_user)
 
 urlpatterns = [
     path('', home, name='home'),
@@ -45,13 +49,16 @@ urlpatterns = [
     path('grain/<pk>/update_shift', grain_update_shift, name='grain_update_shift'),
     # Table of metadata + table of images + upload form to upload metadata, grain images or rois.json
     path('grain/<pk>/images', GrainImagesView.as_view(), name='grain_images'),
+    path('grain/<pk>/analyst/', GrainAnalysesView.as_view(), name='analyses_page'),
+    path('grain/<grain>/analyst/<analyst>/', grainAnalystResult, name='grain_analyst_result'),
+    # Not navigable to, but referenced in README.md
+    path('grain/<grain>/user/<user>/', grainUserResult, name='grain_user_result'),
     path('projects/', projects, name='projects'),
     path('create_project/', ProjectCreateView.as_view(), name='project_create'),
     path('getTableData/', getTableData, name='getTableData'),
     path('getJsonResults/', getJsonResults, name='getJsonResults'),
     path('getCsvResults/', getCsvResults, name='getCsvResults'),
     path('updateFtnResult/', updateFtnResult, name='updateFtnResult'),
-    path('updateTFNResult/', updateFtnResult, name='updateFtnResult'), # deprecated, remove soon!
     path('counting/guest/', counting, name='guest_counting', kwargs={ 'uname': 'guest' }),
     path('counting/', counting, name='counting'),
     path('count/<pk>/', count_grain, name='count'),
@@ -70,7 +77,9 @@ urlpatterns = [
     path('tutorialpage/<pk>/update/', TutorialUpdateView.as_view(), name='tutorial_update'),
     path('tutorialpage/<pk>/delete/', TutorialDeleteView.as_view(), name='tutorial_delete'),
     path('tutorialpage_create/', TutorialCreateView.as_view(), name='tutorial_create'),
-    path('public/<sample>/<grain>/', publicSample, name='public_sample'),
+    path('public/<sample>/<grain>/', publicSample, name='public_sample', kwargs={ 'ft_type': 'S' }),
+    path('public/<sample>/<grain>/mica', publicSample, name='public_sample_mica', kwargs={ 'ft_type': 'I' }),
+    path('result/<result_id>/', grainResult, name='grain_result'),
 
     path('api/get-token', jwt_views.TokenObtainPairView.as_view(), name='get_jwt_token'),
     path('api/refresh-token', jwt_views.TokenRefreshView.as_view(), name='refresh_jwt_token'),
@@ -83,9 +92,12 @@ urlpatterns = [
     path('api/grain/', GrainListView.as_view(), name='api_grain_list'),
     path('api/grain/<pk>/', GrainInfoView.as_view(), name='api_grain_info'),
     path('api/grain/<pk>/rois/', get_grain_rois, name='api_grain_rois'),
+    path('api/grain/<pk>/rois/<user>/', get_grain_rois_user, name='api_grain_rois_user'),
     path('api/rois/', get_many_roiss, name='api_roiss'),
     path('api/grain/<grain>/image/', GrainImageListView.as_view(), name='api_grain_image_list'),
     path('api/image/', ImageListView.as_view(), name='api_image_list'),
     path('api/image/<pk>/', ImageInfoView.as_view(), name='api_image_info'),
+    path('api/image/<pk>/data/', apiviews.get_image, name='api_image_data'),
     path('api/count/', FissionTrackNumberingView.as_view(), name='api_ftn_list'),
+    path('api/countll/', FissionTrackNumberingViewLatLngs.as_view(), name='api_ftn_list'),
 ]

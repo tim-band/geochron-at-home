@@ -148,6 +148,9 @@ window.addEventListener('load', function() {
         in sample <a href="{% url 'sample' object.sample.pk %}">{{ object.sample.sample_name }}</a>,
         in project <a href="{% url 'project' object.sample.in_project.pk %}">{{ object.sample.in_project.project_name }}</a>
     </span>
+    {% if previous_pk %}
+    <a id="go_prev" class="btn btn-default" href="{% url 'grain' previous_pk %}">&lt;</a>
+    {% endif %}
     <a id="count" class="btn btn-default" href="{% url 'count_my' object.pk %}">Count</a>
     <a id="count-mica" class="btn btn-default" href="{% url 'count_my_mica' object.pk %}">Count Mica</a>
     <a id="images" class="btn btn-default" href="{% url 'grain_images' object.pk %}">View Image Stack Info</a>
@@ -165,6 +168,10 @@ window.addEventListener('load', function() {
     <a id="save_shift" href="#" class="btn btn-default" onclick="saveShift(crystal_control, &quot;{% url 'grain_update_shift' object.pk %}&quot;, document.getElementById('empty-form'))" disabled>Save</a>
     {% endif %}
     <a id="cancel_edit" href="#" class="btn btn-default" onclick="cancelEdit(crystal_control)" disabled>Cancel Edit</a>
+    <a id="download-rois" href="{% url 'download_grain_rois' object.pk %}" class="btn btn-default" download="rois.json">Download ROI</a>
+    {% if next_pk %}
+    <a id="go_next" class="btn btn-default" href="{% url 'grain' next_pk %}">&gt;</a>
+    {% endif %}
 </div>
 <div id="metadata-bar">
     <table id="metadata">

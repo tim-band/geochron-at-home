@@ -1,0 +1,72 @@
+[
+  {
+    "model": "ftc.region",
+    "pk": 20,
+    "fields": {
+      "result": 4,
+      "grain": 1
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 20,
+    "fields": {
+      "region": 20,
+      "x": 1,
+      "y": 97
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 21,
+    "fields": {
+      "region": 20,
+      "x": 97,
+      "y": 97
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 22,
+    "fields": {
+      "region": 20,
+      "x": 99,
+      "y": 1
+    }
+  },
+  {
+    "model": "ftc.region",
+    "pk": 30,
+    "fields": {
+      "result": 6,
+      "grain": 1
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 30,
+    "fields": {
+      "region": 30,
+      "x": 1,
+      "y": 96
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 31,
+    "fields": {
+      "region": 30,
+      "x": 96,
+      "y": 96
+    }
+  },
+  {
+    "model": "ftc.vertex",
+    "pk": 32,
+    "fields": {
+      "region": 30,
+      "x": 96,
+      "y": 1
+    }
+  }
+]

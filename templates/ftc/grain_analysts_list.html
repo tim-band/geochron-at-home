@@ -1,0 +1,39 @@
+{% extends "ftc/base.html" %}
+
+{% load static %}
+{% load order_by %}
+
+{% block head %}
+{% endblock %}
+
+{% block right_nav_fn_edit %}
+{% endblock %}
+
+{% block content %}
+
+<h1>Analyses of grain
+    <strong>{{ grain.index }}</strong> of sample
+        <a href="{% url 'sample' grain.sample.pk %}">
+            {{ grain.sample.sample_name }}
+        </a>
+    of project
+    <a href="{% url 'project' grain.sample.in_project.pk %}">
+        {{ grain.sample.in_project.project_name }}
+    </a>
+</h1>
+<table class="table" id="analyst-table">
+    <thead>
+        <tr>
+            <th>Analyst</th><th>Tracks</th><th>Lengths</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for ftn in object_list %}
+        <tr><td><a href="{% url 'grain_analyst_result' grain.pk ftn.analyst %}" id="analysis-link-{{ ftn.analyst }}">
+            {{ ftn.analyst }}
+        </a></td><td>{{ ftn.get_track_count }}</td><td>{{ ftn.get_contained_track_count }}</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

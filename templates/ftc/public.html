@@ -123,6 +123,18 @@ function next_page() {
     //{% endif %}
 }
 
+function mineral_page() {
+    //{% if index %}
+    window.location = '{% url "public_sample" sample_id index %}';
+    //{% endif %}
+}
+
+function mica_page() {
+    //{% if index %}
+    window.location = '{% url "public_sample_mica" sample_id index %}';
+    //{% endif %}
+}
+
 function setup() {
     $(document.body).on('shown.bs.dropdown', function() {
         $('[autofocus]').focus();
@@ -181,6 +193,16 @@ function setup() {
             {% if next_page %}
             <button type="button" id="next" onclick="next_page()" class="button">
                 Next Page
+            </button>
+            {% endif %}
+            {% if has_mica_button %}
+            <button type="button" id="mica" onclick="mica_page()" class="button">
+                Mica
+            </button>
+            {% endif %}
+            {% if has_mineral_button %}
+            <button type="button" id="mineral" onclick="mineral_page()" class="button">
+                Mineral
             </button>
             {% endif %}
         </span>

@@ -1,4 +1,4 @@
-Copyright 2014-2023 Jiangping He, geochron.home@gmail.com and Tim Band
+Copyright 2014-2018 Jiangping He, geochron.home@gmail.com and 2019-20025 Tim Band
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF

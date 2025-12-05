@@ -32,7 +32,7 @@ def creategrain(src, sample, grain_nth):
     transform = None
     rois_transform = rois.get('mica_transform')
     if rois_transform and type(rois_transform) is list and len(rois_transform) == 2:
-        tranform = Transform2D(
+        transform = Transform2D(
             x0=rois_transform[0][0],
             y0=rois_transform[0][1],
             t0=rois_transform[0][2],

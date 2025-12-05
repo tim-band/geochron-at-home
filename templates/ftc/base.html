@@ -33,6 +33,7 @@
 
 </head>
 <body {% block body_attributes %}{% endblock %} style="overflow-y:scroll;">
+    <form id="logout-form" method="POST" action="{% url 'logout' %}" style="display: none;">{% csrf_token %}</form>
     <!-- Fixed navbar -->
     <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
       <div class="container-fluid">
@@ -62,7 +63,7 @@
                 {% if user.is_authenticated %}
                   <li><a href="{% url 'profile' %}"><i class="fa fa-cogs"></i>Site dashboard</a></li>
                   <li class="divider"></li>
-                  <li><a href="{% url 'logout' %}"><i class="fa fa-sign-out"></i>Logout</a></li>
+                  <li><a id="nav-logout-link" href="#" onclick="document.getElementById('logout-form').submit()"><i class="fa fa-sign-out"></i>Logout</a></li>
                   {% if user.username != "guest"  %}
                     <li><a href="{% url 'account_change_password' %}"><i class="fa fa-key"></i>Change password</a></li>
                   {% endif %}

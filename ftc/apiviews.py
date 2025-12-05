@@ -3,24 +3,27 @@ from django.core.exceptions import (
     ObjectDoesNotExist, MultipleObjectsReturned
 )
 from django.db.models.aggregates import Max
+from django.forms import ValidationError
 from django.shortcuts import get_object_or_404
 import json
 import logging
+import numbers
 from rest_framework import exceptions
 from rest_framework import generics, serializers
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.fields import empty
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
-from ftc.load_rois import get_rois, get_roiss
+from ftc.load_rois import get_rois, get_rois_user, get_roiss
 from ftc.models import (
     Project, Sample, Grain, Image, FissionTrackNumbering,
-    Transform2D, GrainPoint, GrainPointCategory
+    Transform2D, GrainPoint, GrainPointCategory, ContainedTrack,
+    Region, Vertex
 )
 from ftc.parse_image_name import parse_upload_name
 from ftc.save_rois_regions import save_rois_regions
+from ftc import views
 
 
 def explicit_exception_handler(exc, context):
@@ -286,9 +289,27 @@ class GrainInfoView(RetrieveUpdateDeleteView):
 
 @api_view()
 @permission_classes([IsAuthenticated])
+def get_image(request, pk):
+    return views.get_image(request, pk)
+
+
+@api_view()
+@permission_classes([IsAuthenticated])
 def get_grain_rois(request, pk):
     grain = Grain.objects.get(id=pk)
     return Response(get_rois(grain))
+
+
+@api_view()
+@permission_classes([IsAuthenticated])
+def get_grain_rois_user(request, pk, user):
+    grain = Grain.objects.get(id=pk)
+    if user.isnumeric():
+        user_obj = User.objects.get(pk=int(user))
+    else:
+        user_obj = User.objects.get(username=user)
+    return Response(get_rois_user(grain, user_obj))
+
 
 def request_roiss(request):
     gq = Grain.objects.all()
@@ -391,7 +412,7 @@ class ImageInfoView(RetrieveUpdateDeleteView):
         serializer.save(**kwargs)
 
 
-class FissionTrackNumberingSerializer(serializers.ModelSerializer):
+class FissionTrackNumberingSerializerBase(serializers.ModelSerializer):
     class UserRelatedField(serializers.RelatedField):
         def get_queryset(self):
             return super().get_queryset()
@@ -426,14 +447,9 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
         def to_representation(self, value):
             return value.pk
 
-    # class GrainPointSerializer(serializers.ModelSerializer):
-    #     class Meta:
-    #         model = GrainPoint
-    #         fields = ['x_pixels', 'y_pixels', 'category', 'comment']
-
-    class LatLngSizeDefault:
+    class ResultSizeDefault:
         """
-        A default value that gets the number of latlngs specified
+        A default value that gets the number of points specified
         """
         requires_context = True
         def __call__(self, serializer_field):
@@ -441,29 +457,112 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
             return len(grainpoints)
 
     worker = UserRelatedField()
-    result = serializers.IntegerField(default=LatLngSizeDefault())
+    result = serializers.IntegerField(default=ResultSizeDefault())
     grain = GrainField()
-    latlngs = serializers.CharField(read_only=True)
-    # For some reason this "normal" way doesn't work, so we override
-    # create and run_validation
-    #grainpoints = GrainPointSerializer(many=True)
+    contained_tracks = serializers.SerializerMethodField()
+    regions = serializers.SerializerMethodField()
 
-    class Meta:
-        model = FissionTrackNumbering
-        fields = ['id', 'grain', 'ft_type', 'worker',
-            'result', 'create_date', 'latlngs']
+    def get_contained_tracks(self, obj):
+        return [
+            { k: v for (k, v) in gp.items() if k not in ['id', 'result_id'] }
+            for gp in obj.containedtrack_set.values()
+        ]
+
+    def get_regions(self, obj):
+        region_qs = obj.region_set.all()
+        if not region_qs.exists():
+            return None
+        return [
+            [[vertex.x, vertex.y]
+            for vertex in region.vertex_set.all()]
+            for region in region_qs
+        ]
 
     def run_validation(self, data=...):
         ret = super().run_validation(data)
-        gps = data.get('grainpoints', [])
-        ret['grainpoints'] = json.loads(gps)
+        gps_json = data.get("grainpoints", "[]")
+        gps = json.loads(gps_json)
+        ret["grainpoints"] = gps
+        ret["result"] = data.get("result", len(gps))
+        ret["contained_tracks"] = self.validate_contained_tracks(data)
+        ret["regions"] = self.validate_regions(data.get("regions", None))
         return ret
+
+    def validate_regions(self, regions):
+        if regions is None:
+            return None
+        if type(regions) is str:
+            regions = json.loads(regions)
+        elif type(regions) is list:
+            regions = [json.loads(r) for r in regions]
+        if type(regions) is not list:
+            raise ValidationError("regions should be a list or null")
+        regions_out = []
+        for reg in regions:
+            if type(reg) is dict and 'vertices' in reg:
+                reg = reg['vertices']
+            if type(reg) is not list or len(reg) == 0:
+                raise ValidationError('Each region should be an object with a "vertices" key or a nonempty list')
+            for v in reg:
+                if not(type(v) is list and len(v) == 2 and isinstance(v[0], numbers.Number) and isinstance(v[1], numbers.Number)):
+                    raise ValidationError("Each vertex should be a list of two numbers")
+            regions_out.append(reg)
+        return regions_out
+
+    def validate_contained_tracks(self, data):
+        ct_keys = ["x1_pixels", "y1_pixels", "z1_level", "x2_pixels", "y2_pixels", "z2_level"]
+        ct_key_set = set(ct_keys)
+
+        cts = data.get("contained_tracks", "[]")
+        cts_obj = json.loads(cts)
+        result = []
+        if type(cts_obj) is not list:
+            # empty dicts are OK to help Pieter's script work
+            if not cts_obj:
+                logging.getLogger(__name__).warning("Empty thing")
+                return result
+            raise ValidationError("contained_tracks needs to be an array")
+        for cti, ct_obj in enumerate(cts_obj):
+            if type(ct_obj) is list:
+                if len(ct_obj) != 6:
+                    raise ValidationError(
+                        "contained_tracks element {0} has {1} elements; should have 6".format(cti, len(ct_obj))
+                    )
+                result.append({
+                    k: ct_obj[i] for i, k in enumerate(ct_keys)
+                })
+            elif type(ct_obj) is dict:
+                actual_keys = set(ct_obj.keys())
+                missing = ct_key_set - actual_keys
+                if missing:
+                    raise ValidationError(
+                        "contained_tracks element {0} lacks keys: {1}".format(cti, missing)
+                    )
+                unexpected = actual_keys - ct_key_set
+                if unexpected:
+                    raise ValidationError(
+                        "contained_tracks element {0} has unexpected keys: {1}".format(cti, unexpected)
+                    )
+                result.append(ct_obj)
+            else:
+                raise ValidationError(
+                    "contained_tracks element {0} should be dict or list, but is {1}".format(cti, type(ct_obj))
+                )
+        return result
 
     def create(self, validated_data):
         points = validated_data.pop('grainpoints')
+        contained_tracks = validated_data.pop('contained_tracks')
+        regions = validated_data.pop('regions') or []
+        worker = validated_data['worker']
+        delete_params = {
+            "grain": validated_data['grain'],
+            "worker": worker
+        }
+        if worker.username == "guest":
+            delete_params["analyst"] = validated_data.get("analyst", None)
         ftn = FissionTrackNumbering.objects.filter(
-            grain=validated_data['grain'],
-            worker=validated_data['worker']
+            **delete_params
         ).delete()
         ftn = FissionTrackNumbering.objects.create(**validated_data)
         for point in points:
@@ -471,10 +570,46 @@ class FissionTrackNumberingSerializer(serializers.ModelSerializer):
                 name=point.get("category", "track")
             )
             GrainPoint.objects.create(result=ftn, **point)
+        for ct in contained_tracks:
+            ContainedTrack.objects.create(result=ftn, **ct)
+        for reg in regions:
+            region = Region.objects.create(grain=ftn.grain, result=ftn)
+            for v in reg:
+                Vertex.objects.create(region=region, x=v[0], y=v[1])
         return ftn
 
+
+class FissionTrackNumberingSerializerLatLngs(FissionTrackNumberingSerializerBase):
+    """
+    FissionTrackNumberingSerializer that reports result points as LatLngs
+    """
+    class Meta:
+        model = FissionTrackNumbering
+        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst', 'regions',
+            'result', 'create_date', 'latlngs', 'contained_tracks',]
+
+    latlngs = serializers.CharField(read_only=True)
+
+
+class FissionTrackNumberingSerializerGps(FissionTrackNumberingSerializerBase):
+    """
+    FissionTrackNumberingSerializer that reports result points as GrainPoints
+    """
+    class Meta:
+        model = FissionTrackNumbering
+        fields = ['id', 'grain', 'ft_type', 'worker', 'analyst', 'regions',
+            'result', 'create_date', 'contained_tracks', 'grainpoints']
+
+    grainpoints = serializers.SerializerMethodField()
+
+    def get_grainpoints(self, obj):
+        return [
+            { k: v for (k, v) in gp.items() if k not in ['id', 'result_id'] }
+            for gp in obj.grainpoint_set.values()
+        ]
+
 class FissionTrackNumberingView(generics.ListCreateAPIView):
-    serializer_class = FissionTrackNumberingSerializer
+    serializer_class = FissionTrackNumberingSerializerGps
     model = FissionTrackNumbering
 
     def get_queryset(self):
@@ -490,4 +625,10 @@ class FissionTrackNumberingView(generics.ListCreateAPIView):
                 qs = qs.filter(grain__sample__sample_name=sample)
         if 'grain' in params:
             qs = qs.filter(grain__index=params['grain'])
+        if 'user' in params:
+            qs = qs.filter(worker__username=params['user'])
         return qs.order_by('grain__sample', 'grain__index').select_related('worker')
+
+
+class FissionTrackNumberingViewLatLngs(FissionTrackNumberingView):
+    serializer_class = FissionTrackNumberingSerializerLatLngs

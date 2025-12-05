@@ -1,8 +1,9 @@
 from django.test import Client, TestCase, tag, override_settings
 import django
-from ftc.models import Grain, FissionTrackNumbering
+from ftc.models import Grain, FissionTrackNumbering, Region, Vertex
 from geochron.settings import SIMPLE_JWT
 
+import abc
 import json
 
 
@@ -53,6 +54,9 @@ class ApiTestMixin:
     def setUp(self):
         self.headers = log_in_headers(self.client, 'counter', 'counter_password')
         self.super_headers = log_in_headers(self.client, 'super', 'super_password')
+
+    def assertDictContainsSubset(self, a, b):
+        self.assertEqual(b, {**b, **a})
 
 
 @tag('api')
@@ -569,15 +573,8 @@ class ApiImageUpdate(ApiTestMixin, JwtTestCase):
                 'grain': 1
             }, content_type='application/json', **self.super_headers)
     
-def latlngs_close(lla, llb):
-    [lata, lnga] = lla
-    [latb, lngb] = llb
-    dlat = lata - latb
-    dlng = lnga - lngb
-    return dlat * dlat + dlng * dlng < 1e-4
 
-@tag('api')
-class ApiCount(ApiTestMixin, JwtTestCase):
+class ApiCount(ApiTestMixin):
     fixtures = [
         'essential.json',
         'users.json',
@@ -587,61 +584,77 @@ class ApiCount(ApiTestMixin, JwtTestCase):
         'images.json'
     ]
 
+    @staticmethod
+    @abc.abstractmethod
+    def points_close(lla, llb):
+        ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def points_from_result(result):
+        ...
+
+    @staticmethod
+    @abc.abstractmethod
+    def with_points(points, other):
+        ...
+
     def setUp(self):
         super().setUp()
-        self.latlngs = [
-            [0.1, 0.2],
-            [0.2, 0.4],
-            [0.5, 0.3]
-        ]
         logged_in = self.client.login(username='counter', password='counter_password')
         self.assertTrue(logged_in, 'failed to log in')
-        r = self.client.post('/ftc/updateFtnResult/', {
-            'marker_latlngs': self.latlngs,
+        r = self.client.post('/ftc/updateFtnResult/', self.with_points(self.points, {
             'sample_id': 1,
             'grain_num': 1,
             'ft_type': 'T'
-        }, content_type='application/json')
+        }), content_type='application/json')
         self.assertEqual(r.status_code, 200)
         self.headers = log_in_headers(self.client, 'counter', 'counter_password')
 
     def upload_sample_2_results(self):
-        self.latlngs2 = [
-            [0.31, 0.24],
-            [0.1, 0.42],
-            [0.17, 0.12]
-        ]
-        r = self.client.post('/ftc/updateFtnResult/', {
-            'marker_latlngs': self.latlngs2,
+        r = self.client.post('/ftc/updateFtnResult/', self.with_points(self.points2, {
             'sample_id': 2,
             'grain_num': 1,
             'ft_type': 'T'
-        }, content_type='application/json')
+        }), content_type='application/json')
+        self.assertEqual(r.status_code, 200)
 
     def test_download_count(self):
-        r = self.client.get('/ftc/api/count/', {'all': True}, **self.headers)
+        r = self.client.get(self.count_url, {'all': True}, **self.headers)
         j = json.loads(r.content.decode(r.charset))
-        jl = json.loads(j[0]['latlngs'])
-        self.assertListAlmostEqual(jl, self.latlngs)
+        jl = self.points_from_result(j[0])
+        self.assertSetAlmostEqual(jl, self.points, self.points_close)
         self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
 
     def test_download_count_from_one_named_sample(self):
         self.upload_sample_2_results()
-        r = self.client.get('/ftc/api/count/', {'sample': 'adm_samp'}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 'adm_samp'}, **self.headers)
         j = json.loads(r.content.decode(r.charset))
-        jl = json.loads(j[0]['latlngs'])
-        self.assertListAlmostEqual(jl, self.latlngs)
+        jl = self.points_from_result(j[0])
+        self.assertSetAlmostEqual(jl, self.points, self.points_close)
         self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
 
     def test_download_count_from_one_identified_sample(self):
         self.upload_sample_2_results()
-        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
         j = json.loads(r.content.decode(r.charset))
-        jl = json.loads(j[0]['latlngs'])
-        self.assertListAlmostEqual(jl, self.latlngs2)
+        jl = self.points_from_result(j[0])
+        self.assertSetAlmostEqual(jl, self.points2, self.points_close)
         self.assertDictContainsSubset({'id': 103, 'email': 'counter@uni.ac.uk'}, j[0]['worker'])
 
+    def latlngs_to_points(self, grain, latlngs):
+        return [{
+            'x_pixels': latlng[1] * grain.image_width,
+            'y_pixels': grain.image_height - latlng[0] * grain.image_width,
+            'category': 'track',
+            'comment': ''
+        } for latlng in latlngs]
+
     def test_upload_count(self):
+        """
+        Uploads a count, downloads it as both latlngs and grainpoints
+        (regardless of how it was uploaded) and tests that the result is the same.
+        """
         latlngs = [
             [0.1, 0.5],
             [0.3, 0.4],
@@ -651,12 +664,7 @@ class ApiCount(ApiTestMixin, JwtTestCase):
         sample = 2
         index = 1
         grain = Grain.objects.get(sample__pk=sample, index=index)
-        points = [{
-            'x_pixels': latlng[1] * grain.image_width,
-            'y_pixels': grain.image_height - latlng[0] * grain.image_width,
-            'category': 'track',
-            'comment': ''
-        } for latlng in latlngs]
+        points = self.latlngs_to_points(grain, latlngs)
         data = {
             'grain': '{0}/{1}'.format(sample, index),
             'ft_type': 'S',
@@ -664,23 +672,224 @@ class ApiCount(ApiTestMixin, JwtTestCase):
             'create_date': '2023-11-14',
             'grainpoints': json.dumps(points),
         }
-        r = self.client.post('/ftc/api/count/', data, **self.super_headers)
+        r = self.client.post(self.count_url, data, **self.super_headers)
         self.assertEqual(r.status_code, 201)
+        # Check that we now have four points
+        ftn = FissionTrackNumbering.objects.get(
+            worker__username="admin",
+            grain__sample__pk=sample,
+            grain__index=index
+        )
+        self.assertEqual(ftn.result, 4)
+        # Download as latlngs
+        r = self.client.get('/ftc/api/countll/', {'sample': 2}, **self.headers)
+        self.assertEqual(r.status_code, 200)
+        jo = json.loads(r.content.decode(r.charset))
+        jl = json.loads(jo[0]['latlngs'])
+        self.assertListAlmostEqual(jl, latlngs)
+        self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, jo[0]['worker'])
+        # Download as grainpoints
         r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
         self.assertEqual(r.status_code, 200)
+        jo2 = json.loads(r.content.decode(r.charset))
+        jgp = jo2[0]['grainpoints']
+        self.assertSetAlmostEqual(jgp, points, ApiCountGrainPoint.points_close)
+        self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, jo2[0]['worker'])
+
+    def _upload_count_with_roi(self, grain, regions, region_repr):
+        """
+        Uploads a count with an ROI (by both APIs which should do the same thing).
+        grain: The grain to upload for
+        regions: list of lists of vertices, each of which is a list of two co-ordinates.
+            Each element of this list must have a different length!
+        region_repr: The representation of this
+        """
+        data = {
+            'grain': '{0}/{1}'.format(grain.sample.pk, grain.index),
+            'ft_type': 'S',
+            'worker': 'admin',
+            'create_date': '2023-11-14',
+            'grainpoints': json.dumps(self.latlngs_to_points(grain, [[0.2, 0.3]])),
+            'regions': region_repr,
+        }
+        r = self.client.post(self.count_url, data, **self.super_headers)
+        self.assertEqual(r.status_code, 201)
+        region_objects = Region.objects.filter(
+            result__worker__username='admin',
+            grain__sample=grain.sample,
+        )
+        self.assertEqual(region_objects.count(), 2)
+        for r in region_objects:
+            vertices = Vertex.objects.filter(region=r)
+            # Find the item in regions that has this length
+            vertex_count = vertices.count()
+            vs = next(filter(lambda reg: len(reg) == vertex_count, regions))
+            self.assertListEqual(vs, [[v.x, v.y] for v in vertices])
+
+    def test_upload_count_with_roi(self):
+        """
+        Uploads a count with an ROI (by both APIs which should do the same thing).
+        """
+        regions = [
+            [[10, 10], [30, 10], [20, 30]],
+            [[10, 50], [50, 30], [80, 90], [15, 99]]
+        ]
+        self._upload_count_with_roi(
+            Grain.objects.get(sample__pk=2, index=1),
+            regions,
+            json.dumps(regions),
+        )
+
+    def test_upload_count_with_dict_roi(self):
+        """
+        Uploads a count with an ROI (by both APIs which should do the same thing).
+        """
+        regions = [
+            [[10, 10], [30, 10], [20, 30]],
+            [[10, 50], [50, 30], [80, 90], [15, 99]]
+        ]
+        self._upload_count_with_roi(
+            Grain.objects.get(sample__pk=2, index=1),
+            regions,
+            json.dumps([
+                {"vertices": region, "shift": [0, 0]}
+                for region in regions
+            ]),
+        )
+
+    def upload_contained_tracks(self, use_dict: bool):
+        cts = [
+            [100, 500, 300, 130, 420, 450],
+            [300, 400, 250, 340, 340, 250],
+        ]
+        sample = 2
+        index = 1
+        tracks = [{
+            'x1_pixels': ct[0],
+            'y1_pixels': ct[1],
+            'z1_level': ct[2],
+            'x2_pixels': ct[3],
+            'y2_pixels': ct[4],
+            'z2_level': ct[5],
+        } for ct in cts]
+        data = {
+            'grain': '{0}/{1}'.format(sample, index),
+            'ft_type': 'S',
+            'worker': 'admin',
+            'create_date': '2024-06-26',
+            'grainpoints': '[]',
+            'contained_tracks': json.dumps(tracks if use_dict else cts),
+        }
+        r = self.client.post(self.count_url, data, **self.super_headers)
+        self.assertEqual(r.status_code, 201)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
+        self.assertEqual(r.status_code, 200)
         j = json.loads(r.content.decode(r.charset))
-        jl = json.loads(j[0]['latlngs'])
-        self.assertSetAlmostEqual(jl, latlngs, latlngs_close)
-        self.assertDictContainsSubset({'id': 102, 'email': 'admin@uni.ac.uk'}, j[0]['worker'])
+        jl = j[0]['contained_tracks']
+        self.assertEqual(jl, tracks)
+
+    def test_upload_contained_tracks_dict(self):
+        self.upload_contained_tracks(True)
+
+    def test_upload_contained_tracks_list(self):
+        self.upload_contained_tracks(False)
+
+    def test_upload_different_analysts(self):
+        ctss: dict[str, list[dict]] = {
+            "amy": [{
+               'x1_pixels': 100,
+                'y1_pixels': 200,
+                'z1_level': 3,
+                'x2_pixels': 400,
+                'y2_pixels': 500,
+                'z2_level': 6,
+            }, {
+               'x1_pixels': 300,
+                'y1_pixels': 200,
+                'z1_level': 2,
+                'x2_pixels': 500,
+                'y2_pixels': 400,
+                'z2_level': 5,
+            }],
+            "bill": [{
+               'x1_pixels': 123,
+                'y1_pixels': 223,
+                'z1_level': 4,
+                'x2_pixels': 423,
+                'y2_pixels': 523,
+                'z2_level': 5,
+            }, {
+               'x1_pixels': 323,
+                'y1_pixels': 223,
+                'z1_level': 1,
+                'x2_pixels': 523,
+                'y2_pixels': 423,
+                'z2_level': 2,
+            }]
+        }
+        sample = 2
+        index = 1
+        data = [{
+            'grain': '{0}/{1}'.format(sample, index),
+            'ft_type': 'S',
+            'worker': 'guest',
+            'analyst': analyst,
+            'create_date': '2024-07-25',
+            'grainpoints': '[]',
+            'contained_tracks': json.dumps(cts)
+        } for analyst, cts in ctss.items()]
+        for data_item in data:
+            r = self.client.post(self.count_url, data_item, **self.super_headers)
+            self.assertEqual(r.status_code, 201)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
+        self.assertEqual(r.status_code, 200)
+        j = json.loads(r.content.decode(r.charset))
+        results: dict[str, list[dict[str, str]]] = {}
+        for ftn in j:
+            analyst = ftn["analyst"]
+            line_set = results.get(analyst, list())
+            line_set += ftn["contained_tracks"]
+            results[analyst] = line_set
+        self.assertDictsOfListsContainTheSameDicts(ctss, results)
+
+    def test_upload_guest_no_analyst(self):
+        data = {
+            'grain': '2/1',
+            'ft_type': 'S',
+            'worker': 'guest',
+            'create_date': '2024-07-25',
+            'grainpoints': '[]',
+            'contained_tracks': '[]'
+        }
+        r = self.client.post(self.count_url, data, **self.super_headers)
+        self.assertEqual(r.status_code, 201)
+
+    def assertDictsOfListsContainTheSameDicts(
+        self,
+        dict2ListOfDicts1: dict[str, list[dict]],
+        dict2ListOfDicts2: dict[str, list[dict]]
+    ):
+        self.assertEqual(sorted(dict2ListOfDicts2.keys()), sorted(dict2ListOfDicts1.keys()))
+        for k in dict2ListOfDicts2.keys():
+            self.listsContainTheSameDicts(dict2ListOfDicts1[k], dict2ListOfDicts2[k])
+
+    def listsContainTheSameDicts(self, listOfDicts1: list[dict], listOfDicts2: list[dict]):
+        self.assertEqual(
+            self.comparableListOfDicts(listOfDicts1),
+            self.comparableListOfDicts(listOfDicts2)
+        )
+
+    def comparableListOfDicts(self, ds: list[dict]):
+        return sorted(map(lambda x: sorted(x.items()), ds))
 
     def test_upload_deletes_existing(self):
         self.upload_sample_2_results()
-        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
         self.assertEqual(r.status_code, 200)
         j = json.loads(r.content.decode(r.charset))
         self.assertEqual(len(j), 1)
         # Check the correct number of points
-        jl = json.loads(j[0]['latlngs'])
+        jl = self.points_from_result(j[0])
         self.assertEqual(len(jl), 3)
         # Check the FTN object has the correct "result"
         ftn = FissionTrackNumbering.objects.get(
@@ -696,15 +905,15 @@ class ApiCount(ApiTestMixin, JwtTestCase):
             'create_date': '2023-11-14',
             'grainpoints': '[{"x_pixels": 120, "y_pixels": 123}]'
         }
-        r = self.client.post('/ftc/api/count/', data, **self.headers)
+        r = self.client.post(self.count_url, data, **self.headers)
         self.assertEqual(r.status_code, 201)
-        r = self.client.get('/ftc/api/count/', {'sample': 2}, **self.headers)
+        r = self.client.get(self.count_url, {'sample': 2}, **self.headers)
         self.assertEqual(r.status_code, 200)
         # Should still only have one result
         j = json.loads(r.content.decode(r.charset))
         self.assertEqual(len(j), 1)
         # but this time it has just one point
-        jl = json.loads(j[0]['latlngs'])
+        jl = self.points_from_result(j[0])
         self.assertEqual(len(jl), 1)
         ftn = FissionTrackNumbering.objects.get(
             worker__username="counter",
@@ -737,6 +946,60 @@ class ApiCount(ApiTestMixin, JwtTestCase):
                 self.assertListAlmostEqual(xs[i], ys[i])
         else:
             self.assertAlmostEqual(xs, ys, delta=0.05)
+
+
+@tag('api')
+class ApiCountLatLng(ApiCount, JwtTestCase):
+    count_url = '/ftc/api/countll/'
+    points = [
+        [0.1, 0.2],
+        [0.2, 0.4],
+        [0.5, 0.3]
+    ]
+    points2 = [
+        [0.31, 0.24],
+        [0.1, 0.42],
+        [0.17, 0.12]
+    ]
+    @staticmethod
+    def points_close(lla, llb):
+        [lata, lnga] = lla
+        [latb, lngb] = llb
+        dlat = lata - latb
+        dlng = lnga - lngb
+        return dlat * dlat + dlng * dlng < 1e-4
+    @staticmethod
+    def points_from_result(result):
+        return json.loads(result['latlngs'])
+    @staticmethod
+    def with_points(points, other):
+        return {**other, 'marker_latlngs': points}
+
+
+@tag('api')
+class ApiCountGrainPoint(ApiCount, JwtTestCase):
+    count_url = '/ftc/api/count/'
+    points = [
+        {"x_pixels": 100, "y_pixels": 200},
+        {"x_pixels": 200, "y_pixels": 400},
+        {"x_pixels": 500, "y_pixels": 300},
+    ]
+    points2 = [
+        {"x_pixels": 310, "y_pixels": 240, "category": "track", "comment": "one"},
+        {"x_pixels": 100, "y_pixels": 424, "category": "defect", "comment": "two"},
+        {"x_pixels": 170, "y_pixels": 123},
+    ]
+    @staticmethod
+    def points_close(gpa, gpb):
+        dx = gpa['x_pixels'] - gpb['x_pixels']
+        dy = gpa['y_pixels'] - gpb['y_pixels']
+        return dx * dx + dy * dy < 1
+    @staticmethod
+    def points_from_result(result):
+        return result['grainpoints']
+    @staticmethod
+    def with_points(points, other):
+        return {**other, 'grainpoints': points}
 
 
 class ApiGrainCreate(ApiTestMixin, JwtTestCase):

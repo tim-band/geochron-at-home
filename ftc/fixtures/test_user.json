@@ -19,7 +19,7 @@
     },
     {
         "model": "account.emailaddress",
-        "pk": 103,
+        "pk": 104,
         "fields": {
             "user": 104,
             "email": "tester@test.com",

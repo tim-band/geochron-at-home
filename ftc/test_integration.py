@@ -1,5 +1,6 @@
 from django.test import TestCase, tag
 from django.urls import reverse
+from django.contrib.auth.models import User, Group
 
 import csv
 import io
@@ -7,7 +8,10 @@ import json
 from random import uniform
 import re
 
-from ftc.models import TutorialPage, Sample
+from ftc.models import (
+  GrainPoint, FissionTrackNumbering,
+  TutorialPage, Sample, Region, Project,
+)
 
 def gen_latlng():
   return [
@@ -45,6 +49,17 @@ class GahCase(TestCase):
   def logout(self):
     self.client.post(reverse('logout'))
 
+  def assertForbidden(self, response):
+    if response.status_code == 403:
+      return
+    if response.status_code == 302:
+      if "accounts/login" in response.url:
+        return
+      self.fail("response was redirect to {0}, not to login.".format(response.url))
+    self.fail("response code was {0}, not 403 or redirect to login".format(response.status_code))
+
+  def assertDictContainsSubset(self, a, b):
+      self.assertEqual(b, {**b, **a})
 
 
 class CountingCase(GahCase):
@@ -333,6 +348,28 @@ class TutorialPageCase(GahCase):
     self.assertEqual(len(tps), 1, 'should still be one tutorial page')
     self.assertEqual(tps[0].pk, tp_pk, 'tutorial page changed')
 
+  def test_modifying_tutorial_results_works(self):
+    self.login_admin()
+    tps = TutorialPage.objects.all()
+    self.assertEqual(len(tps), 1, 'precondition failed, should be one tutorial page')
+    LATLNG_COUNT = 4
+    r = self.client.post(
+      reverse('updateFtnResult'),
+      {
+        'sample_id': 1,
+        'grain_num': 1,
+        'ft_type': 'S',
+        'marker_latlngs': gen_latlngs(LATLNG_COUNT)
+      },
+      content_type='application/json'
+    )
+    self.assertEqual(r.status_code, 200)
+    tps.all()
+    self.assertEqual(len(tps), 1, 'should still be one tutorial page')
+    tp = tps[0]
+    gp_count = GrainPoint.objects.filter(result=tp.marks.pk).count()
+    self.assertEqual(gp_count, LATLNG_COUNT)
+
   def get_tutorial_page_grain_info(self, pk):
     r = self.client.get(reverse('tutorial_page', kwargs={'pk': pk}))
     content = r.content.decode('utf-8')
@@ -378,37 +415,64 @@ class PublicPageCase(GahCase):
     'samples.json',
     'grains.json',
     'results.json',
+    'results_analyst.json',
     'images.json',
     'grain1_region.json',
     'grain1_region_hole.json'
   ]
-  def test_sample_publicness_controls_access_to_public_page(self):
+  # Checks for access to certain aspects of sample 1.
+  # Sample 1 is owned by admin, so these aspects
+  # should be visible to super (as superuser) and admin
+  # (as the owner but not superuser) but not to
+  # counter or an unauthenticated user unless the
+  # sample is made public.
+  def run_publicness(self, gets):
+    sample_pk = 1
+    self.logout()
+    for get in gets:
+      r = self.client.get(get)
+      self.assertForbidden(r)
+    self.login_super()
+    for get in gets:
+      r = self.client.get(get)
+      self.assertEqual(r.status_code, 200)
+    self.logout()
+    # The admin is the owner of the sample, but is not superuser
+    self.login_admin()
+    for get in gets:
+      r = self.client.get(get)
+      self.assertEqual(r.status_code, 200)
+    self.logout()
     self.login_counter()
-    r = self.client.get(
-      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
-    )
-    self.assertEqual(r.status_code, 403)
-    s = Sample.objects.get(pk=1)
+    for get in gets:
+      r = self.client.get(get)
+      self.assertForbidden(r)
+    s = Sample.objects.get(pk=sample_pk)
     s.public = True
     s.save()
-    r = self.client.get(
-      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
-    )
-    self.assertEqual(r.status_code, 200)
+    for get in gets:
+      r = self.client.get(get)
+      self.assertEqual(r.status_code, 200)
+    self.logout()
+    # unauthenticated users should be able to see, too
+    for get in gets:
+      r = self.client.get(get)
+      self.assertEqual(r.status_code, 200)
+
+  def test_sample_publicness_controls_access_to_public_page(self):
+    self.run_publicness(gets = [
+      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 }),
+    ])
 
   def test_sample_publicness_controls_access_to_grain_image(self):
-    self.login_counter()
-    r = self.client.get(
-      reverse('get_image', kwargs={ 'pk': 1 })
-    )
-    self.assertEqual(r.status_code, 403)
-    s = Sample.objects.get(pk=1)
-    s.public = True
-    s.save()
-    r = self.client.get(
-      reverse('get_image', kwargs={ 'pk': 1 })
-    )
-    self.assertEqual(r.status_code, 200)
+    self.run_publicness(gets = [
+      reverse('get_image', kwargs={ 'pk': 1 }),
+    ])
+
+  def test_analyst_page_publicness(self):
+    self.run_publicness(gets = [
+      reverse('analyses_page', kwargs={ 'pk': 1 })
+    ])
 
   def test_public_markers(self):
     self.login_counter()
@@ -419,10 +483,132 @@ class PublicPageCase(GahCase):
       reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
     )
     self.assertEqual(r.status_code, 200)
-    content = r.content.decode('utf-8')
-    grain_info_json = re.search(r"grain_info:\s*JSON.parse\('(.*)'\)", content).group(1)
-    grain_info_json = grain_info_json.replace("\\u0022", '"')
-    j = json.loads(grain_info_json)
+    j = self.get_grain_info(r)
     latlngs = j['marker_latlngs']
     # There are three points; one is outside the ROI, one is in the hole
     self.assertEqual(len(latlngs), 1)
+    # Delete the ROI regions, all the markers should become visible
+    Region.objects.filter(grain__index=1, grain__sample__pk=1).delete()
+    r = self.client.get(
+      reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
+    )
+    self.assertEqual(r.status_code, 200)
+    j = self.get_grain_info(r)
+    latlngs = j['marker_latlngs']
+    # Now we should see them all
+    self.assertEqual(len(latlngs), 3)
+
+  def get_grain_info(self, response):
+      content = response.content.decode('utf-8')
+      grain_info_json = re.search(r"grain_info:\s*JSON.parse\('(.*)'\)", content).group(1)
+      grain_info_json = grain_info_json.replace("\\u0022", '"')
+      j = json.loads(grain_info_json)
+      return j
+
+class GroupsTestCaseBase(GahCase):
+  fixtures = [
+    'essential.json',
+    'users.json',
+    'projects.json',
+    'samples.json',
+    'grains.json',
+    'results.json',
+    'results_analyst.json',
+    'images.json',
+    'groups.json',
+    'counter_verification.json',
+    'test_user.json',
+    'results_counter_user.json',
+    'results_test_user.json',
+  ]
+
+  def setUp(self):
+      counter = User.objects.get(pk=103)
+      self.workg = Group.objects.get(pk=1)
+      self.workg.user_set.add(counter)
+      self.project1 = Project.objects.get(pk=1)
+      self.project1.groups_who_have_access.add(self.workg)
+      return super().setUp()
+
+
+class GroupsTestCase(GroupsTestCaseBase):
+  def test_save_project_user_roi(self):
+    self.login_counter()
+    grain_pk = 1
+    user = User.objects.get(username='counter')
+    FissionTrackNumbering.objects.filter(grain__pk=grain_pk, worker=user).delete()
+    r1 = self.client.post(
+      reverse('grain_update_roi', kwargs={ 'pk': grain_pk }), {
+      'vertex_0_0_x': 0.1,
+      'vertex_0_0_y': 0.1,
+      'vertex_0_1_x': 0.5,
+      'vertex_0_1_y': 0.1,
+      'vertex_0_2_x': 0.3,
+      'vertex_0_2_y': 0.6,
+    })
+    self.assertLess(r1.status_code, 400)
+    ftn = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=user)
+    grain_regions = Region.objects.filter(grain__pk=grain_pk, result=ftn)
+    self.assertEqual(grain_regions.count(), 1)
+    self.assertIsNotNone(grain_regions.first().result)
+
+
+class GroupsAndRoisTestCase(GroupsTestCaseBase):
+  fixtures = GroupsTestCaseBase.fixtures + [
+    'grain1_region.json',
+    'grain1_region_hole.json',
+    'grain1_user_regions.json',
+  ]
+
+  def test_saving_project_user_roi_drops_only_that_users_previous_roi(self):
+    tester = User.objects.get(pk=104)
+    self.workg.user_set.add(tester)
+    self.login_counter()
+    grain_pk = 1
+    counter = User.objects.get(username='counter')
+    counter_ftn = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=counter)
+    tester_ftn  = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=tester)
+    counter_region_pks = Region.objects.filter(result=counter_ftn).values_list('id', flat=True)
+    tester_region_pks = Region.objects.filter(result=tester_ftn).values_list('id', flat=True)
+    owner_region_pks = Region.objects.filter(result__isnull=True).values_list('id', flat=True)
+    # want some regions to play with so that this test is interesting
+    self.assertGreater(len(counter_region_pks), 0)
+    self.assertGreater(len(tester_region_pks), 0)
+    self.assertGreater(len(owner_region_pks), 0)
+    r = self.client.post(
+      reverse('grain_update_roi', kwargs={ 'pk': grain_pk }), {
+      'vertex_0_0_x': 0.1,
+      'vertex_0_0_y': 0.1,
+      'vertex_0_1_x': 0.5,
+      'vertex_0_1_y': 0.1,
+      'vertex_0_2_x': 0.3,
+      'vertex_0_2_y': 0.6,
+    })
+    self.assertLess(r.status_code, 400)
+    counter_region_pks2 = Region.objects.filter(result=counter_ftn).values_list('id', flat=True)
+    tester_region_pks2 = Region.objects.filter(result=tester_ftn).values_list('id', flat=True)
+    owner_region_pks2 = Region.objects.filter(result__isnull=True).values_list('id', flat=True)
+    self.assertGreater(len(counter_region_pks2), 0)
+    self.assertSetEqual(set(tester_region_pks), set(tester_region_pks2))
+    self.assertSetEqual(set(owner_region_pks), set(owner_region_pks2))
+    # All the previous counter regions should have disappeared
+    self.assertEqual(len(set(counter_region_pks) & set(counter_region_pks2)), 0)
+
+  def test_updating_count_retains_roi(self):
+    self.login_counter()
+    grain_pk = 1
+    counter = User.objects.get(username='counter')
+    counter_ftn = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=counter)
+    counter_region_pks = Region.objects.filter(result=counter_ftn).values_list('id', flat=True)
+    self.assertGreater(len(counter_region_pks), 0)
+    r = self.client.post(
+      reverse('updateFtnResult'), content_type= 'application/json', data={
+        'sample_id': counter_ftn.grain.sample.id,
+        'grain_num': counter_ftn.grain.index,
+        'ft_type': counter_ftn.ft_type,
+        'marker_latlngs': [[0.5,0.5]],
+    })
+    self.assertLess(r.status_code, 400)
+    counter_ftn2 = FissionTrackNumbering.objects.get(grain__pk=grain_pk, worker=counter)
+    counter_region_pks2 = Region.objects.filter(result=counter_ftn2).values_list('id', flat=True)
+    self.assertSetEqual(set(counter_region_pks), set(counter_region_pks2))

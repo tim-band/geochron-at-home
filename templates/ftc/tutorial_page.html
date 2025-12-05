@@ -152,6 +152,9 @@ font-family: "ds-digitalitalic";
     padding: 7px 10px;
 }
 
+#map.no-boxes .leaflet-marker-icon {
+	display: none
+}
 </style>
 <script src="{% static 'Leaflet-1.9.3/leaflet.js' %}"></script>
 <script type='text/javascript' src="{% static 'counting/script/easy-button.js' %}"></script>
@@ -227,19 +230,6 @@ function setup() {
         iconAnchor: [20, 20],
         iconPopup: [20, 0]
     });
-    /* map.setTrackCounterElement(document.getElementById('tracknum'));
-    document.getElementById('tracknum-submit').onclick = function() {
-        var submit_url = "{{ submit_url }}" || "{% url 'counting' %}";
-        map.submitTrackCount("{% url 'updateFtnResult'%}", submit_url);
-    };
-    document.getElementById('tracknum-restart').onclick = map.restartTrackCount;
-    var save = document.getElementById('tracknum-save');
-    if (save) {
-        save.onclick = function() {
-            map.saveTrackCount("{% url 'saveWorkingGrain'%}", null);
-        };
-    }
-    map.resetUndo(); */
     {% if object.page_type == "S" or object.page_type == "I" %}
     map.enableEditing();
     {% endif %}
@@ -247,6 +237,15 @@ function setup() {
     map.map.setZoom(map.map.getMaxZoom());
     setTimeout(map.firstMarker, 800);
     {% endif %}
+}
+function hide_boxes() {
+    var hidden = document.getElementById('hide-boxes').checked;
+    var mapelt = document.getElementById('map');
+    if (hidden) {
+        mapelt.classList.add('no-boxes');
+    } else {
+        mapelt.classList.remove('no-boxes');
+    }
 }
 </script>
 {% endblock %}
@@ -311,6 +310,7 @@ function setup() {
             <button type="button" id="next" onclick="next_page()" class="button">
                 Next Page
             </button>
+            <input type="checkbox" id="hide-boxes" onclick="hide_boxes()"><label for="hide-boxes">Hide boxes</label>
         </span>
         {% endif %}
     </div>
