@@ -215,6 +215,17 @@ class Grain(models.Model):
             analyst__isnull=False
         )
 
+    def roi_area_pixels(self):
+        """
+        Find the area of the ROI in pixels.
+
+        Currently this does not take account of negative ROI regions.
+        """
+        total = 0
+        for r in self.region_set.all():
+            total += r.area()
+        return total
+
     def pixels_to_mm2(self, pixels):
         """
         Convert area in pixels to millimeters square, based on the grain's scale.
