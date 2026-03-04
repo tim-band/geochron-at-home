@@ -1,9 +1,10 @@
 from django.contrib.auth.models import User
 from django.core.exceptions import (
-    ObjectDoesNotExist, MultipleObjectsReturned
+    ObjectDoesNotExist, MultipleObjectsReturned, PermissionDenied
 )
 from django.db.models.aggregates import Max
 from django.forms import ValidationError
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 import json
 import logging
@@ -152,11 +153,29 @@ class SampleListView(ListCreateView):
         serializer.save(completed=False)
 
 
-def get_sample_queryset(id_or_name, request):
-        samples = models_owned(Sample, request)
-        if id_or_name.isnumeric():
-            return samples.filter(pk=id_or_name)
-        return samples.filter(sample_name__iexact=id_or_name)
+def get_sample_object(id_or_name, request) -> Sample:
+    user = request.user
+    if not user:
+        raise PermissionDenied()
+    kwargs = {}
+    if id_or_name.isnumeric():
+        kwargs["pk"] = id_or_name
+        vals = Sample.objects.filter(pk=id_or_name)
+    else:
+        kwargs["sample_name__iexact"] = id_or_name
+        vals = Sample.objects.filter(sample_name__iexact=id_or_name)
+    if user.is_superuser:
+        s = Sample.objects.filter(**kwargs).first()
+        if not s:
+            raise Http404()
+        return s
+    ss = Sample.objects.filter(**kwargs)
+    if ss.count() == 0:
+        raise Http404()
+    vals = Sample.filter_owned_by(ss, user)
+    if not vals:
+        raise PermissionDenied()
+    return vals.first()
 
 
 class SampleInfoView(RetrieveUpdateDeleteView):
@@ -165,8 +184,7 @@ class SampleInfoView(RetrieveUpdateDeleteView):
 
     def get_object(self):
         assert('pk' in self.kwargs)
-        qs = get_sample_queryset(self.kwargs['pk'], self.request)
-        obj = get_object_or_404(qs)
+        obj = get_sample_object(self.kwargs['pk'], self.request)
         self.check_object_permissions(self.request, obj)
         return obj
 
@@ -186,8 +204,7 @@ class GrainSerializer(serializers.ModelSerializer):
     image_height = serializers.IntegerField(required=False, read_only=False)
 
     def do_create(self, request, sample_id):
-        qs = get_sample_queryset(sample_id, request)
-        sample = get_object_or_404(qs)
+        sample = get_sample_object(sample_id, request)
         if (not request.user.is_superuser and
             sample.get_owner() != request.user):
             raise exceptions.PermissionDenied
@@ -252,6 +269,18 @@ class SampleGrainListView(ListCreateView):
         else:
             qs = qs.filter(sample__sample_name=sample)
         return qs.order_by('id')
+
+    def create(self, request, *args, **kwargs):
+        index = request.data.get("index")
+        if (
+            not isinstance(index, str)
+            or not index.isdecimal()
+        ) and "sample" in kwargs:
+            max_index = Grain.objects.filter(
+                sample__pk=kwargs["sample"]
+            ).aggregate(mi=Max("index", default=0))
+            request.data["index"] = max_index["mi"] + 1
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.do_create(self.request, self.kwargs['sample'])

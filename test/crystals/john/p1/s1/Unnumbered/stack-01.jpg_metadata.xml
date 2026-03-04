@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ImageMetadata>
+  <HardwareSetting>
+    <ParameterCollection Id="MTBFocus">
+      <Position Status="Valid" Unit="µm">20102.55</Position>
+    </ParameterCollection>
+    <ParameterCollection Id="MTBRLTLSwitch">
+      <Position Status="Valid">1</Position>
+      <PositionName Status="Valid">RLTLSwitch.TL</PositionName>
+    </ParameterCollection>
+    <ParameterCollection Id="MTBStageAxisX">
+      <Position Status="Valid" Unit="µm">30224.66</Position>
+    </ParameterCollection>
+    <ParameterCollection Id="MTBStageAxisY">
+      <Position Status="Valid" Unit="µm">11127.77</Position>
+    </ParameterCollection>
+  </HardwareSetting>
+  <Information>
+    <Image>
+      <SizeX>201</SizeX>
+      <SizeY>202</SizeY>
+    </Image>
+  </Information>
+  <Scaling>
+    <Items>
+      <Distance Id="X">
+        <Value>9.079E-08</Value>
+        <DefaultUnitFormat>µm</DefaultUnitFormat>
+      </Distance>
+      <Distance Id="Y">
+        <Value>9.079E-08</Value>
+        <DefaultUnitFormat>µm</DefaultUnitFormat>
+      </Distance>
+    </Items>
+  </Scaling>
+</ImageMetadata>
