@@ -31,25 +31,29 @@ def choose_working_grain(request, ft_type):
         Q(results__result__gte=0)
         & ~Q(results__worker__username='guest')
     )
-    # Result objects produced by this user
-    has_backref_user = FissionTrackNumbering.objects.filter(
-        grain=OuterRef('pk'),
-        worker=request.user,
-        ft_type=ft_type,
-        result__gte=0
-    )
-    has_backref_image = Image.objects.filter(
+    # Only include grains with images
+    has_backref_image = Q(Exists(Image.objects.filter(
         grain=OuterRef('pk'),
         ft_type=ft_type
-    )
+    )))
+    if request.user.username == 'guest':
+        grain_is_suitable = has_backref_image
+    else:
+        # Result objects produced by this user
+        has_backref_user = FissionTrackNumbering.objects.filter(
+            grain=OuterRef('pk'),
+            worker=request.user,
+            ft_type=ft_type,
+            result__gte=0
+        )
+        grain_is_suitable = has_backref_image & ~Q(Exists(has_backref_user))
     # Grains without results from this user, and with more results needed
     # Ordered by priority of project then priority of sample
     # A random one of these top priority samples will be first
     available_to_count = Grain.objects.values('id').annotate(
         backref_count=backref_count
     ).filter(
-        ~Q(Exists(has_backref_user)),
-        Q(Exists(has_backref_image)),
+        grain_is_suitable,
         sample__in_project__closed=False,
         sample__completed=False,
         sample__min_contributor_num__gte=F('backref_count')
@@ -58,7 +62,6 @@ def choose_working_grain(request, ft_type):
         '-sample__priority',
         '?'
     )
-    s = str(available_to_count.query)
     chosen = available_to_count.first()
     if chosen is None:
         return None
