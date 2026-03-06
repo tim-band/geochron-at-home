@@ -105,6 +105,7 @@ class CountingCase(GahCase):
       self.count_grain(j["sample_id"], j["grain_num"], count)
 
   def get_total_track_count(self):
+    """Get a pair of track counts (including guest counts, excluding guest counts)."""
     r = self.client.post(
       reverse('getTableData'),
       { 'client_response': [
@@ -115,6 +116,7 @@ class CountingCase(GahCase):
     self.assertEqual(r.status_code, 200)
     j = json.loads(r.content)
     total = 0
+    total_exc_guest = 0
     for [project, sample, index, ft_type, track_count, user, datetime, area] in j['aaData']:
       total += track_count
     return total
@@ -144,14 +146,15 @@ class TestGuestCounts(CountingCase):
       self.count_grain(1, 1, ac)
     self.logout()
     self.login_admin()
-    total = self.get_total_track_count()
-    # should get the results from sample 1 which is owned by admin
-    self.assertEqual(total, base_admin + sum(acounts))
+    # get the results from sample 1 which is owned by admin
+    total_sample1 = self.get_total_track_count()
     self.logout()
     self.login_super()
-    total = self.get_total_track_count()
     # should get the results from all samples
-    self.assertEqual(total, base_super + guest_count * sum(scounts) + sum(acounts))
+    total_sample2 = self.get_total_track_count()
+    self.assertEqual(total_sample2, base_super + guest_count * sum(scounts) + sum(acounts))
+    self.assertLess(base_admin + sum(acounts), total_sample1)
+    self.assertLess(total_sample1, base_admin + sum(acounts) + guest_count * sum(scounts))
 
 
 class TestCountJsonDownload(CountingCase):
