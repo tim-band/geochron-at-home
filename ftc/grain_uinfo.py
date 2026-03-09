@@ -36,7 +36,7 @@ def choose_working_grain(request, ft_type):
         grain=OuterRef('pk'),
         ft_type=ft_type
     )))
-    # Grains with images, in non-completed samples in open projects
+    # Grains with images, in non-completed samples in open, public projects
     basic_query = Grain.objects.annotate(
         backref_count=backref_count
     ).filter(
