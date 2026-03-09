@@ -31,35 +31,44 @@ def choose_working_grain(request, ft_type):
         Q(results__result__gte=0)
         & ~Q(results__worker__username='guest')
     )
-    # Result objects produced by this user
-    has_backref_user = FissionTrackNumbering.objects.filter(
-        grain=OuterRef('pk'),
-        worker=request.user,
-        ft_type=ft_type,
-        result__gte=0
-    )
-    has_backref_image = Image.objects.filter(
+    # Only include grains with images
+    has_backref_image = Q(Exists(Image.objects.filter(
         grain=OuterRef('pk'),
         ft_type=ft_type
-    )
-    # Grains without results from this user, and with more results needed
-    # Ordered by priority of project then priority of sample
-    # A random one of these top priority samples will be first
-    available_to_count = Grain.objects.values('id').annotate(
+    )))
+    # Grains with images, in non-completed samples in open, public projects
+    basic_query = Grain.objects.annotate(
         backref_count=backref_count
     ).filter(
-        ~Q(Exists(has_backref_user)),
-        Q(Exists(has_backref_image)),
+        has_backref_image,
         sample__in_project__closed=False,
         sample__completed=False,
-        sample__min_contributor_num__gte=F('backref_count')
-    ).order_by(
-        '-sample__in_project__priority',
-        '-sample__priority',
-        '?'
+        sample__public=True,
     )
-    s = str(available_to_count.query)
-    chosen = available_to_count.first()
+    if request.user.username == 'guest':
+        available_to_count = basic_query.order_by(
+            '?'
+        )
+    else:
+        # Result objects produced by this user
+        has_backref_user = FissionTrackNumbering.objects.filter(
+            grain=OuterRef('pk'),
+            worker=request.user,
+            ft_type=ft_type,
+            result__gte=0
+        )
+        # Only grains that don't have enough (non-guest) results anyway.
+        # Choosing at random from those projects at the highest priority
+        # and within that those samples at the highest priority.
+        available_to_count = basic_query.filter(
+            ~Q(Exists(has_backref_user)),
+            sample__min_contributor_num__gte=F('backref_count'),
+        ).order_by(
+            '-sample__in_project__priority',
+            '-sample__priority',
+            '?'
+        )
+    chosen = available_to_count.values('id').first()
     if chosen is None:
         return None
     chosen_id = chosen['id']
