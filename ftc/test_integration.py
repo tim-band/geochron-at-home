@@ -1,5 +1,5 @@
 from django.test import TestCase, tag
-from django.urls import reverse
+from django.urls import resolve, reverse
 from django.contrib.auth.models import User, Group
 
 import csv
@@ -25,6 +25,15 @@ def gen_latlngs(n):
     r.append(gen_latlng())
   return r
 
+grain_info_re = re.compile(r"grain_info:\s*JSON.parse\('(.*)'\)")
+
+def grain_info_from_response(response):
+  """Get a grian info from counting.html, public.html or tutorial.html."""
+  content = response.content.decode('utf-8')
+  grain_info_json = grain_info_re.search(content).group(1)
+  grain_info_json = grain_info_json.replace("\\u0022", '"')
+  j = json.loads(grain_info_json)
+  return j
 
 @tag('integration')
 class GahCase(TestCase):
@@ -38,13 +47,13 @@ class GahCase(TestCase):
     return r
 
   def login_admin(self):
-    self.login('admin', 'admin_password')
+    return self.login('admin', 'admin_password')
 
   def login_super(self):
-    self.login('super', 'super_password')
+    return self.login('super', 'super_password')
 
   def login_counter(self):
-    self.login('counter', 'counter_password')
+    return self.login('counter', 'counter_password')
 
   def logout(self):
     self.client.post(reverse('logout'))
@@ -83,11 +92,20 @@ class CountingCase(GahCase):
   def perform_guest_count(self, grain_counts):
     self.client.get(reverse('guest_counting'))
     self.complete_tutorial()
-    for ((sample, grain), count) in grain_counts.items():
-      self.count_grain(sample, grain, count)
-    self.logout()
+    grain_ids_seen = set()
+    for count in grain_counts:
+      res = self.client.get(reverse('guest_counting'))
+      self.assertEqual(res.status_code, 302)
+      resolved = resolve(res.url)
+      grain_ids_seen.add(resolved.kwargs["pk"])
+      self.assertEqual(resolved.url_name, 'count')
+      red = self.client.get(res.url)
+      j = grain_info_from_response(red)
+      self.assertIsNotNone(j, "No grains for counting")
+      self.count_grain(j["sample_id"], j["grain_num"], count)
 
   def get_total_track_count(self):
+    """Get a pair of track counts (including guest counts, excluding guest counts)."""
     r = self.client.post(
       reverse('getTableData'),
       { 'client_response': [
@@ -98,6 +116,7 @@ class CountingCase(GahCase):
     self.assertEqual(r.status_code, 200)
     j = json.loads(r.content)
     total = 0
+    total_exc_guest = 0
     for [project, sample, index, ft_type, track_count, user, datetime, area] in j['aaData']:
       total += track_count
     return total
@@ -116,20 +135,26 @@ class TestGuestCounts(CountingCase):
     self.login_super()
     base_super = self.get_total_track_count()
     self.logout()
-    s1count = 5
-    s2count = 6
+    # Do some counting as guest
+    scounts = [5, 6]
     guest_count = 5
     for i in range(guest_count):
-      self.perform_guest_count({ (1, 1): s1count, (2, 1): s2count })
+      self.perform_guest_count(scounts)
+    # count admin's own
+    acounts = [7, 6, 4]
+    for ac in acounts:
+      self.count_grain(1, 1, ac)
+    self.logout()
     self.login_admin()
-    total = self.get_total_track_count()
-    # should get the results from sample 1 which is owned by admin
-    self.assertEqual(total, base_admin + guest_count * s1count)
+    # get the results from sample 1 which is owned by admin
+    total_sample1 = self.get_total_track_count()
     self.logout()
     self.login_super()
-    total = self.get_total_track_count()
     # should get the results from all samples
-    self.assertEqual(total, base_super + guest_count * (s1count + s2count))
+    total_sample2 = self.get_total_track_count()
+    self.assertEqual(total_sample2, base_super + guest_count * sum(scounts) + sum(acounts))
+    self.assertLess(base_admin + sum(acounts), total_sample1)
+    self.assertLess(total_sample1, base_admin + sum(acounts) + guest_count * sum(scounts))
 
 
 class TestCountJsonDownload(CountingCase):
@@ -372,10 +397,7 @@ class TutorialPageCase(GahCase):
 
   def get_tutorial_page_grain_info(self, pk):
     r = self.client.get(reverse('tutorial_page', kwargs={'pk': pk}))
-    content = r.content.decode('utf-8')
-    grain_info_json = re.search(r"grain_info:\s*JSON.parse\('(.*)'\)", content).group(1)
-    grain_info_json = grain_info_json.replace("\\u0022", '"')
-    return json.loads(grain_info_json)
+    return grain_info_from_response(r)
 
   def test_adding_count_does_not_change_tutorial(self):
     self.login_counter()
@@ -483,7 +505,7 @@ class PublicPageCase(GahCase):
       reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
     )
     self.assertEqual(r.status_code, 200)
-    j = self.get_grain_info(r)
+    j = grain_info_from_response(r)
     latlngs = j['marker_latlngs']
     # There are three points; one is outside the ROI, one is in the hole
     self.assertEqual(len(latlngs), 1)
@@ -493,17 +515,11 @@ class PublicPageCase(GahCase):
       reverse('public_sample', kwargs={ 'sample': 1, 'grain': 1 })
     )
     self.assertEqual(r.status_code, 200)
-    j = self.get_grain_info(r)
+    j = grain_info_from_response(r)
     latlngs = j['marker_latlngs']
     # Now we should see them all
     self.assertEqual(len(latlngs), 3)
 
-  def get_grain_info(self, response):
-      content = response.content.decode('utf-8')
-      grain_info_json = re.search(r"grain_info:\s*JSON.parse\('(.*)'\)", content).group(1)
-      grain_info_json = grain_info_json.replace("\\u0022", '"')
-      j = json.loads(grain_info_json)
-      return j
 
 class GroupsTestCaseBase(GahCase):
   fixtures = [

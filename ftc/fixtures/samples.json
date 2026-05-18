@@ -8,6 +8,7 @@
             "sample_property": "T",
             "priority": 5,
             "min_contributor_num": 10,
+            "public": true,
             "completed": false
         }
     },
@@ -20,6 +21,7 @@
             "sample_property": "T",
             "priority": 10,
             "min_contributor_num": 4,
+            "public": true,
             "completed": false
         }
     }
