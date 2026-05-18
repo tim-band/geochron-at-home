@@ -125,7 +125,7 @@ class SampleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sample
         fields = ['id', 'sample_name', 'in_project', 'sample_property',
-            'priority', 'min_contributor_num', 'completed']
+            'priority', 'min_contributor_num', 'completed', 'public']
 
     completed = serializers.BooleanField(required=False, read_only=True)
     in_project = ProjectField()

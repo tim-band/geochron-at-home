@@ -1,0 +1,28 @@
+[
+    {
+        "model": "ftc.sample",
+        "pk": 1,
+        "fields": {
+            "sample_name": "adm_samp",
+            "in_project": 1,
+            "sample_property": "T",
+            "priority": 5,
+            "min_contributor_num": 10,
+            "public": false,
+            "completed": false
+        }
+    },
+    {
+        "model": "ftc.sample",
+        "pk": 2,
+        "fields": {
+            "sample_name": "counter_samp",
+            "in_project": 2,
+            "sample_property": "T",
+            "priority": 10,
+            "min_contributor_num": 4,
+            "public": false,
+            "completed": false
+        }
+    }
+]

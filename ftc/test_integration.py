@@ -430,11 +430,20 @@ class TutorialPageCase(GahCase):
     self.assertEqual(len(grain_info["points"]), 3)
 
 class PublicPageCase(GahCase):
+  """
+  Checks for access to certain aspects of sample 1.
+
+  Sample 1 is owned by admin, so these aspects
+  should be visible to super (as superuser) and admin
+  (as the owner but not superuser) but not to
+  counter or an unauthenticated user unless the
+  sample is made public.
+  """
   fixtures = [
     'essential.json',
     'users.json',
     'projects.json',
-    'samples.json',
+    'samples_private.json',
     'grains.json',
     'results.json',
     'results_analyst.json',
@@ -442,12 +451,6 @@ class PublicPageCase(GahCase):
     'grain1_region.json',
     'grain1_region_hole.json'
   ]
-  # Checks for access to certain aspects of sample 1.
-  # Sample 1 is owned by admin, so these aspects
-  # should be visible to super (as superuser) and admin
-  # (as the owner but not superuser) but not to
-  # counter or an unauthenticated user unless the
-  # sample is made public.
   def run_publicness(self, gets):
     sample_pk = 1
     self.logout()
