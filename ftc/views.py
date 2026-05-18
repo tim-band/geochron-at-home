@@ -1,3 +1,5 @@
+from typing import Any
+
 from django.shortcuts import render, get_object_or_404
 from django.db import transaction
 from django.db.models import Exists, OuterRef, Q, Subquery, Prefetch
@@ -193,7 +195,14 @@ class SampleCreateView(ParentCreatorOrSuperuserMixin, CreateView):
     model = Sample
     parent = Project
     template_name = "ftc/sample_create.html"
-    fields = ['sample_name', 'sample_property', 'priority', 'min_contributor_num', 'completed']
+    fields = [
+        'sample_name',
+        'sample_property',
+        'priority',
+        'min_contributor_num',
+        'completed',
+        'public',
+    ]
 
     def form_valid(self, form):
         form.instance.in_project = self.parent_object
@@ -712,9 +721,10 @@ def grainResult(request, result_id):
     if not request.user.is_authenticated and not result.grain.sample.public:
         raise PermissionDenied('not a public grain')
     ctx = get_grain_info(
-        User.objects.get(username__exact='guest'),
+        result.worker,
         result.grain.pk,
         'S',
+        result.analyst,
         specific=RoiSpecificity.SPECIFIC_IF_AVAILABLE,
         result=result,
     )
@@ -1024,9 +1034,16 @@ def add_grain_info_markers(info, grain, ft_type, worker, analyst, regions: Regio
         objects = objects.filter(analyst=analyst)
     save = objects.order_by('result').first()
     if save:
-        info['marker_latlngs'] = save.get_latlngs_within_roi(regions)
-        info['points'] = save.points()
-        info['lengths'] = save.contained_tracks_latlngs
+        add_grain_info_markers_from_ftn(info, save, regions)
+
+def add_grain_info_markers_from_ftn(
+    info: dict[str, Any],
+    save: FissionTrackNumbering,
+    regions: RegionOfInterest,
+) -> None:
+    info['marker_latlngs'] = save.get_latlngs_within_roi(regions)
+    info['points'] = save.points()
+    info['lengths'] = save.contained_tracks_latlngs
 
 class RoiSpecificity(enum.Enum):
     GENERIC = 0
@@ -1085,7 +1102,11 @@ def get_grain_info(
         'indices': indices_list,
         'rois': rois
     }
-    add_grain_info_markers(info, grain, ft_type, user, analyst, regions)
+    ftn = kwargs.get("result", None)
+    if ftn:
+        add_grain_info_markers_from_ftn(info, ftn, regions)
+    else:
+        add_grain_info_markers(info, grain, ft_type, user, analyst, regions)
     return {
         'grain_info': json.dumps(info),
         'sample_id': the_sample.id,

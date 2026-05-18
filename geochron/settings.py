@@ -75,7 +75,10 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
-    'EXCEPTION_HANDLER': 'ftc.apiviews.explicit_exception_handler'
+    'EXCEPTION_HANDLER': 'ftc.apiviews.explicit_exception_handler',
+    'DEFAULT_THROTTLE_RATES': {
+        'burst': '100/s',
+    },
 }
 
 # Application definition

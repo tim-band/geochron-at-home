@@ -110,7 +110,8 @@
       "sample_property": "T",
       "priority": 1,
       "min_contributor_num": 1,
-      "completed": false
+      "completed": false,
+      "public": true
     }
   },
   {

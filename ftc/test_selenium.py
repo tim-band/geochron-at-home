@@ -12,6 +12,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.remote.webdriver import WebDriver
 import glob
 import inspect
+import logging
 import os
 import re
 import shutil
@@ -245,6 +246,10 @@ class ConfirmPage(BasePage):
 
 
 class SignInPage(BasePage):
+    def __init__(self, *args, **kwargs):
+        self.logger = logging.getLogger("SignInPage")
+        super().__init__(*args, **kwargs)
+
     def go(self):
         self.get(self.url + "/accounts/login")
         return self
@@ -257,7 +262,18 @@ class SignInPage(BasePage):
         self.find_by_css('input[name="login"]').send_keys(user.identity)
         self.find_by_css('input[name="password"]').send_keys(user.password)
         self.click_by_css('.btn-primary')
+        self.find_by_css(".alert-success")
         return ProfilePage(self.driver, self.url)
+
+    def go_and_sign_in(self, user):
+        def do_sign_in():
+            self.go()
+            self.check()
+            return self.sign_in(user)
+        # A whole minute is required to recover from 429 Too Many Requests.
+        # A quicker way to avoid this is not to have all the integration tests
+        # running one after the other by using --shuffle.
+        return retrying(3, do_sign_in, 60)
 
 
 class TutorialPage(BasePage):
@@ -701,13 +717,14 @@ class ProjectsPage(BasePage):
 
 
 class SampleCreatePage(BasePage):
-    def create(self, name, property_, priority, min_contributor_num, completed):
+    def create(self, name, property_, priority, min_contributor_num, completed, public):
         self.fill_form({
             'sample_name': name,
             'sample_property': property_,
             'priority': priority,
             'min_contributor_num': min_contributor_num,
-            'completed': completed
+            'completed': completed,
+            'public': public,
         })
         self.submit()
         return SamplePage(self.driver, self.url)
@@ -786,12 +803,13 @@ class SampleEditPage(BasePage):
         self.click_by_id('cancel')
         return SamplePage(self.driver, self.url)
 
-    def update(self, name, property_, priority, contributor, completed):
+    def update(self, name, property_, priority, contributor, completed, public):
         self.fill_form({
             'sample_name': name,
             'sample_property': property_,
             'min_contributor_num': contributor,
-            'completed': completed
+            'completed': completed,
+            'public': public,
         })
         self.submit()
         return SamplePage(self.driver, self.url)
@@ -1180,7 +1198,7 @@ class WebUploader:
         time.sleep(0.3)  # attempting to avoid 429 (too many requests) errors
         edit_projects = navbar.go_edit_projects()
         project_page = edit_projects.create_project().create('p1', 'description', 1, False)
-        sample_page = project_page.create_sample().create('s1', 'T', 1, 1, False)
+        sample_page = project_page.create_sample().create('s1', 'T', 1, 1, False, True)
         grain_detail_page = sample_page.create_grain().create(files)
         grain_page = grain_detail_page.go_zstack().edit()
         grain_page.drag_marker(0, 0, 0.01, 0.01)
@@ -1223,7 +1241,7 @@ class SeleniumTests(LiveServerTestCase):
             self.driver = webdriver.Chrome()
 
     def sign_in(self, user):
-        return SignInPage(self.driver, self.live_server_url).go().sign_in(user)
+        return SignInPage(self.driver, self.live_server_url).go_and_sign_in(user)
 
     def sign_out(self):
         pp = self.go_profile_page()
@@ -1369,7 +1387,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
             20,
             False
         )
-        sample = project.create_sample().create("Sample-1", "T", 20, 99, False)
+        sample = project.create_sample().create("Sample-1", "T", 20, 99, False, True)
         grain = sample.create_grain().create([
             self.grain_file_name(1),
             self.mica_file_name(1),
@@ -1511,7 +1529,7 @@ class FromCleanWithTutorialsDone(SeleniumTests):
             20,
             False
         )
-        sample = project.create_sample().create("SS2", "T", 20, 99, False)
+        sample = project.create_sample().create("SS2", "T", 20, 99, False, True)
         sample_pk = sample.pk()
         explicit_index = 54
         grain = sample.create_grain().create([
